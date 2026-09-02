@@ -1103,6 +1103,7 @@
 
             // حالات مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center)
             const [showRestoreCenterModal, setShowRestoreCenterModal] = useState(false);
+            const [showSessionsModal, setShowSessionsModal] = useState(false);
             const [availableSnapshots, setAvailableSnapshots] = useState([]);
             const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
             const [selectedSnapshotPreview, setSelectedSnapshotPreview] = useState(null);
@@ -1690,11 +1691,7 @@
             // استعادة وتثبيت لقطة تاريخية معتمدة (Point-in-Time Restore)
             const handleRestoreSnapshot = async (snapshot) => {
                 if (currentUserRole !== 'admin') {
-                    alert('⛔ عذراً، ميزة استعادة البيانات مخصصة حصرياً لمدير النظام 👑');
-                    return;
-                }
-                if (currentUserRole !== 'admin') {
-                    alert('❌ رمز الدخول غير صحيح! تم إلغاء عملية الاستعادة للأمان.');
+                    alert('⛔ الاستعادة مخصصة حصرياً لمدير النظام 👑\n\nيمكنك استعراض اللقطات وتنزيلها كملف JSON، أما اعتماد لقطة كقاعدة حية فيبدّل بيانات الشعبة كلها ويبقى بيد المدير.');
                     return;
                 }
                 const confirmMsg = `⚠️ تأكيد نهائي لاستعادة بيانات يوم: ${snapshot.date}\n\nسيتم تطبيق نسخة هذا اليوم (التي تحتوي على ${snapshot.staffCount} موظف و ${snapshot.overridesCount} أيام مواقف) واعتمادها كقاعدة حية.\n\nهل تريد المتابعة؟`;
@@ -4317,11 +4314,12 @@
                     alert('⛔ عذراً، ليس لديك صلاحية حذف منتسبين من الملاك العام!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
                     return;
                 }
-                if (currentUserRole !== 'admin') {
-                    alert('❌ الرمز السري غير صحيح! تم إلغاء عملية الحذف للحماية.');
+                if (currentUserRole !== 'admin' && currentUserRole !== 'manager') {
+                    alert('⛔ حذف منتسب من الملاك مخصص لمدير النظام والإداري.');
                     return;
                 }
-                
+                logAuditEvent('delete_employee:' + (editingEmployee.jobNumber || editingEmployee.id), currentUserName);
+
                 // تأكيد مزدوج للحذف
                 const firstName = editingEmployee.name.split(' ')[0];
                 const confirmMsg1 = `⚠️ هل أنت متأكد من حذف الموظف؟
@@ -5290,10 +5288,15 @@
             };
 
 
-            
+
+            const liveSessionUids = Object.keys(activeSessions || {}).filter(uid => {
+                const sess = activeSessions[uid];
+                return sess && sess.lastSeen && (Date.now() - sess.lastSeen < 15000);
+            });
+
             return (
                 <div className="min-h-screen bg-gray-50">
-                    
+
                     {/* Splash Screen - نافذة ترحيبية متحركة */}
                     {showWelcome && (
                         <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center z-50 overflow-auto">
@@ -5488,18 +5491,30 @@
                                                 <span>👥</span>
                                                 <span>إدارة الحسابات والمستخدمين</span>
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    fetchAvailableSnapshots();
-                                                    setShowRestoreCenterModal(true);
-                                                }}
-                                                className="px-3.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
-                                                title="مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية"
-                                            >
-                                                <span>🛡️</span>
-                                                <span>الأرشيف والاستعادة</span>
-                                            </button>
                                         </>
+                                    )}
+                                    {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
+                                        <button
+                                            onClick={() => {
+                                                fetchAvailableSnapshots();
+                                                setShowRestoreCenterModal(true);
+                                            }}
+                                            className="px-3.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
+                                            title={currentUserRole === 'admin' ? "مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية" : "استعراض وتنزيل اللقطات اليومية (الاستعادة خاصة بمدير النظام)"}
+                                        >
+                                            <span>🛡️</span>
+                                            <span>{currentUserRole === 'admin' ? 'الأرشيف والاستعادة' : 'الأرشيف'}</span>
+                                        </button>
+                                    )}
+                                    {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
+                                        <button
+                                            onClick={() => setShowSessionsModal(true)}
+                                            className="px-3.5 py-1 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
+                                            title="عرض الجلسات النشطة وفك أي جلسة عالقة"
+                                        >
+                                            <span>🔓</span>
+                                            <span>الجلسات النشطة</span>
+                                        </button>
                                     )}
                                     <button
                                         onClick={handleLogout}
@@ -6319,6 +6334,36 @@
                 </div>
             )}
 
+            {showSessionsModal && (
+                <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[120] flex items-center justify-center p-4 no-print">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
+                        <div className="bg-gradient-to-r from-sky-700 to-blue-900 p-4 text-white flex justify-between items-center">
+                            <h3 className="text-base font-black flex items-center gap-2"><span>🔓</span><span>الجلسات النشطة</span></h3>
+                            <button onClick={() => setShowSessionsModal(false)} className="bg-white/10 hover:bg-white/20 w-8 h-8 rounded-full font-bold transition">✕</button>
+                        </div>
+                        <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+                            {liveSessionUids.map(uid => (
+                                <div key={uid} className="flex items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                                    <div>
+                                        <div className="font-black text-sm text-slate-900">{activeSessions[uid].name}</div>
+                                        <div className="text-[11px] text-slate-500">{activeSessions[uid].role}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleForceEvictSession(uid, activeSessions[uid].name)}
+                                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black transition"
+                                    >
+                                        🔓 فك القفل
+                                    </button>
+                                </div>
+                            ))}
+                            {liveSessionUids.length === 0 && (
+                                <div className="text-center text-slate-500 text-sm font-bold py-6">لا توجد جلسات نشطة حالياً.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* نافذة مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center Modal) */}
             {showRestoreCenterModal && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
@@ -6407,16 +6452,23 @@
                                         >
                                             <span>📥 تنزيل ملف النسخة (JSON)</span>
                                         </button>
-                                        <button
-                                            onClick={() => handleRestoreSnapshot(selectedSnapshotPreview)}
-                                            className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                                        >
-                                            <span>⏪ اعتماد واستعادة هذه النسخة كقاعدة حية</span>
-                                        </button>
+                                        {currentUserRole === 'admin' && (
+                                            <button
+                                                onClick={() => handleRestoreSnapshot(selectedSnapshotPreview)}
+                                                className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                            >
+                                                <span>⏪ اعتماد واستعادة هذه النسخة كقاعدة حية</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
+                                {currentUserRole !== 'admin' && (
+                                    <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs font-bold text-amber-900">
+                                        🛡️ يمكنك استعراض اللقطات وتنزيلها. اعتماد لقطة كقاعدة حية يبدّل بيانات الشعبة كلها ويبقى بيد مدير النظام.
+                                    </div>
+                                )}
                             {/* قائمة اللقطات المتاحة */}
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center px-1">
@@ -6496,14 +6548,16 @@
                                                                         >
                                                                             📥
                                                                         </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleRestoreSnapshot(snap)}
-                                                                            className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-[11px] font-black shadow-sm transition cursor-pointer active:scale-95"
-                                                                            title="استعادة واعتماد هذه النسخة"
-                                                                        >
-                                                                            ⏪ استعادة
-                                                                        </button>
+                                                                        {currentUserRole === 'admin' && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRestoreSnapshot(snap)}
+                                                                                className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-[11px] font-black shadow-sm transition cursor-pointer active:scale-95"
+                                                                                title="استعادة واعتماد هذه النسخة"
+                                                                            >
+                                                                                ⏪ استعادة
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -8853,10 +8907,11 @@
                                                                     {view === 'all' && (
                                                                         <button
                                                                             onClick={() => {
-                                                                                if (currentUserRole !== 'admin') {
-                                                                                    alert('❌ الرمز السري غير صحيح! تم إلغاء عملية الحذف للحماية.');
+                                                                                if (currentUserRole !== 'admin' && currentUserRole !== 'manager') {
+                                                                                    alert('⛔ حذف منتسب من الملاك مخصص لمدير النظام والإداري.');
                                                                                     return;
                                                                                 }
+                                                                                logAuditEvent('delete_employee:' + (s.jobNumber || s.id), currentUserName);
                                                                                 const firstName = s.name.split(' ')[0];
                                                                                 if (confirm(`⚠️ هل أنت متأكد من حذف الموظف؟\n\nالموظف: ${s.name}\nالرقم الوظيفي: ${s.jobNumber}\n\n⚠️ هذه العملية لا يمكن التراجع عنها!`)) {
                                                                                     const userInput = prompt(`⚠️⚠️ تأكيد نهائي ⚠️⚠️\n\nأنت على وشك حذف: ${s.name}\n\nاكتب اسم الموظف الأول (${firstName}) للتأكيد:`);
