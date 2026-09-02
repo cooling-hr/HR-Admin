@@ -1089,8 +1089,10 @@
                         body: JSON.stringify({
                             uid: session.uid,
                             displayName: displayName || '',
-                            action,
-                            timestamp: new Date().toISOString()
+                            // الحقول الأربعة وأنواعها مقيّدة بشرط .validate على الخادم:
+                            // uid يجب أن يساوي auth.uid، والطابع الزمني رقم قريب من وقت الخادم
+                            action: String(action).slice(0, 200),
+                            timestamp: Date.now()
                         })
                     });
                 } catch (e) {}
