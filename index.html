@@ -1163,7 +1163,7 @@
                 // لا يُطبَّق على حسابات الاطلاع: لا تكتب شيئاً، ويجوز استعمالها من عدة أجهزة معاً
                 const enforcesSessionLock = targetUser.role !== 'viewer';
                 if (enforcesSessionLock) try {
-                    const sessRes = await fetch(`${FIREBASE_SESSIONS_URL}/${targetUser.id}.json?t=${Date.now()}`);
+                    const sessRes = await cloudFetch(`${FIREBASE_SESSIONS_URL}/${targetUser.id}.json?t=${Date.now()}`);
                     if (sessRes.ok) {
                         const sessData = await sessRes.json();
                         if (sessData && sessData.sessionId && sessData.lastSeen) {
@@ -1236,7 +1236,7 @@
 
                 const heartbeat = async () => {
                     try {
-                        const checkRes = await fetch(`${FIREBASE_SESSIONS_URL}/${uid}.json?t=${Date.now()}`);
+                        const checkRes = await cloudFetch(`${FIREBASE_SESSIONS_URL}/${uid}.json?t=${Date.now()}`);
                         if (checkRes.ok) {
                             const sessData = await checkRes.json();
                             if (sessData && sessData.sessionId && sessData.sessionId !== sid) {
@@ -1285,7 +1285,7 @@
                 if (!showUserManagementModal) return;
                 const fetchSessions = async () => {
                     try {
-                        const res = await fetch(`${FIREBASE_SESSIONS_URL}.json?t=${Date.now()}`);
+                        const res = await cloudFetch(`${FIREBASE_SESSIONS_URL}.json?t=${Date.now()}`);
                         if (res.ok) {
                             const data = await res.json();
                             setActiveSessions(data || {});
