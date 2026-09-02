@@ -1309,6 +1309,12 @@
                 }
             };
 
+            // حذف آخر مدير أو تنزيل رتبته يقفل إدارة الحسابات نهائياً — لا مخرج إلا يدوياً من لوحة Firebase
+            const isLastActiveAdmin = (userId) => {
+                const activeAdmins = systemUsers.filter(u => u.role === 'admin' && u.active !== false);
+                return activeAdmins.length === 1 && activeAdmins[0].id === userId;
+            };
+
             const handleSaveUser = (e) => {
                 if (e) e.preventDefault();
                 const name = userFormName.trim();
@@ -1325,6 +1331,11 @@
                 const existingWithUid = systemUsers.find(u => String(u.uid || '').trim() === targetUid && u.id !== editingUserId);
                 if (existingWithUid) {
                     alert(`⚠️ هذا المعرّف (UID) مسند بالفعل للمستخدم (${existingWithUid.name})! كل حساب Firebase يُسند لمستخدم واحد فقط.`);
+                    return;
+                }
+
+                if (editingUserId && userFormRole !== 'admin' && isLastActiveAdmin(editingUserId)) {
+                    alert('⛔ لا يمكن تنزيل رتبة آخر مدير نظام نشط.\n\nلو فقد هذا الحساب صفة المدير، لن يستطيع أحد إسناد الأدوار بعدها، ولن يُفتح النظام إلا بتدخل يدوي من لوحة Firebase.\n\nعيّن مديراً آخر أولاً، ثم أعد المحاولة.');
                     return;
                 }
 
@@ -1436,6 +1447,10 @@
             };
 
             const handleDeleteUser = (userId) => {
+                if (isLastActiveAdmin(userId)) {
+                    alert('⛔ لا يمكن حذف آخر مدير نظام نشط.\n\nعيّن مديراً آخر أولاً، ثم أعد المحاولة.');
+                    return;
+                }
                 const userToDelete = systemUsers.find(u => u.id === userId);
                 if (!userToDelete) return;
                 if (systemUsers.filter(u => u.role === 'admin' && u.active !== false).length <= 1 && userToDelete.role === 'admin') {
@@ -1467,6 +1482,10 @@
             };
 
             const handleToggleUserActive = (userId) => {
+                if (isLastActiveAdmin(userId)) {
+                    alert('⛔ لا يمكن تعطيل آخر مدير نظام نشط.\n\nعيّن مديراً آخر أولاً، ثم أعد المحاولة.');
+                    return;
+                }
                 const userToToggle = systemUsers.find(u => u.id === userId);
                 if (!userToToggle) return;
                 if (userToToggle.role === 'admin' && userToToggle.active !== false && systemUsers.filter(u => u.role === 'admin' && u.active !== false).length <= 1) {
