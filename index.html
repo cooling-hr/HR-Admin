@@ -1524,7 +1524,7 @@
                 isSyncing: false
             });
                                     // ===== محرك المزامنة السحابية الحية الرسمي (Google Firebase Realtime DB) =====
-            const [cloudSyncStatus, setCloudSyncStatus] = useState({ connected: true, syncing: false, lastSync: null });
+            const [cloudSyncStatus, setCloudSyncStatus] = useState({ connected: true, syncing: false, lastSync: null, error: null });
             const lastCloudTimeRef = React.useRef(null);
             const isInitialCloudLoadCompleteRef = React.useRef(false);
 
@@ -1604,8 +1604,17 @@
                         body: JSON.stringify(dataPayload)
                     });
                     if (res.ok) {
-                        setCloudSyncStatus({ connected: true, syncing: false, lastSync: new Date().toLocaleTimeString('ar-IQ') });
+                        setCloudSyncStatus({ connected: true, syncing: false, lastSync: new Date().toLocaleTimeString('ar-IQ'), error: null });
                         logAuditEvent('save_system_bundle', currentUserName);
+                    } else if (res.status === 401) {
+                        // التوكن منتهٍ وتعذّر تجديده — الاستمرار يعني العمل على نسخة لا تُحفظ
+                        setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'انتهت جلستك ولم يُحفظ آخر تعديل. يرجى تسجيل الدخول من جديد.' });
+                        signOutFirebase();
+                        setCurrentUserRole(null);
+                        setShowLoginModal(true);
+                        alert('⛔ انتهت صلاحية جلستك ولم يصل آخر حفظ إلى السحابة.\n\nسجّل الدخول من جديد ثم أعد التعديل.');
+                    } else {
+                        setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: `لم يصل آخر حفظ إلى السحابة (رمز ${res.status}). تعديلاتك محفوظة على هذا الجهاز فقط.` });
                     }
 
                     // 3. حفظ لقطة أرشيفية تلقائية يومية غير قابلة للإلغاء في الأرشيف السحابي (Immutable Daily Snapshot)
@@ -1638,6 +1647,7 @@
                     } catch(snapErr) {}
                 } catch (err) {
                     console.warn("Could not push to Firebase Cloud:", err);
+                    setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الوصول إلى السحابة. تعديلاتك محفوظة على هذا الجهاز فقط وستُرفع عند عودة الاتصال.' });
                 }
             };
 
@@ -5461,6 +5471,14 @@
                                 title="اضغط لعرض تفاصيل المزامنة ورابط أجهزة الشعبة"
                             >
                                 <span className="relative flex h-2.5 w-2.5">
+                                    {cloudSyncStatus && cloudSyncStatus.error && (
+                                        <span
+                                            className="px-2.5 py-1 rounded-full text-[10px] font-black bg-red-600 text-white border border-red-300 shadow animate-pulse cursor-help"
+                                            title={cloudSyncStatus.error}
+                                        >
+                                            ⚠️ الحفظ السحابي متوقف
+                                        </span>
+                                    )}
                                     {(typeof cloudSyncStatus !== 'undefined' && cloudSyncStatus && cloudSyncStatus.connected) || syncStatus.connected ? (
                                         <>
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
