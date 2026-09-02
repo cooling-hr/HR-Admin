@@ -2,6 +2,7 @@
 // and compiles it with the vendored Babel standalone build. Exits non-zero
 // on a syntax error. Usage: node scratch/check_babel_block.js <file.html>
 const fs = require('fs');
+const path = require('path');
 const vm = require('vm');
 
 const target = process.argv[2];
@@ -12,7 +13,7 @@ const blocks = [...html.matchAll(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/s
 if (!blocks.length) { console.error('no babel block found in ' + target); process.exit(2); }
 const jsx = blocks.reduce((a, b) => (b.length > a.length ? b : a), '');
 
-const babelCode = fs.readFileSync('scratch/babel.min.js', 'utf8');
+const babelCode = fs.readFileSync(path.join(__dirname, 'babel.min.js'), 'utf8');
 const sandbox = { window: {}, exports: {}, console: { log(){}, warn(){}, error(){} } };
 vm.createContext(sandbox);
 vm.runInContext(babelCode, sandbox);

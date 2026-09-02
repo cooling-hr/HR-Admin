@@ -971,6 +971,11 @@
             const currentUserIdRef = React.useRef(null);
             const currentUserPriorityRef = React.useRef(99);
 
+            // تُعلن قبل أي Hook يقرأها (مصفوفة اعتماديات useMemo تُقيَّم فوراً عند الاستدعاء)
+            const [currentUserRole, setCurrentUserRole] = useState(null);
+            const [currentUserPermissions, setCurrentUserPermissions] = useState({});
+            const [activeSessions, setActiveSessions] = useState({});
+
             // قفل التحرير بين الأقران: من يحمل نفس الصلاحية وأولوية أصغر يحتفظ بالتعديل
             // المشرفون (admin/manager) خارج المزاحمة — لا يُخفَّضون ولا يُخفِّضون غيرهم،
             // وإلا لأقفل تبويبٌ مفتوح على مكتب المدير طوال اليوم عمل المُدخلين بلا سبب.
@@ -1018,8 +1023,6 @@
                 }
             };
 
-            const [currentUserRole, setCurrentUserRole] = useState(null);
-            const [currentUserPermissions, setCurrentUserPermissions] = useState({});
             const [pendingDeletionRequest, setPendingDeletionRequest] = useState(() => {
                 const saved = safeStorage.getItem('pendingDeletionRequest');
                 return saved ? JSON.parse(saved) : null;
@@ -1138,7 +1141,6 @@
                 } catch (e) {}
             };
 
-            const [activeSessions, setActiveSessions] = useState({});
             const [isCheckingLogin, setIsCheckingLogin] = useState(false);
 
             // حالات مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center)
