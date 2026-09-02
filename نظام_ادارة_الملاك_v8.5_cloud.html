@@ -1133,6 +1133,8 @@
                 try {
                     const session = getStoredAuth();
                     if (!session) return;
+                    // المستعرض لا يكتب شيئاً، ومحاولة التسجيل ترتد بخطأ صلاحيات فيظهر إنذار كاذب دائم
+                    if (currentUserRole === 'viewer') return;
                     const res = await cloudFetch(`${FIREBASE_AUDIT_LOG_URL}.json`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1472,7 +1474,7 @@
                 setUserFormName('');
                 setUserFormRole('operator');
                 setUserFormUid('');
-                setUserFormPriority('1');
+                setUserFormPriority('99');
                 setUserFormPerms({
                     dailyReport: true,
                     staffMaster: false,
@@ -1512,7 +1514,7 @@
                 setUserFormName('');
                 setUserFormRole('operator');
                 setUserFormUid('');
-                setUserFormPriority('1');
+                setUserFormPriority('99');
                 setUserFormPerms({
                     dailyReport: true,
                     staffMaster: false,
@@ -1642,6 +1644,7 @@
             const isInitialCloudLoadCompleteRef = React.useRef(false);
             // حارس عدم التداخل: فعلٌ واحد قد يغيّر حالتين فيُطلق دفعتين متزامنتين
             const isPushingRef = React.useRef(false);
+            const pendingPushRef = React.useRef(false);
             // بصمة آخر حمولة نعلم أنها على الخادم — تمنع إعادة بثّ ما استقبلناه للتو
             const lastSyncedSignatureRef = React.useRef(null);
             const CLOUD_SIGNATURE_KEYS = ['staffData', 'systemUsersList', 'officialHolidaysList', 'hourlyLeaveRecords', 'overtimeHoursRecords', 'dailyStatusOverrides', 'shiftAnchorDate', 'threeShiftAnchorSquad', 'twoShiftAnchorSquad', 'dataEntryOperator', 'overtimeSelectedIds', 'pendingDeletionRequest'];
@@ -1706,6 +1709,7 @@
                 }
                 // 3. حارس عدم التداخل: دفعتان متزامنتان تُكدّسان نافذتي تحذير وتُطفئان مؤشر المزامنة قبل الأوان
                 if (isPushingRef.current) {
+                    pendingPushRef.current = true;
                     return;
                 }
                 isPushingRef.current = true;
@@ -1808,6 +1812,10 @@
                     setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الوصول إلى السحابة. تعديلاتك محفوظة على هذا الجهاز فقط وستُرفع عند عودة الاتصال.' });
                 } finally {
                     isPushingRef.current = false;
+                    if (pendingPushRef.current) {
+                        pendingPushRef.current = false;
+                        setTimeout(() => pushDataToCloud(), 0);
+                    }
                 }
             };
 
