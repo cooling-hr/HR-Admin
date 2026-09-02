@@ -93,7 +93,7 @@
       ".indexOn": "timestamp",
       "$entryId": {
         ".write": "!data.exists() && newData.exists() && auth != null && root.child('roles').child(auth.uid).exists() && root.child('roles').child(auth.uid).child('role').val() !== 'viewer'",
-        ".validate": "newData.hasOnly(['uid','displayName','action','timestamp']) && newData.child('uid').val() === auth.uid && newData.child('timestamp').isNumber() && newData.child('timestamp').val() <= now + 60000 && newData.child('timestamp').val() >= now - 300000 && newData.child('action').isString() && newData.child('action').val().length <= 200"
+        ".validate": "newData.hasOnly(['uid','displayName','action','timestamp']) && newData.child('uid').val() === auth.uid && newData.child('timestamp').isNumber() && newData.child('timestamp').val() <= now + 300000 && newData.child('timestamp').val() >= now - 300000 && newData.child('action').isString() && newData.child('action').val().length <= 200"
       }
     }
   }
@@ -117,7 +117,7 @@
 شرط `.validate` يعالج ذلك:
 
 * `newData.child('uid').val() === auth.uid` — لا يستطيع أحد الكتابة باسم غيره. الخادم هو من يتحقق، لا الواجهة.
-* الطابع الزمني رقم يقارَن بـ `now` (وقت الخادم) ضمن نافذة من خمس دقائق ماضية إلى دقيقة قادمة — نافذة واسعة بما يكفي لاختلاف ساعات الأجهزة، وضيّقة بما يمنع التأريخ الرجعي.
+* الطابع الزمني رقم يقارَن بـ `now` (وقت الخادم) ضمن نافذة متناظرة من خمس دقائق ماضية إلى خمس دقائق قادمة — نافذة واسعة بما يكفي لاختلاف ساعات الأجهزة في الاتجاهين (ساعة مكتبية متقدّمة دقيقتين تكفي لرفض كل قيود ذلك الجهاز إلى الأبد)، وضيّقة بما يمنع التأريخ الرجعي.
 * `hasOnly` يحصر الحقول الأربعة، و`length <= 200` يمنع إغراق السجل بنصوص ضخمة.
 
 **أثره على الكود:** `logAuditEvent` يرسل اليوم `timestamp` كنص ISO؛ يصبح رقماً (`Date.now()`)، ويُنسَّق عند العرض. `displayName` يبقى للعرض فقط ولا يُعتد به، لأن `uid` هو الحقيقة المُثبَتة من الخادم.

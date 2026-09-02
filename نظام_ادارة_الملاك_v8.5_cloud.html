@@ -951,6 +951,7 @@
             const [userFormName, setUserFormName] = useState('');
             const [userFormRole, setUserFormRole] = useState('operator');
             const [userFormUid, setUserFormUid] = useState('');
+            const [userFormPriority, setUserFormPriority] = useState('99');
             const [userFormPerms, setUserFormPerms] = useState({
                 dailyReport: true,
                 staffMaster: false,
@@ -959,9 +960,54 @@
             });
 
             // دالة التحقق من صلاحية التعديل والمزامنة لتبويب معين (Can Edit & Sync Guard)
+            // نبضة داخلية: تُبقي فحص قِدَم الجلسات حياً حتى لو تعثّر الاستطلاع، فلا يعلق القفل
+            const [peerLockTick, setPeerLockTick] = useState(0);
+            React.useEffect(() => {
+                const t = setInterval(() => setPeerLockTick(v => v + 1), 5000);
+                return () => clearInterval(t);
+            }, []);
+
+            const currentSessionIdRef = React.useRef(null);
+            const currentUserIdRef = React.useRef(null);
+            const currentUserPriorityRef = React.useRef(99);
+
+            // تُعلن قبل أي Hook يقرأها (مصفوفة اعتماديات useMemo تُقيَّم فوراً عند الاستدعاء)
+            const [currentUserRole, setCurrentUserRole] = useState(null);
+            const [currentUserPermissions, setCurrentUserPermissions] = useState({});
+            const [activeSessions, setActiveSessions] = useState({});
+
+            // قفل التحرير بين الأقران: من يحمل نفس الصلاحية وأولوية أصغر يحتفظ بالتعديل
+            // المشرفون (admin/manager) خارج المزاحمة — لا يُخفَّضون ولا يُخفِّضون غيرهم،
+            // وإلا لأقفل تبويبٌ مفتوح على مكتب المدير طوال اليوم عمل المُدخلين بلا سبب.
+            const lockedSections = React.useMemo(() => {
+                const locked = {};
+                if (currentUserRole !== 'operator') return locked;
+                const myUid = currentUserIdRef.current;
+                const myPriority = currentUserPriorityRef.current;
+                Object.keys(activeSessions || {}).forEach(uid => {
+                    const sess = activeSessions[uid];
+                    if (!sess || uid === myUid) return;
+                    if (sess.role !== 'operator') return;
+                    if (!sess.lastSeen || (Date.now() - sess.lastSeen) >= 15000) return;
+                    const theirPriority = sess.editPriority || 99;
+                    if (theirPriority >= myPriority) return;
+                    // نفس احتياطي canEdit: حساب قديم بلا صلاحيات مخزّنة يملك الموقف اليومي ضمناً
+                    const theirPerms = (sess.permissions && Object.keys(sess.permissions).length > 0) ? sess.permissions : { dailyReport: true };
+                    const myPerms = (currentUserPermissions && Object.keys(currentUserPermissions).length > 0) ? currentUserPermissions : { dailyReport: true };
+                    Object.keys(theirPerms).forEach(section => {
+                        if (theirPerms[section] && myPerms[section]) {
+                            locked[section] = sess.name || 'زميل';
+                        }
+                    });
+                });
+                return locked;
+            }, [activeSessions, currentUserRole, currentUserPermissions, peerLockTick]);
+
             const canEdit = (section) => {
-                if (currentUserRole === 'admin') return true;
+                // الأدمن والإداري يملكان كل الأقسام؛ الفرق بينهما في الهوية والتعافي والتدمير لا في البيانات
+                if (currentUserRole === 'admin' || currentUserRole === 'manager') return true;
                 if (currentUserRole !== 'operator') return false;
+                if (lockedSections[section]) return false;
                 // الصلاحيات تأتي من عقدة roles/{uid} السحابية عند تسجيل الدخول (لا من قائمة PIN محلية)
                 if (!currentUserPermissions || Object.keys(currentUserPermissions).length === 0) {
                     return section === 'dailyReport';
@@ -977,8 +1023,6 @@
                 }
             };
 
-            const [currentUserRole, setCurrentUserRole] = useState(null);
-            const [currentUserPermissions, setCurrentUserPermissions] = useState({});
             const [pendingDeletionRequest, setPendingDeletionRequest] = useState(() => {
                 const saved = safeStorage.getItem('pendingDeletionRequest');
                 return saved ? JSON.parse(saved) : null;
@@ -1037,12 +1081,16 @@
                 return session;
             };
 
+            // عدّاد حقب المصادقة: كل خروج يبدأ حقبة جديدة، فتُهمَل نتيجة أي تجديد كان في الطريق
+            const authEpochRef = React.useRef(0);
+
             const refreshIdTokenIfNeeded = async () => {
                 const session = getStoredAuth();
                 if (!session) return null;
                 if (Date.now() < session.expiresAt - 5 * 60 * 1000) {
                     return session;
                 }
+                const epoch = authEpochRef.current;
                 try {
                     const res = await fetch(`${FIREBASE_TOKEN_URL}?key=${FIREBASE_WEB_API_KEY}`, {
                         method: 'POST',
@@ -1050,6 +1098,7 @@
                         body: `grant_type=refresh_token&refresh_token=${session.refreshToken}`
                     });
                     const data = await res.json();
+                    if (epoch !== authEpochRef.current) return null;
                     if (!res.ok) {
                         setStoredAuth(null);
                         return null;
@@ -1063,11 +1112,13 @@
                     setStoredAuth(refreshed);
                     return refreshed;
                 } catch (e) {
+                    if (epoch !== authEpochRef.current) return null;
                     return session;
                 }
             };
 
             const signOutFirebase = () => {
+                authEpochRef.current += 1;
                 setStoredAuth(null);
             };
 
@@ -1082,28 +1133,39 @@
                 try {
                     const session = getStoredAuth();
                     if (!session) return;
-                    await cloudFetch(`${FIREBASE_AUDIT_LOG_URL}.json`, {
+                    // المستعرض لا يكتب شيئاً، ومحاولة التسجيل ترتد بخطأ صلاحيات فيظهر إنذار كاذب دائم
+                    if (currentUserRole === 'viewer') return;
+                    const res = await cloudFetch(`${FIREBASE_AUDIT_LOG_URL}.json`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             uid: session.uid,
                             displayName: displayName || '',
-                            action,
-                            timestamp: new Date().toISOString()
+                            // الحقول الأربعة وأنواعها مقيّدة بشرط .validate على الخادم:
+                            // uid يجب أن يساوي auth.uid، والطابع الزمني رقم قريب من وقت الخادم
+                            action: String(action).slice(0, 200),
+                            timestamp: Date.now()
                         })
                     });
-                } catch (e) {}
+                    // قيدٌ مرفوض بلا إشعار يعني سجل تدقيق يبدو سليماً وهو فارغ. الرسالة تسمّي
+                    // التدقيق صراحةً كي لا تُقرأ على أنها فشل حفظ بيانات، وتذكر ساعة الجهاز لأن
+                    // شرط الخادم يقارن الطابع الزمني بوقته.
+                    if (!res.ok) {
+                        setCloudSyncStatus(prev => ({ ...prev, error: `تعذّر تسجيل قيد التدقيق (رمز ${res.status}). بياناتك تُحفظ، لكن سجل التدقيق لا يستقبل القيود — تحقّق من ساعة الجهاز ومن صلاحية حسابك.` }));
+                    }
+                } catch (e) {
+                    setCloudSyncStatus(prev => ({ ...prev, error: 'تعذّر تسجيل قيد التدقيق: لم يصل الطلب إلى السحابة. بياناتك تُحفظ، لكن سجل التدقيق ناقص.' }));
+                }
             };
 
-            const currentSessionIdRef = React.useRef(null);
-            const currentUserIdRef = React.useRef(null);
-            const [activeSessions, setActiveSessions] = useState({});
             const [isCheckingLogin, setIsCheckingLogin] = useState(false);
 
             // حالات مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center)
             const [showRestoreCenterModal, setShowRestoreCenterModal] = useState(false);
+            const [showSessionsModal, setShowSessionsModal] = useState(false);
             const [availableSnapshots, setAvailableSnapshots] = useState([]);
             const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
+            const [snapshotsError, setSnapshotsError] = useState(null);
             const [selectedSnapshotPreview, setSelectedSnapshotPreview] = useState(null);
             const [isRestoringSnapshot, setIsRestoringSnapshot] = useState(false);
 
@@ -1159,7 +1221,7 @@
                 // لا يُطبَّق على حسابات الاطلاع: لا تكتب شيئاً، ويجوز استعمالها من عدة أجهزة معاً
                 const enforcesSessionLock = targetUser.role !== 'viewer';
                 if (enforcesSessionLock) try {
-                    const sessRes = await fetch(`${FIREBASE_SESSIONS_URL}/${targetUser.id}.json?t=${Date.now()}`);
+                    const sessRes = await cloudFetch(`${FIREBASE_SESSIONS_URL}/${targetUser.id}.json?t=${Date.now()}`);
                     if (sessRes.ok) {
                         const sessData = await sessRes.json();
                         if (sessData && sessData.sessionId && sessData.lastSeen) {
@@ -1182,6 +1244,7 @@
                 const newSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 7);
                 currentSessionIdRef.current = newSessionId;
                 currentUserIdRef.current = targetUser.id;
+                currentUserPriorityRef.current = roleData.editPriority || 99;
 
                 if (enforcesSessionLock) try {
                     await cloudFetch(`${FIREBASE_SESSIONS_URL}/${targetUser.id}.json`, {
@@ -1192,6 +1255,8 @@
                             userId: targetUser.id,
                             name: targetUser.name,
                             role: targetUser.role,
+                            permissions: targetUser.permissions || {},
+                            editPriority: roleData.editPriority || 99,
                             lastSeen: Date.now()
                         })
                     });
@@ -1200,7 +1265,7 @@
                 setCurrentUserRole(targetUser.role);
                 setCurrentUserName(targetUser.name);
                 setCurrentUserPermissions(targetUser.permissions);
-                if (targetUser.role === 'operator' || targetUser.role === 'admin') {
+                if (targetUser.role === 'operator' || targetUser.role === 'manager' || targetUser.role === 'admin') {
                     setDataEntryOperator(targetUser.name.split('(')[0].trim());
                 }
                 logAuditEvent('login', targetUser.name);
@@ -1232,7 +1297,7 @@
 
                 const heartbeat = async () => {
                     try {
-                        const checkRes = await fetch(`${FIREBASE_SESSIONS_URL}/${uid}.json?t=${Date.now()}`);
+                        const checkRes = await cloudFetch(`${FIREBASE_SESSIONS_URL}/${uid}.json?t=${Date.now()}`);
                         if (checkRes.ok) {
                             const sessData = await checkRes.json();
                             if (sessData && sessData.sessionId && sessData.sessionId !== sid) {
@@ -1249,6 +1314,8 @@
                                 userId: uid,
                                 name: currentUserName,
                                 role: currentUserRole,
+                                permissions: currentUserPermissions || {},
+                                editPriority: currentUserPriorityRef.current,
                                 lastSeen: Date.now()
                             })
                         });
@@ -1276,12 +1343,12 @@
                 return () => window.removeEventListener('beforeunload', handleBeforeUnload);
             }, []);
 
-            // جلب حالة الجلسات النشطة للمستخدمين عند فتح شاشة إدارة المستخدمين
+            // استطلاع الجلسات النشطة لكل مستخدم مسجّل — يغذّي قفل التحرير بين الأقران وقائمة الجلسات
             React.useEffect(() => {
-                if (!showUserManagementModal) return;
+                if (!currentUserRole || currentUserRole === 'viewer') return;
                 const fetchSessions = async () => {
                     try {
-                        const res = await fetch(`${FIREBASE_SESSIONS_URL}.json?t=${Date.now()}`);
+                        const res = await cloudFetch(`${FIREBASE_SESSIONS_URL}.json?t=${Date.now()}`);
                         if (res.ok) {
                             const data = await res.json();
                             setActiveSessions(data || {});
@@ -1291,9 +1358,13 @@
                 fetchSessions();
                 const interval = setInterval(fetchSessions, 3000);
                 return () => clearInterval(interval);
-            }, [showUserManagementModal]);
+            }, [currentUserRole]);
 
             const handleForceEvictSession = async (userId, userName) => {
+                if (!userId) {
+                    alert('⛔ لا يمكن فك القفل: هذا الحساب غير مربوط بمعرّف Firebase (UID) بعد.');
+                    return;
+                }
                 if (!confirm(`⚠️ هل أنت متأكد من فك قفل وإنهاء جلسة المستخدم (${userName})؟\nسيتم تحرير الحساب فوراً ليتمكن من تسجيل الدخول من أي جهاز جديد.`)) return;
                 try {
                     await cloudFetch(`${FIREBASE_SESSIONS_URL}/${userId}.json`, { method: 'DELETE' });
@@ -1306,6 +1377,12 @@
                 } catch (err) {
                     alert('❌ خطأ في فك القفل: ' + err.message);
                 }
+            };
+
+            // حذف آخر مدير أو تنزيل رتبته يقفل إدارة الحسابات نهائياً — لا مخرج إلا يدوياً من لوحة Firebase
+            const isLastActiveAdmin = (userId) => {
+                const activeAdmins = systemUsers.filter(u => u.role === 'admin' && u.active !== false);
+                return activeAdmins.length === 1 && activeAdmins[0].id === userId;
             };
 
             const handleSaveUser = (e) => {
@@ -1327,15 +1404,23 @@
                     return;
                 }
 
+                if (editingUserId && userFormRole !== 'admin' && isLastActiveAdmin(editingUserId)) {
+                    alert('⛔ لا يمكن تنزيل رتبة آخر مدير نظام نشط.\n\nلو فقد هذا الحساب صفة المدير، لن يستطيع أحد إسناد الأدوار بعدها، ولن يُفتح النظام إلا بتدخل يدوي من لوحة Firebase.\n\nعيّن مديراً آخر أولاً، ثم أعد المحاولة.');
+                    return;
+                }
+
+                const parsedPriority = parseInt(userFormPriority, 10);
+                const priorityToSave = (isNaN(parsedPriority) || parsedPriority < 1) ? 99 : parsedPriority;
+
                 let updatedUsers;
-                const permsToSave = userFormRole === 'admin' 
+                const permsToSave = (userFormRole === 'admin' || userFormRole === 'manager')
                     ? { dailyReport: true, staffMaster: true, safety: true, evaluation: true }
                     : userFormRole === 'viewer'
                         ? { dailyReport: false, staffMaster: false, safety: false, evaluation: false }
                         : userFormPerms;
 
                 if (editingUserId) {
-                    updatedUsers = systemUsers.map(u => u.id === editingUserId ? { ...u, name, role: userFormRole, uid: targetUid, permissions: permsToSave } : u);
+                    updatedUsers = systemUsers.map(u => u.id === editingUserId ? { ...u, name, role: userFormRole, uid: targetUid, editPriority: priorityToSave, permissions: permsToSave } : u);
                     alert(`✅ تم تحديث بيانات وصلاحيات المستخدم (${name}) بنجاح!`);
                 } else {
                     const newUser = {
@@ -1343,6 +1428,7 @@
                         name,
                         role: userFormRole,
                         uid: targetUid,
+                        editPriority: priorityToSave,
                         permissions: permsToSave,
                         active: true,
                         createdAt: new Date().toLocaleDateString('ar-IQ')
@@ -1358,7 +1444,7 @@
                 cloudFetch(`${FIREBASE_ROLES_URL}/${targetUid}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, role: userFormRole, permissions: permsToSave })
+                    body: JSON.stringify({ name, role: userFormRole, editPriority: priorityToSave, permissions: permsToSave })
                 }).then(res => {
                     if (res.ok) {
                         logAuditEvent(`update_role:${targetUid}`, currentUserName);
@@ -1388,6 +1474,7 @@
                 setUserFormName('');
                 setUserFormRole('operator');
                 setUserFormUid('');
+                setUserFormPriority('99');
                 setUserFormPerms({
                     dailyReport: true,
                     staffMaster: false,
@@ -1401,6 +1488,7 @@
                 setUserFormName(u.name);
                 setUserFormRole(u.role);
                 setUserFormUid(u.uid || '');
+                setUserFormPriority(String(u.editPriority || 99));
                 setUserFormPerms(u.permissions || {
                     dailyReport: true,
                     staffMaster: u.role === 'admin',
@@ -1426,6 +1514,7 @@
                 setUserFormName('');
                 setUserFormRole('operator');
                 setUserFormUid('');
+                setUserFormPriority('99');
                 setUserFormPerms({
                     dailyReport: true,
                     staffMaster: false,
@@ -1435,13 +1524,27 @@
             };
 
             const handleDeleteUser = (userId) => {
-                const userToDelete = systemUsers.find(u => u.id === userId);
-                if (!userToDelete) return;
-                if (systemUsers.filter(u => u.role === 'admin' && u.active !== false).length <= 1 && userToDelete.role === 'admin') {
-                    alert('⛔ لا يمكن حذف مدير النظام الوحيد في النظام!');
+                if (isLastActiveAdmin(userId)) {
+                    alert('⛔ لا يمكن حذف آخر مدير نظام نشط.\n\nعيّن مديراً آخر أولاً، ثم أعد المحاولة.');
                     return;
                 }
+                const userToDelete = systemUsers.find(u => u.id === userId);
+                if (!userToDelete) return;
                 if (!confirm(`⚠️ هل أنت متأكد من حذف المستخدم (${userToDelete.name}) نهائياً؟`)) return;
+
+                // الدخول يُصرَّح من عقدة roles/{uid} وحدها: حذف السطر محلياً لا يسحب الوصول
+                if (userToDelete.uid) {
+                    cloudFetch(`${FIREBASE_ROLES_URL}/${userToDelete.uid}.json`, { method: 'DELETE' })
+                        .then(res => {
+                            if (!res.ok) {
+                                alert('⚠️ حُذف المستخدم محلياً، لكن لم يُحذف دوره من Firebase (رمز ' + res.status + ').' + String.fromCharCode(10,10) + 'سيبقى قادراً على الدخول حتى يُحذف سجله. راجع عقدة roles في لوحة Firebase.');
+                            }
+                        })
+                        .catch(() => {
+                            alert('⚠️ حُذف المستخدم محلياً، لكن تعذّر الوصول إلى Firebase لحذف دوره. سيبقى قادراً على الدخول حتى ينجح الحذف.');
+                        });
+                    logAuditEvent('revoke_role:' + userToDelete.uid, currentUserName);
+                }
 
                 const updatedUsers = systemUsers.filter(u => u.id !== userId);
                 setSystemUsers(updatedUsers);
@@ -1466,13 +1569,44 @@
             };
 
             const handleToggleUserActive = (userId) => {
-                const userToToggle = systemUsers.find(u => u.id === userId);
-                if (!userToToggle) return;
-                if (userToToggle.role === 'admin' && userToToggle.active !== false && systemUsers.filter(u => u.role === 'admin' && u.active !== false).length <= 1) {
-                    alert('⛔ لا يمكن تعطيل حساب مدير النظام الفعال الوحيد!');
+                if (isLastActiveAdmin(userId)) {
+                    alert('⛔ لا يمكن تعطيل آخر مدير نظام نشط.\n\nعيّن مديراً آخر أولاً، ثم أعد المحاولة.');
                     return;
                 }
-                const updatedUsers = systemUsers.map(u => u.id === userId ? { ...u, active: !(u.active !== false) } : u);
+                const userToToggle = systemUsers.find(u => u.id === userId);
+                if (!userToToggle) return;
+                const willBeActive = !(userToToggle.active !== false);
+                // «تعطيل الحساب» يجب أن يسحب الوصول فعلاً: الدخول يقرأ roles/{uid} ولا يعرف شيئاً
+                // عن العلم المحلي active، فبدون حذف العقدة يبقى الحساب المعطَّل قادراً على الدخول.
+                if (userToToggle.uid) {
+                    const revokeOrRestore = willBeActive
+                        ? cloudFetch(`${FIREBASE_ROLES_URL}/${userToToggle.uid}.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: userToToggle.name,
+                                role: userToToggle.role,
+                                editPriority: userToToggle.editPriority || 99,
+                                permissions: userToToggle.permissions || {}
+                            })
+                        })
+                        : cloudFetch(`${FIREBASE_ROLES_URL}/${userToToggle.uid}.json`, { method: 'DELETE' });
+                    revokeOrRestore
+                        .then(res => {
+                            if (!res.ok) {
+                                alert((willBeActive
+                                    ? '⚠️ فُعّل الحساب محلياً، لكن لم يُستعد دوره في Firebase (رمز ' + res.status + ').' + String.fromCharCode(10,10) + 'لن يستطيع الدخول حتى ينجح الحفظ.'
+                                    : '⚠️ عُطّل الحساب محلياً، لكن لم يُحذف دوره من Firebase (رمز ' + res.status + ').' + String.fromCharCode(10,10) + 'سيبقى قادراً على الدخول حتى ينجح الحذف.'));
+                            }
+                        })
+                        .catch(() => {
+                            alert(willBeActive
+                                ? '⚠️ فُعّل الحساب محلياً، لكن تعذّر الوصول إلى Firebase لاستعادة دوره. لن يستطيع الدخول حتى ينجح الحفظ.'
+                                : '⚠️ عُطّل الحساب محلياً، لكن تعذّر الوصول إلى Firebase لحذف دوره. سيبقى قادراً على الدخول حتى ينجح الحذف.');
+                        });
+                    logAuditEvent((willBeActive ? 'enable_account:' : 'disable_account:') + userToToggle.uid, currentUserName);
+                }
+                const updatedUsers = systemUsers.map(u => u.id === userId ? { ...u, active: willBeActive } : u);
                 setSystemUsers(updatedUsers);
                 safeStorage.setItem('systemUsersList', JSON.stringify(updatedUsers));
                 pushDataToCloud({
@@ -1503,9 +1637,22 @@
                 isSyncing: false
             });
                                     // ===== محرك المزامنة السحابية الحية الرسمي (Google Firebase Realtime DB) =====
-            const [cloudSyncStatus, setCloudSyncStatus] = useState({ connected: true, syncing: false, lastSync: null });
+            const [cloudSyncStatus, setCloudSyncStatus] = useState({ connected: true, syncing: false, lastSync: null, error: null });
+            // آخر lastCloudUpdate رآه هذا الجهاز من الخادم — يُقارَن قبل كل حفظ لمنع محو عمل زميل
+            const knownServerUpdateRef = React.useRef(null);
             const lastCloudTimeRef = React.useRef(null);
             const isInitialCloudLoadCompleteRef = React.useRef(false);
+            // حارس عدم التداخل: فعلٌ واحد قد يغيّر حالتين فيُطلق دفعتين متزامنتين
+            const isPushingRef = React.useRef(false);
+            const pendingPushRef = React.useRef(false);
+            // بصمة آخر حمولة نعلم أنها على الخادم — تمنع إعادة بثّ ما استقبلناه للتو
+            const lastSyncedSignatureRef = React.useRef(null);
+            const CLOUD_SIGNATURE_KEYS = ['staffData', 'systemUsersList', 'officialHolidaysList', 'hourlyLeaveRecords', 'overtimeHoursRecords', 'dailyStatusOverrides', 'shiftAnchorDate', 'threeShiftAnchorSquad', 'twoShiftAnchorSquad', 'dataEntryOperator', 'overtimeSelectedIds', 'pendingDeletionRequest'];
+            const cloudPayloadSignature = (obj) => {
+                try {
+                    return JSON.stringify(CLOUD_SIGNATURE_KEYS.map(k => (obj && obj[k] !== undefined) ? obj[k] : null));
+                } catch (e) { return null; }
+            };
 
             // جلب البيانات السحابية الحية فورياً وتحديث كافة الأجهزة
             const fetchCloudData = async () => {
@@ -1552,10 +1699,20 @@
                 if (window.location.protocol === 'file:' || !FIREBASE_DB_URL) {
                     return;
                 }
+                // المستعرض والزائر لا يكتبان شيئاً: الحارس هنا يمنع دورة رفض/خروج لا معنى لها
+                if (!currentUserRole || currentUserRole === 'viewer') {
+                    return;
+                }
                 // 2. منع رفع الكاش المحلي القديم إلى السحابة قبل إتمام الجلب الأولي للبيانات السحابية
                 if (!isInitialCloudLoadCompleteRef.current && !bundle) {
                     return;
                 }
+                // 3. حارس عدم التداخل: دفعتان متزامنتان تُكدّسان نافذتي تحذير وتُطفئان مؤشر المزامنة قبل الأوان
+                if (isPushingRef.current) {
+                    pendingPushRef.current = true;
+                    return;
+                }
+                isPushingRef.current = true;
                 try {
                     setCloudSyncStatus(prev => ({ ...prev, syncing: true }));
                     const nowIso = (bundle && bundle.lastCloudUpdate) ? bundle.lastCloudUpdate : new Date().toISOString();
@@ -1576,6 +1733,30 @@
                         pendingDeletionRequest: pendingDeletionRequest
                     };
 
+                    // لا نُعيد بثّ ما استقبلناه للتو من جهاز آخر: لو كانت الحمولة مطابقة تماماً
+                    // لآخر ما نعلم أنه على الخادم فليس فيها ما يُحفظ، وبثّها يُنتج قيد تدقيق ولقطة
+                    // أرشيفية لكل جهاز متصل عن كل حفظة واحدة.
+                    const payloadSignature = cloudPayloadSignature(dataPayload);
+                    if (!bundle && payloadSignature !== null && payloadSignature === lastSyncedSignatureRef.current) {
+                        setCloudSyncStatus(prev => ({ ...prev, syncing: false }));
+                        return;
+                    }
+
+                    // قراءة صغيرة تسبق الحفظ: هل كتب زميل شيئاً بعد آخر ما رآه هذا الجهاز؟
+                    try {
+                        const stampRes = await fetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now());
+                        if (stampRes.ok) {
+                            const serverStamp = await stampRes.json();
+                            if (serverStamp && knownServerUpdateRef.current && serverStamp > knownServerUpdateRef.current) {
+                                setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false, error: 'حفظ مستخدم آخر تعديلات بعد آخر تحديث لديك. أعد تحميل الصفحة قبل الحفظ.' }));
+                                alert('⚠️ حفظ مستخدم آخر تعديلات بعد آخر تحديث وصل إلى جهازك.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
+                                return;
+                            }
+                        }
+                    } catch (e) {
+                        // فشل الفحص لا يمنع الحفظ: تعذّر التحقق ليس دليلاً على وجود تعارض
+                    }
+
                     // بث سريع مباشر عبر fetch بدون keepalive (لتفادي حظر المتصفح للحزم الأكبر من 64KB)
                     const res = await cloudFetch(FIREBASE_DB_URL, {
                         method: 'PUT',
@@ -1583,8 +1764,19 @@
                         body: JSON.stringify(dataPayload)
                     });
                     if (res.ok) {
-                        setCloudSyncStatus({ connected: true, syncing: false, lastSync: new Date().toLocaleTimeString('ar-IQ') });
+                        knownServerUpdateRef.current = nowIso;
+                        lastSyncedSignatureRef.current = payloadSignature;
+                        setCloudSyncStatus({ connected: true, syncing: false, lastSync: new Date().toLocaleTimeString('ar-IQ'), error: null });
                         logAuditEvent('save_system_bundle', currentUserName);
+                    } else if (res.status === 401 && getStoredAuth()) {
+                        // التوكن منتهٍ وتعذّر تجديده — الاستمرار يعني العمل على نسخة لا تُحفظ
+                        setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'انتهت جلستك ولم يُحفظ آخر تعديل. يرجى تسجيل الدخول من جديد.' });
+                        signOutFirebase();
+                        setCurrentUserRole(null);
+                        setShowLoginModal(true);
+                        alert('⛔ انتهت صلاحية جلستك ولم يصل آخر حفظ إلى السحابة.\n\nسجّل الدخول من جديد ثم أعد التعديل.');
+                    } else {
+                        setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: `لم يصل آخر حفظ إلى السحابة (رمز ${res.status}). تعديلاتك محفوظة على هذا الجهاز فقط.` });
                     }
 
                     // 3. حفظ لقطة أرشيفية تلقائية يومية غير قابلة للإلغاء في الأرشيف السحابي (Immutable Daily Snapshot)
@@ -1617,16 +1809,25 @@
                     } catch(snapErr) {}
                 } catch (err) {
                     console.warn("Could not push to Firebase Cloud:", err);
+                    setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الوصول إلى السحابة. تعديلاتك محفوظة على هذا الجهاز فقط وستُرفع عند عودة الاتصال.' });
+                } finally {
+                    isPushingRef.current = false;
+                    if (pendingPushRef.current) {
+                        pendingPushRef.current = false;
+                        setTimeout(() => pushDataToCloud(), 0);
+                    }
                 }
             };
 
             // جلب قائمة اللقطات والنسخ الاحتياطية السحابية والمحلية المتاحة (Time-Machine Snapshots Fetcher)
             const fetchAvailableSnapshots = async () => {
                 setIsLoadingSnapshots(true);
+                setSnapshotsError(null);
                 let list = [];
                 try {
                     if (FIREBASE_BACKUPS_URL && window.location.protocol !== 'file:') {
-                        const res = await fetch(`${FIREBASE_BACKUPS_URL}.json?t=${Date.now()}`);
+                        // الأرشيف لم يعد مقروءاً بلا توكن: القواعد تشترط حساباً بدور admin أو manager
+                        const res = await cloudFetch(`${FIREBASE_BACKUPS_URL}.json?t=${Date.now()}`);
                         if (res.ok) {
                             const data = await res.json();
                             if (data && typeof data === 'object') {
@@ -1639,10 +1840,16 @@
                                     bundle: data[k].bundle || data[k]
                                 }));
                             }
+                        } else {
+                            console.warn('Could not fetch cloud backups: HTTP ' + res.status);
+                            setSnapshotsError(res.status === 401 || res.status === 403
+                                ? `تعذّرت قراءة الأرشيف السحابي: حسابك غير مخوّل أو انتهت جلسته (رمز ${res.status}). المعروض أدناه نسخ هذا الجهاز المحلية فقط.`
+                                : `تعذّرت قراءة الأرشيف السحابي (رمز ${res.status}). المعروض أدناه نسخ هذا الجهاز المحلية فقط.`);
                         }
                     }
                 } catch (err) {
                     console.warn("Could not fetch cloud backups:", err);
+                    setSnapshotsError('تعذّر الوصول إلى الأرشيف السحابي. المعروض أدناه نسخ هذا الجهاز المحلية فقط.');
                 }
 
                 // دمج النسخ الاحتياطية المحلية
@@ -1670,11 +1877,7 @@
             // استعادة وتثبيت لقطة تاريخية معتمدة (Point-in-Time Restore)
             const handleRestoreSnapshot = async (snapshot) => {
                 if (currentUserRole !== 'admin') {
-                    alert('⛔ عذراً، ميزة استعادة البيانات مخصصة حصرياً لمدير النظام 👑');
-                    return;
-                }
-                if (currentUserRole !== 'admin') {
-                    alert('❌ رمز الدخول غير صحيح! تم إلغاء عملية الاستعادة للأمان.');
+                    alert('⛔ الاستعادة مخصصة حصرياً لمدير النظام 👑\n\nيمكنك استعراض اللقطات وتنزيلها كملف JSON، أما اعتماد لقطة كقاعدة حية فيبدّل بيانات الشعبة كلها ويبقى بيد المدير.');
                     return;
                 }
                 const confirmMsg = `⚠️ تأكيد نهائي لاستعادة بيانات يوم: ${snapshot.date}\n\nسيتم تطبيق نسخة هذا اليوم (التي تحتوي على ${snapshot.staffCount} موظف و ${snapshot.overridesCount} أيام مواقف) واعتمادها كقاعدة حية.\n\nهل تريد المتابعة؟`;
@@ -1828,6 +2031,12 @@
                     setDataEntryOperator(bundle.dataEntryOperator);
                     safeStorage.setItem('dataEntryOperator', bundle.dataEntryOperator);
                 }
+                if (bundle.lastCloudUpdate) {
+                    knownServerUpdateRef.current = bundle.lastCloudUpdate;
+                }
+                // حالتنا صارت هي هذه الحزمة، فبصمتها هي آخر ما نعلم أنه على الخادم:
+                // أي دفعة تالية مطابقة لها هي صدى لما استقبلناه، لا تعديلاً يستحق البثّ.
+                lastSyncedSignatureRef.current = cloudPayloadSignature(bundle);
                 if (bundle.pendingDeletionRequest !== undefined) {
                     setPendingDeletionRequest(bundle.pendingDeletionRequest);
                     if (bundle.pendingDeletionRequest) {
@@ -2158,7 +2367,11 @@
 
             const setEmployeeDailyStatusOverride = (empId, dateStr, status) => {
                 if (!canEdit('dailyReport')) {
-                    alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    if (lockedSections['dailyReport']) {
+                        alert('🔒 ' + lockedSections['dailyReport'] + ' يعدّل الموقف اليومي الآن.\n\nأنت في وضع الاطلاع مؤقتاً، وتعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه.');
+                    } else {
+                        alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    }
                     return;
                 }
                 const emp = staff.find(s => s.id === empId);
@@ -2278,7 +2491,11 @@
             // تسليط إجراء جماعي لمنتسبي موقع / وحدة معينة (تعذر حضور للصباحي فقط، أو استعادة الافتراضي)
             const setUnitBulkStatus = (unitName, statusValue) => {
                 if (!canEdit('dailyReport')) {
-                    alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    if (lockedSections['dailyReport']) {
+                        alert('🔒 ' + lockedSections['dailyReport'] + ' يعدّل الموقف اليومي الآن.\n\nأنت في وضع الاطلاع مؤقتاً، وتعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه.');
+                    } else {
+                        alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    }
                     return;
                 }
                 const targetStaff = staff.filter(s => s.unit === unitName);
@@ -4297,11 +4514,10 @@
                     alert('⛔ عذراً، ليس لديك صلاحية حذف منتسبين من الملاك العام!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
                     return;
                 }
-                if (currentUserRole !== 'admin') {
-                    alert('❌ الرمز السري غير صحيح! تم إلغاء عملية الحذف للحماية.');
+                if (currentUserRole !== 'admin' && currentUserRole !== 'manager') {
+                    alert('⛔ حذف منتسب من الملاك مخصص لمدير النظام والإداري.');
                     return;
                 }
-                
                 // تأكيد مزدوج للحذف
                 const firstName = editingEmployee.name.split(' ')[0];
                 const confirmMsg1 = `⚠️ هل أنت متأكد من حذف الموظف؟
@@ -4328,6 +4544,9 @@
                     return;
                 }
                 
+                // القيد يُكتب بعد التأكيد النهائي: السجل لا يُمحى، فلا يجوز أن يوثّق حذفاً لم يقع
+                logAuditEvent('delete_employee:' + (editingEmployee.jobNumber || editingEmployee.id), currentUserName);
+
                 // حذف الموظف
                 setStaff(staff.filter(s => s.id !== editingEmployee.id));
                 setShowEditModal(false);
@@ -4476,7 +4695,7 @@
                     }
                     const newRequest = {
                         id: 'del_req_' + Date.now(),
-                        requestedBy: dataEntryOperator || 'الإداري المُدخل',
+                        requestedBy: currentUserName || dataEntryOperator || 'الإداري المُدخل',
                         reason: reason.trim(),
                         timestamp: new Date().toLocaleString('ar-IQ'),
                         status: 'pending'
@@ -5270,10 +5489,15 @@
             };
 
 
-            
+
+            const liveSessionUids = Object.keys(activeSessions || {}).filter(uid => {
+                const sess = activeSessions[uid];
+                return sess && sess.lastSeen && (Date.now() - sess.lastSeen < 15000);
+            });
+
             return (
                 <div className="min-h-screen bg-gray-50">
-                    
+
                     {/* Splash Screen - نافذة ترحيبية متحركة */}
                     {showWelcome && (
                         <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center z-50 overflow-auto">
@@ -5428,7 +5652,15 @@
                                 </p>
                             </div>
                             
-                            <div 
+                            {cloudSyncStatus && cloudSyncStatus.error && (
+                                <span
+                                    className="px-3 py-1.5 rounded-full text-[10px] font-black bg-red-600 text-white border border-red-300 shadow animate-pulse cursor-help flex-shrink-0"
+                                    title={cloudSyncStatus.error}
+                                >
+                                    ⚠️ الحفظ السحابي متوقف
+                                </span>
+                            )}
+                            <div
                                 onClick={() => setShowSyncModal(true)}
                                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full border cursor-pointer transition shadow-md flex-shrink-0 ${
                                     syncStatus.connected 
@@ -5456,7 +5688,7 @@
                             {currentUserRole && (
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                     <div className="flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full border border-white/20 text-xs font-extrabold text-white shadow-sm">
-                                        <span>{currentUserRole === 'admin' ? `👑 ${currentUserName || 'مدير النظام'}` : (currentUserRole === 'operator' ? `✍️ ${currentUserName || 'إداري مُدخل'}` : `👁️ ${currentUserName || 'مستعرض'}`)}</span>
+                                        <span>{currentUserRole === 'admin' ? `👑 ${currentUserName || 'مدير النظام'}` : (currentUserRole === 'manager' ? `🛡️ ${currentUserName || 'إداري'}` : (currentUserRole === 'operator' ? `✍️ ${currentUserName || 'إداري مُدخل'}` : `👁️ ${currentUserName || 'مستعرض'}`))}</span>
                                     </div>
                                     {currentUserRole === 'admin' && (
                                         <>
@@ -5468,18 +5700,30 @@
                                                 <span>👥</span>
                                                 <span>إدارة الحسابات والمستخدمين</span>
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    fetchAvailableSnapshots();
-                                                    setShowRestoreCenterModal(true);
-                                                }}
-                                                className="px-3.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
-                                                title="مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية"
-                                            >
-                                                <span>🛡️</span>
-                                                <span>الأرشيف والاستعادة</span>
-                                            </button>
                                         </>
+                                    )}
+                                    {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
+                                        <button
+                                            onClick={() => {
+                                                fetchAvailableSnapshots();
+                                                setShowRestoreCenterModal(true);
+                                            }}
+                                            className="px-3.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
+                                            title={currentUserRole === 'admin' ? "مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية" : "استعراض وتنزيل اللقطات اليومية (الاستعادة خاصة بمدير النظام)"}
+                                        >
+                                            <span>🛡️</span>
+                                            <span>{currentUserRole === 'admin' ? 'الأرشيف والاستعادة' : 'الأرشيف'}</span>
+                                        </button>
+                                    )}
+                                    {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
+                                        <button
+                                            onClick={() => setShowSessionsModal(true)}
+                                            className="px-3.5 py-1 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
+                                            title="عرض الجلسات النشطة وفك أي جلسة عالقة"
+                                        >
+                                            <span>🔓</span>
+                                            <span>الجلسات النشطة</span>
+                                        </button>
                                     )}
                                     <button
                                         onClick={handleLogout}
@@ -6029,7 +6273,8 @@
                                             onChange={(e) => setUserFormRole(e.target.value)}
                                             className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition shadow-sm cursor-pointer"
                                         >
-                                            <option value="operator">✍️ إداري مُدخل (صلاحيات مخصصة حسب التبويبات)</option>
+                                            <option value="operator">✍️ مُدخل بيانات (صلاحيات مخصصة حسب التبويبات)</option>
+                                            <option value="manager">🛡️ إداري (تعديل كل الأقسام بلا إدارة حسابات ولا استعادة)</option>
                                             <option value="admin">👑 مدير النظام (كامل الصلاحيات والحذف)</option>
                                             <option value="viewer">👁️ مستعرض (عرض وطباعة وبحث فقط)</option>
                                         </select>
@@ -6044,6 +6289,17 @@
                                             onChange={(e) => setUserFormUid(e.target.value)}
                                             placeholder="UID من Firebase"
                                             className="w-full bg-white border border-amber-400 focus:border-indigo-600 rounded-xl px-3 py-2 text-[11px] font-mono font-bold text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2 space-y-1">
+                                        <label className="block text-[11px] font-black text-slate-700">🥇 أولوية التحرير:</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={userFormPriority}
+                                            onChange={(e) => setUserFormPriority(e.target.value)}
+                                            title="الرقم الأصغر يفوز: عند دخول موظفَين بنفس الصلاحية معاً، يحتفظ صاحب الرقم الأصغر بالتعديل ويهبط الآخر للاطلاع. والرقم الافتراضي لأي حساب جديد هو 99."
+                                            className="w-full bg-white border border-slate-300 focus:border-indigo-600 rounded-xl px-3 py-2 text-xs font-mono font-black text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
                                         />
                                     </div>
 
@@ -6162,9 +6418,11 @@
                                                         </div>
                                                     );
                                                     if (u.role === 'admin') roleBadge = <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 text-amber-900 border border-amber-300">👑 مدير النظام</span>;
+                                                    else if (u.role === 'manager') roleBadge = <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-teal-50 text-teal-900 border border-teal-300">🛡️ إداري</span>;
                                                     else if (u.role === 'viewer') roleBadge = <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">👁️ مستعرض (اطلاع فقط)</span>;
 
-                                                    const userSess = activeSessions && activeSessions[u.id];
+                                                    // الجلسات مفهرسة بمعرّف Firebase لا بالمعرّف المحلي usr_<وقت>
+                                                    const userSess = (u.uid && activeSessions) ? activeSessions[u.uid] : null;
                                                     const isOnline = userSess && userSess.lastSeen && (Date.now() - userSess.lastSeen < 15000);
 
                                                     const isCurrentlyEditing = editingUserId === u.id;
@@ -6228,7 +6486,7 @@
                                                                         </span>
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => handleForceEvictSession(u.id, u.name)}
+                                                                            onClick={() => handleForceEvictSession(u.uid, u.name)}
                                                                             title="إنهاء الجلسة وفك القفل"
                                                                             className="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-black transition cursor-pointer border border-rose-300"
                                                                         >
@@ -6297,6 +6555,36 @@
                 </div>
             )}
 
+            {showSessionsModal && (
+                <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[120] flex items-center justify-center p-4 no-print">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
+                        <div className="bg-gradient-to-r from-sky-700 to-blue-900 p-4 text-white flex justify-between items-center">
+                            <h3 className="text-base font-black flex items-center gap-2"><span>🔓</span><span>الجلسات النشطة</span></h3>
+                            <button onClick={() => setShowSessionsModal(false)} className="bg-white/10 hover:bg-white/20 w-8 h-8 rounded-full font-bold transition">✕</button>
+                        </div>
+                        <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+                            {liveSessionUids.map(uid => (
+                                <div key={uid} className="flex items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                                    <div>
+                                        <div className="font-black text-sm text-slate-900">{activeSessions[uid].name}</div>
+                                        <div className="text-[11px] text-slate-500">{activeSessions[uid].role}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleForceEvictSession(uid, activeSessions[uid].name)}
+                                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black transition"
+                                    >
+                                        🔓 فك القفل
+                                    </button>
+                                </div>
+                            ))}
+                            {liveSessionUids.length === 0 && (
+                                <div className="text-center text-slate-500 text-sm font-bold py-6">لا توجد جلسات نشطة حالياً.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* نافذة مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center Modal) */}
             {showRestoreCenterModal && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
@@ -6308,7 +6596,7 @@
                                 <div>
                                     <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
                                         <span>مركز الاستعادة والأرشيف الزمني (Time-Machine Recovery)</span>
-                                        <span className="text-xs bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full border border-teal-500/30">خاص بالمدير 👑</span>
+                                        <span className="text-xs bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full border border-teal-500/30">{currentUserRole === 'admin' ? 'خاص بالمدير 👑' : 'اطلاع وتنزيل 🛡️'}</span>
                                     </h3>
                                     <p className="text-xs text-slate-300 mt-0.5">أرشيف سحابي ومحلي تلقائي غير قابل للإلغاء لحفظ واسترجاع لقطات الأيام السابقة بضغطة زر</p>
                                 </div>
@@ -6385,16 +6673,23 @@
                                         >
                                             <span>📥 تنزيل ملف النسخة (JSON)</span>
                                         </button>
-                                        <button
-                                            onClick={() => handleRestoreSnapshot(selectedSnapshotPreview)}
-                                            className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                                        >
-                                            <span>⏪ اعتماد واستعادة هذه النسخة كقاعدة حية</span>
-                                        </button>
+                                        {currentUserRole === 'admin' && (
+                                            <button
+                                                onClick={() => handleRestoreSnapshot(selectedSnapshotPreview)}
+                                                className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                            >
+                                                <span>⏪ اعتماد واستعادة هذه النسخة كقاعدة حية</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
+                                {currentUserRole !== 'admin' && (
+                                    <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs font-bold text-amber-900">
+                                        🛡️ يمكنك استعراض اللقطات وتنزيلها. اعتماد لقطة كقاعدة حية يبدّل بيانات الشعبة كلها ويبقى بيد مدير النظام.
+                                    </div>
+                                )}
                             {/* قائمة اللقطات المتاحة */}
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center px-1">
@@ -6403,6 +6698,12 @@
                                         <span className="text-[11px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-bold">{availableSnapshots.length} نسخة محفوظة</span>
                                     </span>
                                 </div>
+
+                                {snapshotsError && (
+                                    <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-900">
+                                        ⚠️ {snapshotsError}
+                                    </div>
+                                )}
 
                                 {isLoadingSnapshots ? (
                                     <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
@@ -6474,14 +6775,16 @@
                                                                         >
                                                                             📥
                                                                         </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleRestoreSnapshot(snap)}
-                                                                            className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-[11px] font-black shadow-sm transition cursor-pointer active:scale-95"
-                                                                            title="استعادة واعتماد هذه النسخة"
-                                                                        >
-                                                                            ⏪ استعادة
-                                                                        </button>
+                                                                        {currentUserRole === 'admin' && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRestoreSnapshot(snap)}
+                                                                                className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-[11px] font-black shadow-sm transition cursor-pointer active:scale-95"
+                                                                                title="استعادة واعتماد هذه النسخة"
+                                                                            >
+                                                                                ⏪ استعادة
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -7315,6 +7618,12 @@
 
                                 {unitsSubView === 'dailyStatus' ? (
                                     <div className="space-y-5 animate-fadeIn">
+                                        {lockedSections['dailyReport'] && (
+                                            <div className="mb-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-xl text-xs font-black text-amber-900 flex items-center gap-2 no-print">
+                                                <span className="text-lg">🔒</span>
+                                                <span>{lockedSections['dailyReport']} يعدّل الموقف اليومي الآن — أنت في وضع الاطلاع. تعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه. الطباعة والتصدير متاحان كالمعتاد.</span>
+                                            </div>
+                                        )}
                                         {/* شريط الموقف اليومي البصري */}
                                         <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
                                             <div className="p-6 bg-gradient-to-r from-teal-500 to-emerald-600 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -8831,14 +9140,16 @@
                                                                     {view === 'all' && (
                                                                         <button
                                                                             onClick={() => {
-                                                                                if (currentUserRole !== 'admin') {
-                                                                                    alert('❌ الرمز السري غير صحيح! تم إلغاء عملية الحذف للحماية.');
+                                                                                if (currentUserRole !== 'admin' && currentUserRole !== 'manager') {
+                                                                                    alert('⛔ حذف منتسب من الملاك مخصص لمدير النظام والإداري.');
                                                                                     return;
                                                                                 }
                                                                                 const firstName = s.name.split(' ')[0];
                                                                                 if (confirm(`⚠️ هل أنت متأكد من حذف الموظف؟\n\nالموظف: ${s.name}\nالرقم الوظيفي: ${s.jobNumber}\n\n⚠️ هذه العملية لا يمكن التراجع عنها!`)) {
                                                                                     const userInput = prompt(`⚠️⚠️ تأكيد نهائي ⚠️⚠️\n\nأنت على وشك حذف: ${s.name}\n\nاكتب اسم الموظف الأول (${firstName}) للتأكيد:`);
                                                                                     if (userInput === firstName) {
+                                                                                        // القيد بعد التأكيد النهائي لا قبله: السجل غير قابل للتصحيح
+                                                                                        logAuditEvent('delete_employee:' + (s.jobNumber || s.id), currentUserName);
                                                                                         setStaff(staff.filter(emp => emp.id !== s.id));
                                                                                         alert('✅ تم حذف الموظف من النظام');
                                                                                     } else {

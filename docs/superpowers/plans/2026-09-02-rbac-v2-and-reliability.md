@@ -1280,7 +1280,7 @@ and press **Publish** (not Save draft):
       ".indexOn": "timestamp",
       "$entryId": {
         ".write": "!data.exists() && newData.exists() && auth != null && root.child('roles').child(auth.uid).exists() && root.child('roles').child(auth.uid).child('role').val() !== 'viewer'",
-        ".validate": "newData.hasOnly(['uid','displayName','action','timestamp']) && newData.child('uid').val() === auth.uid && newData.child('timestamp').isNumber() && newData.child('timestamp').val() <= now + 60000 && newData.child('timestamp').val() >= now - 300000 && newData.child('action').isString() && newData.child('action').val().length <= 200"
+        ".validate": "newData.hasOnly(['uid','displayName','action','timestamp']) && newData.child('uid').val() === auth.uid && newData.child('timestamp').isNumber() && newData.child('timestamp').val() <= now + 300000 && newData.child('timestamp').val() >= now - 300000 && newData.child('action').isString() && newData.child('action').val().length <= 200"
       }
     }
   }
