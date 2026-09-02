@@ -1525,6 +1525,8 @@
             });
                                     // ===== محرك المزامنة السحابية الحية الرسمي (Google Firebase Realtime DB) =====
             const [cloudSyncStatus, setCloudSyncStatus] = useState({ connected: true, syncing: false, lastSync: null, error: null });
+            // آخر lastCloudUpdate رآه هذا الجهاز من الخادم — يُقارَن قبل كل حفظ لمنع محو عمل زميل
+            const knownServerUpdateRef = React.useRef(null);
             const lastCloudTimeRef = React.useRef(null);
             const isInitialCloudLoadCompleteRef = React.useRef(false);
 
@@ -1597,6 +1599,21 @@
                         pendingDeletionRequest: pendingDeletionRequest
                     };
 
+                    // قراءة صغيرة تسبق الحفظ: هل كتب زميل شيئاً بعد آخر ما رآه هذا الجهاز؟
+                    try {
+                        const stampRes = await fetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now());
+                        if (stampRes.ok) {
+                            const serverStamp = await stampRes.json();
+                            if (serverStamp && knownServerUpdateRef.current && serverStamp > knownServerUpdateRef.current) {
+                                setCloudSyncStatus({ connected: true, syncing: false, lastSync: null, error: 'حفظ مستخدم آخر تعديلات بعد آخر تحديث لديك. أعد تحميل الصفحة قبل الحفظ.' });
+                                alert('⚠️ حفظ مستخدم آخر تعديلات بعد آخر تحديث وصل إلى جهازك.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
+                                return;
+                            }
+                        }
+                    } catch (e) {
+                        // فشل الفحص لا يمنع الحفظ: تعذّر التحقق ليس دليلاً على وجود تعارض
+                    }
+
                     // بث سريع مباشر عبر fetch بدون keepalive (لتفادي حظر المتصفح للحزم الأكبر من 64KB)
                     const res = await cloudFetch(FIREBASE_DB_URL, {
                         method: 'PUT',
@@ -1604,6 +1621,7 @@
                         body: JSON.stringify(dataPayload)
                     });
                     if (res.ok) {
+                        knownServerUpdateRef.current = nowIso;
                         setCloudSyncStatus({ connected: true, syncing: false, lastSync: new Date().toLocaleTimeString('ar-IQ'), error: null });
                         logAuditEvent('save_system_bundle', currentUserName);
                     } else if (res.status === 401) {
@@ -1854,6 +1872,9 @@
                 if (bundle.dataEntryOperator) {
                     setDataEntryOperator(bundle.dataEntryOperator);
                     safeStorage.setItem('dataEntryOperator', bundle.dataEntryOperator);
+                }
+                if (bundle.lastCloudUpdate) {
+                    knownServerUpdateRef.current = bundle.lastCloudUpdate;
                 }
                 if (bundle.pendingDeletionRequest !== undefined) {
                     setPendingDeletionRequest(bundle.pendingDeletionRequest);
