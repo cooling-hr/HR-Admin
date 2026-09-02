@@ -951,6 +951,7 @@
             const [userFormName, setUserFormName] = useState('');
             const [userFormRole, setUserFormRole] = useState('operator');
             const [userFormUid, setUserFormUid] = useState('');
+            const [userFormPriority, setUserFormPriority] = useState('1');
             const [userFormPerms, setUserFormPerms] = useState({
                 dailyReport: true,
                 staffMaster: false,
@@ -959,10 +960,35 @@
             });
 
             // دالة التحقق من صلاحية التعديل والمزامنة لتبويب معين (Can Edit & Sync Guard)
+            // قفل التحرير بين الأقران: من يحمل نفس الصلاحية وأولوية أصغر يحتفظ بالتعديل
+            // المشرفون (admin/manager) خارج المزاحمة — لا يُخفَّضون ولا يُخفِّضون غيرهم،
+            // وإلا لأقفل تبويبٌ مفتوح على مكتب المدير طوال اليوم عمل المُدخلين بلا سبب.
+            const lockedSections = React.useMemo(() => {
+                const locked = {};
+                if (currentUserRole !== 'operator') return locked;
+                const myUid = currentUserIdRef.current;
+                const myPriority = currentUserPriorityRef.current;
+                Object.keys(activeSessions || {}).forEach(uid => {
+                    const sess = activeSessions[uid];
+                    if (!sess || uid === myUid) return;
+                    if (sess.role !== 'operator') return;
+                    if (!sess.lastSeen || (Date.now() - sess.lastSeen) >= 15000) return;
+                    const theirPriority = sess.editPriority || 99;
+                    if (theirPriority >= myPriority) return;
+                    Object.keys(sess.permissions || {}).forEach(section => {
+                        if (sess.permissions[section] && currentUserPermissions && currentUserPermissions[section]) {
+                            locked[section] = sess.name || 'زميل';
+                        }
+                    });
+                });
+                return locked;
+            }, [activeSessions, currentUserRole, currentUserPermissions]);
+
             const canEdit = (section) => {
                 // الأدمن والإداري يملكان كل الأقسام؛ الفرق بينهما في الهوية والتعافي والتدمير لا في البيانات
                 if (currentUserRole === 'admin' || currentUserRole === 'manager') return true;
                 if (currentUserRole !== 'operator') return false;
+                if (lockedSections[section]) return false;
                 // الصلاحيات تأتي من عقدة roles/{uid} السحابية عند تسجيل الدخول (لا من قائمة PIN محلية)
                 if (!currentUserPermissions || Object.keys(currentUserPermissions).length === 0) {
                     return section === 'dailyReport';
@@ -1100,6 +1126,7 @@
 
             const currentSessionIdRef = React.useRef(null);
             const currentUserIdRef = React.useRef(null);
+            const currentUserPriorityRef = React.useRef(99);
             const [activeSessions, setActiveSessions] = useState({});
             const [isCheckingLogin, setIsCheckingLogin] = useState(false);
 
@@ -1186,6 +1213,7 @@
                 const newSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 7);
                 currentSessionIdRef.current = newSessionId;
                 currentUserIdRef.current = targetUser.id;
+                currentUserPriorityRef.current = roleData.editPriority || 99;
 
                 if (enforcesSessionLock) try {
                     await cloudFetch(`${FIREBASE_SESSIONS_URL}/${targetUser.id}.json`, {
@@ -1196,6 +1224,8 @@
                             userId: targetUser.id,
                             name: targetUser.name,
                             role: targetUser.role,
+                            permissions: targetUser.permissions || {},
+                            editPriority: roleData.editPriority || 99,
                             lastSeen: Date.now()
                         })
                     });
@@ -1253,6 +1283,8 @@
                                 userId: uid,
                                 name: currentUserName,
                                 role: currentUserRole,
+                                permissions: currentUserPermissions || {},
+                                editPriority: currentUserPriorityRef.current,
                                 lastSeen: Date.now()
                             })
                         });
@@ -1282,7 +1314,7 @@
 
             // جلب حالة الجلسات النشطة للمستخدمين عند فتح شاشة إدارة المستخدمين
             React.useEffect(() => {
-                if (!showUserManagementModal) return;
+                if (!currentUserRole || currentUserRole === 'viewer') return;
                 const fetchSessions = async () => {
                     try {
                         const res = await cloudFetch(`${FIREBASE_SESSIONS_URL}.json?t=${Date.now()}`);
@@ -1295,7 +1327,7 @@
                 fetchSessions();
                 const interval = setInterval(fetchSessions, 3000);
                 return () => clearInterval(interval);
-            }, [showUserManagementModal]);
+            }, [currentUserRole]);
 
             const handleForceEvictSession = async (userId, userName) => {
                 if (!confirm(`⚠️ هل أنت متأكد من فك قفل وإنهاء جلسة المستخدم (${userName})؟\nسيتم تحرير الحساب فوراً ليتمكن من تسجيل الدخول من أي جهاز جديد.`)) return;
@@ -1342,6 +1374,9 @@
                     return;
                 }
 
+                const parsedPriority = parseInt(userFormPriority, 10);
+                const priorityToSave = (isNaN(parsedPriority) || parsedPriority < 1) ? 99 : parsedPriority;
+
                 let updatedUsers;
                 const permsToSave = (userFormRole === 'admin' || userFormRole === 'manager')
                     ? { dailyReport: true, staffMaster: true, safety: true, evaluation: true }
@@ -1350,7 +1385,7 @@
                         : userFormPerms;
 
                 if (editingUserId) {
-                    updatedUsers = systemUsers.map(u => u.id === editingUserId ? { ...u, name, role: userFormRole, uid: targetUid, permissions: permsToSave } : u);
+                    updatedUsers = systemUsers.map(u => u.id === editingUserId ? { ...u, name, role: userFormRole, uid: targetUid, editPriority: priorityToSave, permissions: permsToSave } : u);
                     alert(`✅ تم تحديث بيانات وصلاحيات المستخدم (${name}) بنجاح!`);
                 } else {
                     const newUser = {
@@ -1358,6 +1393,7 @@
                         name,
                         role: userFormRole,
                         uid: targetUid,
+                        editPriority: priorityToSave,
                         permissions: permsToSave,
                         active: true,
                         createdAt: new Date().toLocaleDateString('ar-IQ')
@@ -1373,7 +1409,7 @@
                 cloudFetch(`${FIREBASE_ROLES_URL}/${targetUid}.json`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, role: userFormRole, permissions: permsToSave })
+                    body: JSON.stringify({ name, role: userFormRole, editPriority: priorityToSave, permissions: permsToSave })
                 }).then(res => {
                     if (res.ok) {
                         logAuditEvent(`update_role:${targetUid}`, currentUserName);
@@ -1403,6 +1439,7 @@
                 setUserFormName('');
                 setUserFormRole('operator');
                 setUserFormUid('');
+                setUserFormPriority('1');
                 setUserFormPerms({
                     dailyReport: true,
                     staffMaster: false,
@@ -1416,6 +1453,7 @@
                 setUserFormName(u.name);
                 setUserFormRole(u.role);
                 setUserFormUid(u.uid || '');
+                setUserFormPriority(String(u.editPriority || 1));
                 setUserFormPerms(u.permissions || {
                     dailyReport: true,
                     staffMaster: u.role === 'admin',
@@ -1441,6 +1479,7 @@
                 setUserFormName('');
                 setUserFormRole('operator');
                 setUserFormUid('');
+                setUserFormPriority('1');
                 setUserFormPerms({
                     dailyReport: true,
                     staffMaster: false,
@@ -6123,6 +6162,17 @@
                                             className="w-full bg-white border border-amber-400 focus:border-indigo-600 rounded-xl px-3 py-2 text-[11px] font-mono font-bold text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
                                         />
                                     </div>
+                                    <div className="md:col-span-2 space-y-1">
+                                        <label className="block text-[11px] font-black text-slate-700">🥇 أولوية التحرير:</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={userFormPriority}
+                                            onChange={(e) => setUserFormPriority(e.target.value)}
+                                            title="عند دخول موظفَين بنفس الصلاحية معاً، يحتفظ صاحب الرقم الأصغر بالتعديل ويهبط الآخر للاطلاع"
+                                            className="w-full bg-white border border-slate-300 focus:border-indigo-600 rounded-xl px-3 py-2 text-xs font-mono font-black text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
+                                        />
+                                    </div>
 
                                     {/* مربعات اختيار صلاحيات التعديل للتبويبات (Granular Tab Permissions) */}
                                     {userFormRole === 'operator' && (
@@ -7432,6 +7482,12 @@
 
                                 {unitsSubView === 'dailyStatus' ? (
                                     <div className="space-y-5 animate-fadeIn">
+                                        {lockedSections['dailyReport'] && (
+                                            <div className="mb-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-xl text-xs font-black text-amber-900 flex items-center gap-2 no-print">
+                                                <span className="text-lg">🔒</span>
+                                                <span>{lockedSections['dailyReport']} يعدّل الموقف اليومي الآن — أنت في وضع الاطلاع. تعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه. الطباعة والتصدير متاحان كالمعتاد.</span>
+                                            </div>
+                                        )}
                                         {/* شريط الموقف اليومي البصري */}
                                         <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
                                             <div className="p-6 bg-gradient-to-r from-teal-500 to-emerald-600 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
