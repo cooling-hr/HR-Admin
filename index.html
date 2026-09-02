@@ -960,6 +960,17 @@
             });
 
             // دالة التحقق من صلاحية التعديل والمزامنة لتبويب معين (Can Edit & Sync Guard)
+            // نبضة داخلية: تُبقي فحص قِدَم الجلسات حياً حتى لو تعثّر الاستطلاع، فلا يعلق القفل
+            const [peerLockTick, setPeerLockTick] = useState(0);
+            React.useEffect(() => {
+                const t = setInterval(() => setPeerLockTick(v => v + 1), 5000);
+                return () => clearInterval(t);
+            }, []);
+
+            const currentSessionIdRef = React.useRef(null);
+            const currentUserIdRef = React.useRef(null);
+            const currentUserPriorityRef = React.useRef(99);
+
             // قفل التحرير بين الأقران: من يحمل نفس الصلاحية وأولوية أصغر يحتفظ بالتعديل
             // المشرفون (admin/manager) خارج المزاحمة — لا يُخفَّضون ولا يُخفِّضون غيرهم،
             // وإلا لأقفل تبويبٌ مفتوح على مكتب المدير طوال اليوم عمل المُدخلين بلا سبب.
@@ -975,14 +986,17 @@
                     if (!sess.lastSeen || (Date.now() - sess.lastSeen) >= 15000) return;
                     const theirPriority = sess.editPriority || 99;
                     if (theirPriority >= myPriority) return;
-                    Object.keys(sess.permissions || {}).forEach(section => {
-                        if (sess.permissions[section] && currentUserPermissions && currentUserPermissions[section]) {
+                    // نفس احتياطي canEdit: حساب قديم بلا صلاحيات مخزّنة يملك الموقف اليومي ضمناً
+                    const theirPerms = (sess.permissions && Object.keys(sess.permissions).length > 0) ? sess.permissions : { dailyReport: true };
+                    const myPerms = (currentUserPermissions && Object.keys(currentUserPermissions).length > 0) ? currentUserPermissions : { dailyReport: true };
+                    Object.keys(theirPerms).forEach(section => {
+                        if (theirPerms[section] && myPerms[section]) {
                             locked[section] = sess.name || 'زميل';
                         }
                     });
                 });
                 return locked;
-            }, [activeSessions, currentUserRole, currentUserPermissions]);
+            }, [activeSessions, currentUserRole, currentUserPermissions, peerLockTick]);
 
             const canEdit = (section) => {
                 // الأدمن والإداري يملكان كل الأقسام؛ الفرق بينهما في الهوية والتعافي والتدمير لا في البيانات
@@ -1124,9 +1138,6 @@
                 } catch (e) {}
             };
 
-            const currentSessionIdRef = React.useRef(null);
-            const currentUserIdRef = React.useRef(null);
-            const currentUserPriorityRef = React.useRef(99);
             const [activeSessions, setActiveSessions] = useState({});
             const [isCheckingLogin, setIsCheckingLogin] = useState(false);
 
@@ -1312,7 +1323,7 @@
                 return () => window.removeEventListener('beforeunload', handleBeforeUnload);
             }, []);
 
-            // جلب حالة الجلسات النشطة للمستخدمين عند فتح شاشة إدارة المستخدمين
+            // استطلاع الجلسات النشطة لكل مستخدم مسجّل — يغذّي قفل التحرير بين الأقران وقائمة الجلسات
             React.useEffect(() => {
                 if (!currentUserRole || currentUserRole === 'viewer') return;
                 const fetchSessions = async () => {
@@ -1453,7 +1464,7 @@
                 setUserFormName(u.name);
                 setUserFormRole(u.role);
                 setUserFormUid(u.uid || '');
-                setUserFormPriority(String(u.editPriority || 1));
+                setUserFormPriority(String(u.editPriority || 99));
                 setUserFormPerms(u.permissions || {
                     dailyReport: true,
                     staffMaster: u.role === 'admin',
@@ -2247,7 +2258,11 @@
 
             const setEmployeeDailyStatusOverride = (empId, dateStr, status) => {
                 if (!canEdit('dailyReport')) {
-                    alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    if (lockedSections['dailyReport']) {
+                        alert('🔒 ' + lockedSections['dailyReport'] + ' يعدّل الموقف اليومي الآن.\n\nأنت في وضع الاطلاع مؤقتاً، وتعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه.');
+                    } else {
+                        alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    }
                     return;
                 }
                 const emp = staff.find(s => s.id === empId);
@@ -2367,7 +2382,11 @@
             // تسليط إجراء جماعي لمنتسبي موقع / وحدة معينة (تعذر حضور للصباحي فقط، أو استعادة الافتراضي)
             const setUnitBulkStatus = (unitName, statusValue) => {
                 if (!canEdit('dailyReport')) {
-                    alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    if (lockedSections['dailyReport']) {
+                        alert('🔒 ' + lockedSections['dailyReport'] + ' يعدّل الموقف اليومي الآن.\n\nأنت في وضع الاطلاع مؤقتاً، وتعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه.');
+                    } else {
+                        alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    }
                     return;
                 }
                 const targetStaff = staff.filter(s => s.unit === unitName);
