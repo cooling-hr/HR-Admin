@@ -1148,6 +1148,7 @@
             const [showSessionsModal, setShowSessionsModal] = useState(false);
             const [availableSnapshots, setAvailableSnapshots] = useState([]);
             const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
+            const [snapshotsError, setSnapshotsError] = useState(null);
             const [selectedSnapshotPreview, setSelectedSnapshotPreview] = useState(null);
             const [isRestoringSnapshot, setIsRestoringSnapshot] = useState(false);
 
@@ -1583,6 +1584,16 @@
             const knownServerUpdateRef = React.useRef(null);
             const lastCloudTimeRef = React.useRef(null);
             const isInitialCloudLoadCompleteRef = React.useRef(false);
+            // حارس عدم التداخل: فعلٌ واحد قد يغيّر حالتين فيُطلق دفعتين متزامنتين
+            const isPushingRef = React.useRef(false);
+            // بصمة آخر حمولة نعلم أنها على الخادم — تمنع إعادة بثّ ما استقبلناه للتو
+            const lastSyncedSignatureRef = React.useRef(null);
+            const CLOUD_SIGNATURE_KEYS = ['staffData', 'systemUsersList', 'officialHolidaysList', 'hourlyLeaveRecords', 'overtimeHoursRecords', 'dailyStatusOverrides', 'shiftAnchorDate', 'threeShiftAnchorSquad', 'twoShiftAnchorSquad', 'dataEntryOperator', 'overtimeSelectedIds', 'pendingDeletionRequest'];
+            const cloudPayloadSignature = (obj) => {
+                try {
+                    return JSON.stringify(CLOUD_SIGNATURE_KEYS.map(k => (obj && obj[k] !== undefined) ? obj[k] : null));
+                } catch (e) { return null; }
+            };
 
             // جلب البيانات السحابية الحية فورياً وتحديث كافة الأجهزة
             const fetchCloudData = async () => {
@@ -1629,10 +1640,19 @@
                 if (window.location.protocol === 'file:' || !FIREBASE_DB_URL) {
                     return;
                 }
+                // المستعرض والزائر لا يكتبان شيئاً: الحارس هنا يمنع دورة رفض/خروج لا معنى لها
+                if (!currentUserRole || currentUserRole === 'viewer') {
+                    return;
+                }
                 // 2. منع رفع الكاش المحلي القديم إلى السحابة قبل إتمام الجلب الأولي للبيانات السحابية
                 if (!isInitialCloudLoadCompleteRef.current && !bundle) {
                     return;
                 }
+                // 3. حارس عدم التداخل: دفعتان متزامنتان تُكدّسان نافذتي تحذير وتُطفئان مؤشر المزامنة قبل الأوان
+                if (isPushingRef.current) {
+                    return;
+                }
+                isPushingRef.current = true;
                 try {
                     setCloudSyncStatus(prev => ({ ...prev, syncing: true }));
                     const nowIso = (bundle && bundle.lastCloudUpdate) ? bundle.lastCloudUpdate : new Date().toISOString();
@@ -1653,13 +1673,22 @@
                         pendingDeletionRequest: pendingDeletionRequest
                     };
 
+                    // لا نُعيد بثّ ما استقبلناه للتو من جهاز آخر: لو كانت الحمولة مطابقة تماماً
+                    // لآخر ما نعلم أنه على الخادم فليس فيها ما يُحفظ، وبثّها يُنتج قيد تدقيق ولقطة
+                    // أرشيفية لكل جهاز متصل عن كل حفظة واحدة.
+                    const payloadSignature = cloudPayloadSignature(dataPayload);
+                    if (!bundle && payloadSignature !== null && payloadSignature === lastSyncedSignatureRef.current) {
+                        setCloudSyncStatus(prev => ({ ...prev, syncing: false }));
+                        return;
+                    }
+
                     // قراءة صغيرة تسبق الحفظ: هل كتب زميل شيئاً بعد آخر ما رآه هذا الجهاز؟
                     try {
                         const stampRes = await fetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now());
                         if (stampRes.ok) {
                             const serverStamp = await stampRes.json();
                             if (serverStamp && knownServerUpdateRef.current && serverStamp > knownServerUpdateRef.current) {
-                                setCloudSyncStatus({ connected: true, syncing: false, lastSync: null, error: 'حفظ مستخدم آخر تعديلات بعد آخر تحديث لديك. أعد تحميل الصفحة قبل الحفظ.' });
+                                setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false, error: 'حفظ مستخدم آخر تعديلات بعد آخر تحديث لديك. أعد تحميل الصفحة قبل الحفظ.' }));
                                 alert('⚠️ حفظ مستخدم آخر تعديلات بعد آخر تحديث وصل إلى جهازك.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
                                 return;
                             }
@@ -1676,9 +1705,10 @@
                     });
                     if (res.ok) {
                         knownServerUpdateRef.current = nowIso;
+                        lastSyncedSignatureRef.current = payloadSignature;
                         setCloudSyncStatus({ connected: true, syncing: false, lastSync: new Date().toLocaleTimeString('ar-IQ'), error: null });
                         logAuditEvent('save_system_bundle', currentUserName);
-                    } else if (res.status === 401) {
+                    } else if (res.status === 401 && getStoredAuth()) {
                         // التوكن منتهٍ وتعذّر تجديده — الاستمرار يعني العمل على نسخة لا تُحفظ
                         setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'انتهت جلستك ولم يُحفظ آخر تعديل. يرجى تسجيل الدخول من جديد.' });
                         signOutFirebase();
@@ -1720,16 +1750,20 @@
                 } catch (err) {
                     console.warn("Could not push to Firebase Cloud:", err);
                     setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الوصول إلى السحابة. تعديلاتك محفوظة على هذا الجهاز فقط وستُرفع عند عودة الاتصال.' });
+                } finally {
+                    isPushingRef.current = false;
                 }
             };
 
             // جلب قائمة اللقطات والنسخ الاحتياطية السحابية والمحلية المتاحة (Time-Machine Snapshots Fetcher)
             const fetchAvailableSnapshots = async () => {
                 setIsLoadingSnapshots(true);
+                setSnapshotsError(null);
                 let list = [];
                 try {
                     if (FIREBASE_BACKUPS_URL && window.location.protocol !== 'file:') {
-                        const res = await fetch(`${FIREBASE_BACKUPS_URL}.json?t=${Date.now()}`);
+                        // الأرشيف لم يعد مقروءاً بلا توكن: القواعد تشترط حساباً بدور admin أو manager
+                        const res = await cloudFetch(`${FIREBASE_BACKUPS_URL}.json?t=${Date.now()}`);
                         if (res.ok) {
                             const data = await res.json();
                             if (data && typeof data === 'object') {
@@ -1742,10 +1776,16 @@
                                     bundle: data[k].bundle || data[k]
                                 }));
                             }
+                        } else {
+                            console.warn('Could not fetch cloud backups: HTTP ' + res.status);
+                            setSnapshotsError(res.status === 401 || res.status === 403
+                                ? `تعذّرت قراءة الأرشيف السحابي: حسابك غير مخوّل أو انتهت جلسته (رمز ${res.status}). المعروض أدناه نسخ هذا الجهاز المحلية فقط.`
+                                : `تعذّرت قراءة الأرشيف السحابي (رمز ${res.status}). المعروض أدناه نسخ هذا الجهاز المحلية فقط.`);
                         }
                     }
                 } catch (err) {
                     console.warn("Could not fetch cloud backups:", err);
+                    setSnapshotsError('تعذّر الوصول إلى الأرشيف السحابي. المعروض أدناه نسخ هذا الجهاز المحلية فقط.');
                 }
 
                 // دمج النسخ الاحتياطية المحلية
@@ -1930,6 +1970,9 @@
                 if (bundle.lastCloudUpdate) {
                     knownServerUpdateRef.current = bundle.lastCloudUpdate;
                 }
+                // حالتنا صارت هي هذه الحزمة، فبصمتها هي آخر ما نعلم أنه على الخادم:
+                // أي دفعة تالية مطابقة لها هي صدى لما استقبلناه، لا تعديلاً يستحق البثّ.
+                lastSyncedSignatureRef.current = cloudPayloadSignature(bundle);
                 if (bundle.pendingDeletionRequest !== undefined) {
                     setPendingDeletionRequest(bundle.pendingDeletionRequest);
                     if (bundle.pendingDeletionRequest) {
@@ -6589,6 +6632,12 @@
                                         <span className="text-[11px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-bold">{availableSnapshots.length} نسخة محفوظة</span>
                                     </span>
                                 </div>
+
+                                {snapshotsError && (
+                                    <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-900">
+                                        ⚠️ {snapshotsError}
+                                    </div>
+                                )}
 
                                 {isLoadingSnapshots ? (
                                     <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
