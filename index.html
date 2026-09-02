@@ -1509,11 +1509,21 @@
                 }
                 const userToDelete = systemUsers.find(u => u.id === userId);
                 if (!userToDelete) return;
-                if (systemUsers.filter(u => u.role === 'admin' && u.active !== false).length <= 1 && userToDelete.role === 'admin') {
-                    alert('⛔ لا يمكن حذف مدير النظام الوحيد في النظام!');
-                    return;
-                }
                 if (!confirm(`⚠️ هل أنت متأكد من حذف المستخدم (${userToDelete.name}) نهائياً؟`)) return;
+
+                // الدخول يُصرَّح من عقدة roles/{uid} وحدها: حذف السطر محلياً لا يسحب الوصول
+                if (userToDelete.uid) {
+                    cloudFetch(`${FIREBASE_ROLES_URL}/${userToDelete.uid}.json`, { method: 'DELETE' })
+                        .then(res => {
+                            if (!res.ok) {
+                                alert('⚠️ حُذف المستخدم محلياً، لكن لم يُحذف دوره من Firebase (رمز ' + res.status + ').' + String.fromCharCode(10,10) + 'سيبقى قادراً على الدخول حتى يُحذف سجله. راجع عقدة roles في لوحة Firebase.');
+                            }
+                        })
+                        .catch(() => {
+                            alert('⚠️ حُذف المستخدم محلياً، لكن تعذّر الوصول إلى Firebase لحذف دوره. سيبقى قادراً على الدخول حتى ينجح الحذف.');
+                        });
+                    logAuditEvent('revoke_role:' + userToDelete.uid, currentUserName);
+                }
 
                 const updatedUsers = systemUsers.filter(u => u.id !== userId);
                 setSystemUsers(updatedUsers);
@@ -1544,11 +1554,38 @@
                 }
                 const userToToggle = systemUsers.find(u => u.id === userId);
                 if (!userToToggle) return;
-                if (userToToggle.role === 'admin' && userToToggle.active !== false && systemUsers.filter(u => u.role === 'admin' && u.active !== false).length <= 1) {
-                    alert('⛔ لا يمكن تعطيل حساب مدير النظام الفعال الوحيد!');
-                    return;
+                const willBeActive = !(userToToggle.active !== false);
+                // «تعطيل الحساب» يجب أن يسحب الوصول فعلاً: الدخول يقرأ roles/{uid} ولا يعرف شيئاً
+                // عن العلم المحلي active، فبدون حذف العقدة يبقى الحساب المعطَّل قادراً على الدخول.
+                if (userToToggle.uid) {
+                    const revokeOrRestore = willBeActive
+                        ? cloudFetch(`${FIREBASE_ROLES_URL}/${userToToggle.uid}.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: userToToggle.name,
+                                role: userToToggle.role,
+                                editPriority: userToToggle.editPriority || 99,
+                                permissions: userToToggle.permissions || {}
+                            })
+                        })
+                        : cloudFetch(`${FIREBASE_ROLES_URL}/${userToToggle.uid}.json`, { method: 'DELETE' });
+                    revokeOrRestore
+                        .then(res => {
+                            if (!res.ok) {
+                                alert((willBeActive
+                                    ? '⚠️ فُعّل الحساب محلياً، لكن لم يُستعد دوره في Firebase (رمز ' + res.status + ').' + String.fromCharCode(10,10) + 'لن يستطيع الدخول حتى ينجح الحفظ.'
+                                    : '⚠️ عُطّل الحساب محلياً، لكن لم يُحذف دوره من Firebase (رمز ' + res.status + ').' + String.fromCharCode(10,10) + 'سيبقى قادراً على الدخول حتى ينجح الحذف.'));
+                            }
+                        })
+                        .catch(() => {
+                            alert(willBeActive
+                                ? '⚠️ فُعّل الحساب محلياً، لكن تعذّر الوصول إلى Firebase لاستعادة دوره. لن يستطيع الدخول حتى ينجح الحفظ.'
+                                : '⚠️ عُطّل الحساب محلياً، لكن تعذّر الوصول إلى Firebase لحذف دوره. سيبقى قادراً على الدخول حتى ينجح الحذف.');
+                        });
+                    logAuditEvent((willBeActive ? 'enable_account:' : 'disable_account:') + userToToggle.uid, currentUserName);
                 }
-                const updatedUsers = systemUsers.map(u => u.id === userId ? { ...u, active: !(u.active !== false) } : u);
+                const updatedUsers = systemUsers.map(u => u.id === userId ? { ...u, active: willBeActive } : u);
                 setSystemUsers(updatedUsers);
                 safeStorage.setItem('systemUsersList', JSON.stringify(updatedUsers));
                 pushDataToCloud({
