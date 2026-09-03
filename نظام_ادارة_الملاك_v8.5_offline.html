@@ -388,9 +388,217 @@
         }
     </style>
 
+    <!-- ================================================================= -->
+    <!-- الوضع الليلي (Dark Mode)                                          -->
+    <!--                                                                   -->
+    <!-- طبقة CSS مستقلة تماماً: لا تمسّ أي className في شجرة React.        -->
+    <!-- تُعيد تعريف الأصناف البنيوية المستعملة فعلاً تحت data-theme="dark". -->
+    <!--                                                                   -->
+    <!-- كل القواعد داخل @media screen عمداً: فيتصرّف محرّك الطباعة كأن       -->
+    <!-- الوضع الليلي غير موجود، وتخرج الكشوفات الرسمية بيضاء دائماً.       -->
+    <!-- ================================================================= -->
+    <script>
+        // يُطبَّق قبل أول رسم لتفادي وميض أبيض عند فتح الصفحة
+        (function () {
+            try {
+                var saved = localStorage.getItem('hrTheme');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (saved === 'dark' || (!saved && prefersDark)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) { /* بعض المتصفحات تحظر التخزين — نتجاهل ونبقى على الوضع النهاري */ }
+        })();
+        window.__toggleHrTheme = function () {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+            try { localStorage.setItem('hrTheme', isDark ? 'light' : 'dark'); } catch (e) {}
+            return !isDark;
+        };
+    </script>
 
+    <style>
+    @media screen {
+        html[data-theme="dark"] {
+            /* الخطوط العربية تبدو أثقل وتتوهّج على الخلفيات الداكنة — التنعيم يعالج ذلك */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            color-scheme: dark;
+        }
+        html[data-theme="dark"] body { background: #0b1220; }
 
+        /* ---- الأسطح البنيوية ---- */
+        html[data-theme="dark"] .bg-white          { background-color: #131c2b !important; }
+        html[data-theme="dark"] .bg-slate-50,
+        html[data-theme="dark"] .bg-gray-50,
+        html[data-theme="dark"] .bg-slate-100,
+        html[data-theme="dark"] .bg-gray-100       { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-200      { background-color: #24324a !important; }
 
+        /* ---- النصوص: لا أبيض خالص، فالتباين المفرط يُنزف التشكيل داخل الحروف ---- */
+        html[data-theme="dark"] .text-slate-900,
+        html[data-theme="dark"] .text-gray-900,
+        html[data-theme="dark"] .text-slate-800,
+        html[data-theme="dark"] .text-gray-800     { color: #e6edf5 !important; }
+        html[data-theme="dark"] .text-slate-700,
+        html[data-theme="dark"] .text-gray-700     { color: #cbd5e1 !important; }
+        html[data-theme="dark"] .text-slate-600,
+        html[data-theme="dark"] .text-gray-600,
+        html[data-theme="dark"] .text-slate-500,
+        html[data-theme="dark"] .text-gray-500     { color: #94a3b8 !important; }
+        html[data-theme="dark"] .text-slate-400    { color: #7d8ba1 !important; }
+
+        /* ---- الحدود ---- */
+        html[data-theme="dark"] .border-slate-100,
+        html[data-theme="dark"] .border-gray-100,
+        html[data-theme="dark"] .border-slate-200,
+        html[data-theme="dark"] .border-gray-200   { border-color: #2b3a52 !important; }
+        html[data-theme="dark"] .border-slate-300,
+        html[data-theme="dark"] .border-gray-300   { border-color: #3a4c68 !important; }
+
+        /* ---- حقول الإدخال ---- */
+        html[data-theme="dark"] input,
+        html[data-theme="dark"] select,
+        html[data-theme="dark"] textarea {
+            background-color: #1a2536 !important;
+            color: #e6edf5 !important;
+            border-color: #3a4c68 !important;
+        }
+        html[data-theme="dark"] input::placeholder,
+        html[data-theme="dark"] textarea::placeholder { color: #6b7a91 !important; }
+        html[data-theme="dark"] option { background-color: #1a2536; color: #e6edf5; }
+
+        /* ---- الألوان الدلالية: نُبقي الصبغة ونخفض الإضاءة فقط ---- */
+        /* الأحمر = غياب · الكهرماني = تنبيه · الأخضر = حضور · النيلي = إجراء */
+        html[data-theme="dark"] .bg-red-50      { background-color: #3b1518 !important; }
+        html[data-theme="dark"] .text-red-800,
+        html[data-theme="dark"] .text-red-700   { color: #fca5a5 !important; }
+        html[data-theme="dark"] .bg-rose-50     { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .text-rose-700  { color: #fda4af !important; }
+        html[data-theme="dark"] .bg-amber-50    { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .text-amber-900,
+        html[data-theme="dark"] .text-amber-800 { color: #fcd34d !important; }
+        html[data-theme="dark"] .bg-emerald-50,
+        html[data-theme="dark"] .bg-green-50    { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .text-emerald-800,
+        html[data-theme="dark"] .text-green-800 { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .bg-indigo-50,
+        html[data-theme="dark"] .bg-blue-50     { background-color: #16233f !important; }
+        html[data-theme="dark"] .text-indigo-900,
+        html[data-theme="dark"] .text-blue-900,
+        html[data-theme="dark"] .text-indigo-800 { color: #a5b4fc !important; }
+        html[data-theme="dark"] .bg-teal-50     { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .text-teal-900  { color: #5eead4 !important; }
+        html[data-theme="dark"] .bg-purple-50   { background-color: #251640 !important; }
+        html[data-theme="dark"] .text-purple-700 { color: #c4b5fd !important; }
+
+        /* ---- درجات نصية إضافية تظهر داخل الشارات ---- */
+        html[data-theme="dark"] .text-indigo-700,
+        html[data-theme="dark"] .text-blue-700     { color: #a5b4fc !important; }
+        html[data-theme="dark"] .text-emerald-700,
+        html[data-theme="dark"] .text-green-700    { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .text-amber-700    { color: #fcd34d !important; }
+        html[data-theme="dark"] .text-teal-700     { color: #5eead4 !important; }
+
+        /* ---- خلفيات فاتحة تحمل معدِّل شفافية ---- */
+        /* تُركت أولاً ظناً أنها كلها فوق ترويسات داكنة، فظهر صف «قيد التعديل» */
+        /* (bg-amber-100/80) وترويسة جدول المستخدمين (bg-slate-100/90) بنص فاتح */
+        /* فوق أرضية فاتحة. المحدِّدات مهروبة لأن Tailwind يكتب «/» كـ «\/». */
+        html[data-theme="dark"] .bg-indigo-50\/80 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-slate-100\/90 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-amber-100\/80 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-slate-50\/80 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-teal-50\/80 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-teal-50\/40 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-teal-50\/20 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-slate-100\/80 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/50 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/90 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-200\/80 { background-color: #24324a !important; }
+        html[data-theme="dark"] .bg-slate-100\/70 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/70 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/60 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-amber-50\/90 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/50 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-emerald-100\/40 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-100\/70 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/40 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-indigo-50\/60 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-emerald-50\/30 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/40 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-50\/60 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-blue-50\/35 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-rose-50\/50 { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/35 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-50\/50 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/30 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-rose-50\/20 { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/10 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-teal-50\/30 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-amber-50\/10 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-white\/85 { background-color: #131c2b !important; }
+        html[data-theme="dark"] .bg-white\/80 { background-color: #131c2b !important; }
+
+        /* ---- بقية الدرجات الفاتحة (100 و200) المستعملة في الشارات ---- */
+        html[data-theme="dark"] .bg-gray-200      { background-color: #24324a !important; }
+        html[data-theme="dark"] .bg-amber-200     { background-color: #4a360b !important; }
+        html[data-theme="dark"] .bg-blue-100,
+        html[data-theme="dark"] .bg-indigo-100    { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-blue-200      { background-color: #1e2f52 !important; }
+        html[data-theme="dark"] .bg-emerald-200,
+        html[data-theme="dark"] .bg-green-100     { background-color: #0e3b2c !important; }
+        html[data-theme="dark"] .bg-purple-100    { background-color: #251640 !important; }
+        html[data-theme="dark"] .bg-purple-200    { background-color: #2f1c52 !important; }
+        html[data-theme="dark"] .bg-red-100,
+        html[data-theme="dark"] .bg-rose-100      { background-color: #3b1518 !important; }
+        html[data-theme="dark"] .bg-red-200,
+        html[data-theme="dark"] .bg-rose-200      { background-color: #4a1a1e !important; }
+        html[data-theme="dark"] .bg-teal-100      { background-color: #0c2f31 !important; }
+
+        /* ---- كل نص داكن (درجة 600 فأعلى) مستعمل في الواجهة ---- */
+        /* هذه الدرجات مصمَّمة لخلفيات فاتحة، فتصبح غير مقروءة بعد تعتيم الأسطح. */
+        /* الدرجات 500 فما دون تُترك عمداً: هي أصلاً فاتحة وتجلس فوق ترويسات داكنة. */
+        html[data-theme="dark"] .text-blue-600,
+        html[data-theme="dark"] .text-blue-800,
+        html[data-theme="dark"] .text-blue-950
+            { color: #93c5fd !important; }
+        html[data-theme="dark"] .text-orange-600,
+        html[data-theme="dark"] .text-orange-700,
+        html[data-theme="dark"] .text-orange-800
+            { color: #fdba74 !important; }
+        html[data-theme="dark"] .text-teal-600,
+        html[data-theme="dark"] .text-teal-800,
+        html[data-theme="dark"] .text-teal-950
+            { color: #5eead4 !important; }
+        html[data-theme="dark"] .text-amber-600,
+        html[data-theme="dark"] .text-amber-950
+            { color: #fcd34d !important; }
+        html[data-theme="dark"] .text-emerald-600,
+        html[data-theme="dark"] .text-green-600
+            { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .text-indigo-600,
+        html[data-theme="dark"] .text-indigo-950
+            { color: #a5b4fc !important; }
+        html[data-theme="dark"] .text-purple-600,
+        html[data-theme="dark"] .text-purple-800
+            { color: #c4b5fd !important; }
+        html[data-theme="dark"] .text-rose-600,
+        html[data-theme="dark"] .text-rose-900
+            { color: #fda4af !important; }
+        html[data-theme="dark"] .text-cyan-800
+            { color: #67e8f9 !important; }
+        html[data-theme="dark"] .text-red-600
+            { color: #fca5a5 !important; }
+        html[data-theme="dark"] .text-slate-950
+            { color: #e6edf5 !important; }
+
+        /* الأزرار الممتلئة والتدرّجات تبقى كما هي: هي أصلاً داكنة ومقروءة. */
+        /* وأصناف bg-white/10..30 تبقى كذلك: هي بريق فوق ترويسات داكنة. */
+    }
+    </style>
 
 </head>
 <body>
@@ -1046,6 +1254,10 @@
             const [loginInputRole, setLoginInputRole] = useState('operator');
             const [loginInputPin, setLoginInputPin] = useState('');
             const [loginError, setLoginError] = useState('');
+            // الوضع الليلي محفوظ على <html> ويُطبَّق قبل تحميل React؛ هذه الحالة لأيقونة الزر فقط
+            const [isDarkTheme, setIsDarkTheme] = useState(() => {
+                try { return document.documentElement.getAttribute('data-theme') === 'dark'; } catch (e) { return false; }
+            });
 
             const handleLogin = async (e) => {
                 if (e) e.preventDefault();
@@ -2019,7 +2231,7 @@
                             const sunStatus = dailyStatusOverrides[sunStr] && dailyStatusOverrides[sunStr][emp.id];
 
                             // إذا كان الخميس والأحد إجازة مدفوعة/اعتيادية/مرضية، تحسب الجمعة والسبت من ضمن الإجازة
-                            const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق'));
+                            const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق') || st.includes('بدون راتب'));
                             if (isLeaveType(thuStatus) && isLeaveType(sunStatus)) {
                                 return thuStatus; // تكتسب نفس نوع إجازة الخميس
                             }
@@ -2110,7 +2322,7 @@
 
                             const thuStatus = dailyStatusOverrides[thuStr] && dailyStatusOverrides[thuStr][empId];
                             const sunStatus = dailyStatusOverrides[sunStr] && dailyStatusOverrides[sunStr][empId];
-                            const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق'));
+                            const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق') || st.includes('بدون راتب'));
 
                             if (!isLeaveType(thuStatus) || !isLeaveType(sunStatus)) {
                                 const confirmLeave = confirm(`⚠️ تنبيه إداري:\n\nيوم (${day === 5 ? 'الجمعة' : 'السبت'}) هو يوم استراحة رسمية نهاية الأسبوع للدوام الصباحي.\n\nتذكير: لا تحسب الإجازة في نهاية الأسبوع إلا إذا كانت مؤشرة يوم الخميس ويوم الأحد معاً (قاعدة ربط الإجازة).\n\nهل تريد تأكيد تسليط الإجازة بالرغم من ذلك؟\n\n• اضغط [موافق / OK] للتأكيد وتسليط الإجازة.\n• اضغط [إلغاء / Cancel] للتراجع والاحتفاظ بـ استراحة نهاية الأسبوع.`);
@@ -2541,6 +2753,14 @@
 
                     unitOrder.forEach(unitName => {
                         const unitStaff = staff.filter(s => s.unit === unitName);
+                        // وحدة سُلّط عليها تعذر الحضور تُعامل معاملة يوم العطلة: عدم الحضور هو
+                        // الحال الطبيعي فيُخفى، ومن حضر رغم الإغلاق هو الاستثناء الذي يستحق الذكر.
+                        const unitHasNoAccess = unitStaff.some(s => {
+                            if (s.workType === 'مناوب') return false;
+                            const st = getEmployeeDailyStatus(s, dailyReportDate);
+                            return st && st.includes('تعذر');
+                        });
+
                         const unitDailyStaff = unitStaff.filter(s => {
                             if (isLongOrMaternityLeave(s.status)) return false;
                             const status = getEmployeeDailyStatus(s, dailyReportDate);
@@ -2560,6 +2780,12 @@
                                     return false; // إخفاء المتمتع بالعطلة أو استراحة نهاية الأسبوع أو تعذر الحضور
                                 }
                                 return true; // يظهر فقط من تم تثبيت تكليف دوام/إضافي/إجازة له في العطلة
+                            } else if (unitHasNoAccess) {
+                                // يوم تعذّر فيه الحضور لهذه الوحدة — تنقلب القاعدة كما في يوم العطلة:
+                                if (status.includes('تعذر')) {
+                                    return false; // من تعذّر حضوره هو الحال الطبيعي هنا فلا يُذكر
+                                }
+                                return true; // ويظهر من حضر رغم الإغلاق، ومن له عذر آخر
                             } else {
                                 // في أيام الدوام الاعتيادية (ليست عطلة):
                                 if (status === 'دوام صباحي' || status === 'حضور فعلي' || status.includes('تعذر حضور') || status.includes('تعذر')) {
@@ -5376,6 +5602,15 @@
                                 </span>
                             </div>
 
+                            {/* مبدّل الوضع الليلي — متاح للجميع، حتى الزائر الذي يتصفّح ويطبع دون تسجيل دخول */}
+                            <button
+                                onClick={() => setIsDarkTheme(window.__toggleHrTheme())}
+                                className="px-3 py-1 bg-slate-900/50 hover:bg-slate-900/80 border border-white/20 text-white rounded-full text-xs font-bold shadow transition flex items-center gap-1 cursor-pointer flex-shrink-0 no-print"
+                                title={isDarkTheme ? "التبديل إلى الوضع النهاري" : "التبديل إلى الوضع الليلي (الطباعة تبقى بيضاء دائماً)"}
+                            >
+                                {isDarkTheme ? '☀️ نهاري' : '🌙 ليلي'}
+                            </button>
+
                             {/* شريط التحكم بالصفة وإدارة المستخدمين */}
                             {currentUserRole && (
                                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -7626,6 +7861,7 @@
                                                                                         <option value="دوام صباحي" className="bg-white text-blue-700 font-bold">🟢 دوام صباحي (حضور فعلي)</option>
                                                                                         <option value="دوام إضافي" className="bg-white text-emerald-800 font-bold">⚡ دوام إضافي</option>
                                                                                         <option value="إجازة اعتيادية" className="bg-white text-rose-700 font-bold">🏖️ إجازة اعتيادية</option>
+                                                                                        <option value="إجازة بدون راتب" className="bg-white text-orange-800 font-bold">💸 إجازة بدون راتب</option>
                                                                                         <option value="إجازة خارج العراق" className="bg-white text-cyan-800 font-bold">🌍 إجازة خارج العراق</option>
                                                                                         <option value="إجازة مرضية" className="bg-white text-rose-700 font-bold">🏥 إجازة مرضية</option>
                                                                                         <option value="إجازة زمنية" className="bg-white text-amber-700 font-bold">⏰ إجازة زمنية</option>
