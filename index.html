@@ -2550,7 +2550,7 @@
                             const sunStatus = dailyStatusOverrides[sunStr] && dailyStatusOverrides[sunStr][emp.id];
 
                             // إذا كان الخميس والأحد إجازة مدفوعة/اعتيادية/مرضية، تحسب الجمعة والسبت من ضمن الإجازة
-                            const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق'));
+                            const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق') || st.includes('بدون راتب'));
                             if (isLeaveType(thuStatus) && isLeaveType(sunStatus)) {
                                 return thuStatus; // تكتسب نفس نوع إجازة الخميس
                             }
@@ -2645,7 +2645,7 @@
 
                             const thuStatus = dailyStatusOverrides[thuStr] && dailyStatusOverrides[thuStr][empId];
                             const sunStatus = dailyStatusOverrides[sunStr] && dailyStatusOverrides[sunStr][empId];
-                            const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق'));
+                            const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق') || st.includes('بدون راتب'));
 
                             if (!isLeaveType(thuStatus) || !isLeaveType(sunStatus)) {
                                 const confirmLeave = confirm(`⚠️ تنبيه إداري:\n\nيوم (${day === 5 ? 'الجمعة' : 'السبت'}) هو يوم استراحة رسمية نهاية الأسبوع للدوام الصباحي.\n\nتذكير: لا تحسب الإجازة في نهاية الأسبوع إلا إذا كانت مؤشرة يوم الخميس ويوم الأحد معاً (قاعدة ربط الإجازة).\n\nهل تريد تأكيد تسليط الإجازة بالرغم من ذلك؟\n\n• اضغط [موافق / OK] للتأكيد وتسليط الإجازة.\n• اضغط [إلغاء / Cancel] للتراجع والاحتفاظ بـ استراحة نهاية الأسبوع.`);
@@ -3080,6 +3080,14 @@
 
                     unitOrder.forEach(unitName => {
                         const unitStaff = staff.filter(s => s.unit === unitName);
+                        // وحدة سُلّط عليها تعذر الحضور تُعامل معاملة يوم العطلة: عدم الحضور هو
+                        // الحال الطبيعي فيُخفى، ومن حضر رغم الإغلاق هو الاستثناء الذي يستحق الذكر.
+                        const unitHasNoAccess = unitStaff.some(s => {
+                            if (s.workType === 'مناوب') return false;
+                            const st = getEmployeeDailyStatus(s, dailyReportDate);
+                            return st && st.includes('تعذر');
+                        });
+
                         const unitDailyStaff = unitStaff.filter(s => {
                             if (isLongOrMaternityLeave(s.status)) return false;
                             const status = getEmployeeDailyStatus(s, dailyReportDate);
@@ -3099,6 +3107,12 @@
                                     return false; // إخفاء المتمتع بالعطلة أو استراحة نهاية الأسبوع أو تعذر الحضور
                                 }
                                 return true; // يظهر فقط من تم تثبيت تكليف دوام/إضافي/إجازة له في العطلة
+                            } else if (unitHasNoAccess) {
+                                // يوم تعذّر فيه الحضور لهذه الوحدة — تنقلب القاعدة كما في يوم العطلة:
+                                if (status.includes('تعذر')) {
+                                    return false; // من تعذّر حضوره هو الحال الطبيعي هنا فلا يُذكر
+                                }
+                                return true; // ويظهر من حضر رغم الإغلاق، ومن له عذر آخر
                             } else {
                                 // في أيام الدوام الاعتيادية (ليست عطلة):
                                 if (status === 'دوام صباحي' || status === 'حضور فعلي' || status.includes('تعذر حضور') || status.includes('تعذر')) {
@@ -8247,6 +8261,7 @@
                                                                                         <option value="دوام صباحي" className="bg-white text-blue-700 font-bold">🟢 دوام صباحي (حضور فعلي)</option>
                                                                                         <option value="دوام إضافي" className="bg-white text-emerald-800 font-bold">⚡ دوام إضافي</option>
                                                                                         <option value="إجازة اعتيادية" className="bg-white text-rose-700 font-bold">🏖️ إجازة اعتيادية</option>
+                                                                                        <option value="إجازة بدون راتب" className="bg-white text-orange-800 font-bold">💸 إجازة بدون راتب</option>
                                                                                         <option value="إجازة خارج العراق" className="bg-white text-cyan-800 font-bold">🌍 إجازة خارج العراق</option>
                                                                                         <option value="إجازة مرضية" className="bg-white text-rose-700 font-bold">🏥 إجازة مرضية</option>
                                                                                         <option value="إجازة زمنية" className="bg-white text-amber-700 font-bold">⏰ إجازة زمنية</option>
