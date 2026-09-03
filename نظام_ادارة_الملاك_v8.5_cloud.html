@@ -495,8 +495,71 @@
         html[data-theme="dark"] .bg-purple-50   { background-color: #251640 !important; }
         html[data-theme="dark"] .text-purple-700 { color: #c4b5fd !important; }
 
-        /* الأزرار الممتلئة والتدرّجات تبقى كما هي: هي أصلاً داكنة ومقروءة، */
-        /* وأصناف الشفافية (bg-white/20 وأخواتها) فوق ترويسات داكنة فلا تُمَس. */
+        /* ---- درجات نصية إضافية تظهر داخل الشارات ---- */
+        html[data-theme="dark"] .text-indigo-700,
+        html[data-theme="dark"] .text-blue-700     { color: #a5b4fc !important; }
+        html[data-theme="dark"] .text-emerald-700,
+        html[data-theme="dark"] .text-green-700    { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .text-amber-700    { color: #fcd34d !important; }
+        html[data-theme="dark"] .text-teal-700     { color: #5eead4 !important; }
+
+        /* ---- خلفيات فاتحة تحمل معدِّل شفافية ---- */
+        /* تُركت أولاً ظناً أنها كلها فوق ترويسات داكنة، فظهر صف «قيد التعديل» */
+        /* (bg-amber-100/80) وترويسة جدول المستخدمين (bg-slate-100/90) بنص فاتح */
+        /* فوق أرضية فاتحة. المحدِّدات مهروبة لأن Tailwind يكتب «/» كـ «\/». */
+        html[data-theme="dark"] .bg-indigo-50\/80 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-slate-100\/90 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-amber-100\/80 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-slate-50\/80 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-teal-50\/80 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-teal-50\/40 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-teal-50\/20 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-slate-100\/80 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/50 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/90 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-200\/80 { background-color: #24324a !important; }
+        html[data-theme="dark"] .bg-slate-100\/70 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/70 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/60 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-amber-50\/90 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/50 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-emerald-100\/40 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-100\/70 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/40 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-indigo-50\/60 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-emerald-50\/30 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/40 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-50\/60 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-blue-50\/35 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-rose-50\/50 { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/35 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-50\/50 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/30 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-rose-50\/20 { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/10 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-teal-50\/30 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-amber-50\/10 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-white\/85 { background-color: #131c2b !important; }
+        html[data-theme="dark"] .bg-white\/80 { background-color: #131c2b !important; }
+
+        /* ---- بقية الدرجات الفاتحة (100 و200) المستعملة في الشارات ---- */
+        html[data-theme="dark"] .bg-gray-200      { background-color: #24324a !important; }
+        html[data-theme="dark"] .bg-amber-200     { background-color: #4a360b !important; }
+        html[data-theme="dark"] .bg-blue-100,
+        html[data-theme="dark"] .bg-indigo-100    { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-blue-200      { background-color: #1e2f52 !important; }
+        html[data-theme="dark"] .bg-emerald-200,
+        html[data-theme="dark"] .bg-green-100     { background-color: #0e3b2c !important; }
+        html[data-theme="dark"] .bg-purple-100    { background-color: #251640 !important; }
+        html[data-theme="dark"] .bg-purple-200    { background-color: #2f1c52 !important; }
+        html[data-theme="dark"] .bg-red-100,
+        html[data-theme="dark"] .bg-rose-100      { background-color: #3b1518 !important; }
+        html[data-theme="dark"] .bg-red-200,
+        html[data-theme="dark"] .bg-rose-200      { background-color: #4a1a1e !important; }
+        html[data-theme="dark"] .bg-teal-100      { background-color: #0c2f31 !important; }
+
+        /* الأزرار الممتلئة والتدرّجات تبقى كما هي: هي أصلاً داكنة ومقروءة. */
+        /* وأصناف bg-white/10..30 تبقى كذلك: هي بريق فوق ترويسات داكنة. */
     }
     </style>
 
