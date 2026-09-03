@@ -558,6 +558,43 @@
         html[data-theme="dark"] .bg-rose-200      { background-color: #4a1a1e !important; }
         html[data-theme="dark"] .bg-teal-100      { background-color: #0c2f31 !important; }
 
+        /* ---- كل نص داكن (درجة 600 فأعلى) مستعمل في الواجهة ---- */
+        /* هذه الدرجات مصمَّمة لخلفيات فاتحة، فتصبح غير مقروءة بعد تعتيم الأسطح. */
+        /* الدرجات 500 فما دون تُترك عمداً: هي أصلاً فاتحة وتجلس فوق ترويسات داكنة. */
+        html[data-theme="dark"] .text-blue-600,
+        html[data-theme="dark"] .text-blue-800,
+        html[data-theme="dark"] .text-blue-950
+            { color: #93c5fd !important; }
+        html[data-theme="dark"] .text-orange-600,
+        html[data-theme="dark"] .text-orange-700,
+        html[data-theme="dark"] .text-orange-800
+            { color: #fdba74 !important; }
+        html[data-theme="dark"] .text-teal-600,
+        html[data-theme="dark"] .text-teal-800,
+        html[data-theme="dark"] .text-teal-950
+            { color: #5eead4 !important; }
+        html[data-theme="dark"] .text-amber-600,
+        html[data-theme="dark"] .text-amber-950
+            { color: #fcd34d !important; }
+        html[data-theme="dark"] .text-emerald-600,
+        html[data-theme="dark"] .text-green-600
+            { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .text-indigo-600,
+        html[data-theme="dark"] .text-indigo-950
+            { color: #a5b4fc !important; }
+        html[data-theme="dark"] .text-purple-600,
+        html[data-theme="dark"] .text-purple-800
+            { color: #c4b5fd !important; }
+        html[data-theme="dark"] .text-rose-600,
+        html[data-theme="dark"] .text-rose-900
+            { color: #fda4af !important; }
+        html[data-theme="dark"] .text-cyan-800
+            { color: #67e8f9 !important; }
+        html[data-theme="dark"] .text-red-600
+            { color: #fca5a5 !important; }
+        html[data-theme="dark"] .text-slate-950
+            { color: #e6edf5 !important; }
+
         /* الأزرار الممتلئة والتدرّجات تبقى كما هي: هي أصلاً داكنة ومقروءة. */
         /* وأصناف bg-white/10..30 تبقى كذلك: هي بريق فوق ترويسات داكنة. */
     }
@@ -6709,14 +6746,20 @@
                                                                             <span>🟢</span>
                                                                             <span>متصل الآن</span>
                                                                         </span>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleForceEvictSession(u.uid, u.name)}
-                                                                            title="إنهاء الجلسة وفك القفل"
-                                                                            className="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-black transition cursor-pointer border border-rose-300"
-                                                                        >
-                                                                            🔓 فك القفل
-                                                                        </button>
+                                                                        {u.uid === currentUserIdRef.current ? (
+                                                                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
+                                                                                أنت
+                                                                            </span>
+                                                                        ) : (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleForceEvictSession(u.uid, u.name)}
+                                                                                title="إنهاء الجلسة وفك القفل"
+                                                                                className="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-black transition cursor-pointer border border-rose-300"
+                                                                            >
+                                                                                🔓 فك القفل
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 ) : (
                                                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
