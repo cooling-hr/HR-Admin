@@ -388,9 +388,117 @@
         }
     </style>
 
+    <!-- ================================================================= -->
+    <!-- الوضع الليلي (Dark Mode)                                          -->
+    <!--                                                                   -->
+    <!-- طبقة CSS مستقلة تماماً: لا تمسّ أي className في شجرة React.        -->
+    <!-- تُعيد تعريف الأصناف البنيوية المستعملة فعلاً تحت data-theme="dark". -->
+    <!--                                                                   -->
+    <!-- كل القواعد داخل @media screen عمداً: فيتصرّف محرّك الطباعة كأن       -->
+    <!-- الوضع الليلي غير موجود، وتخرج الكشوفات الرسمية بيضاء دائماً.       -->
+    <!-- ================================================================= -->
+    <script>
+        // يُطبَّق قبل أول رسم لتفادي وميض أبيض عند فتح الصفحة
+        (function () {
+            try {
+                var saved = localStorage.getItem('hrTheme');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (saved === 'dark' || (!saved && prefersDark)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) { /* بعض المتصفحات تحظر التخزين — نتجاهل ونبقى على الوضع النهاري */ }
+        })();
+        window.__toggleHrTheme = function () {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+            try { localStorage.setItem('hrTheme', isDark ? 'light' : 'dark'); } catch (e) {}
+            return !isDark;
+        };
+    </script>
 
+    <style>
+    @media screen {
+        html[data-theme="dark"] {
+            /* الخطوط العربية تبدو أثقل وتتوهّج على الخلفيات الداكنة — التنعيم يعالج ذلك */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            color-scheme: dark;
+        }
+        html[data-theme="dark"] body { background: #0b1220; }
 
+        /* ---- الأسطح البنيوية ---- */
+        html[data-theme="dark"] .bg-white          { background-color: #131c2b !important; }
+        html[data-theme="dark"] .bg-slate-50,
+        html[data-theme="dark"] .bg-gray-50,
+        html[data-theme="dark"] .bg-slate-100,
+        html[data-theme="dark"] .bg-gray-100       { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-200      { background-color: #24324a !important; }
 
+        /* ---- النصوص: لا أبيض خالص، فالتباين المفرط يُنزف التشكيل داخل الحروف ---- */
+        html[data-theme="dark"] .text-slate-900,
+        html[data-theme="dark"] .text-gray-900,
+        html[data-theme="dark"] .text-slate-800,
+        html[data-theme="dark"] .text-gray-800     { color: #e6edf5 !important; }
+        html[data-theme="dark"] .text-slate-700,
+        html[data-theme="dark"] .text-gray-700     { color: #cbd5e1 !important; }
+        html[data-theme="dark"] .text-slate-600,
+        html[data-theme="dark"] .text-gray-600,
+        html[data-theme="dark"] .text-slate-500,
+        html[data-theme="dark"] .text-gray-500     { color: #94a3b8 !important; }
+        html[data-theme="dark"] .text-slate-400    { color: #7d8ba1 !important; }
+
+        /* ---- الحدود ---- */
+        html[data-theme="dark"] .border-slate-100,
+        html[data-theme="dark"] .border-gray-100,
+        html[data-theme="dark"] .border-slate-200,
+        html[data-theme="dark"] .border-gray-200   { border-color: #2b3a52 !important; }
+        html[data-theme="dark"] .border-slate-300,
+        html[data-theme="dark"] .border-gray-300   { border-color: #3a4c68 !important; }
+
+        /* ---- حقول الإدخال ---- */
+        html[data-theme="dark"] input,
+        html[data-theme="dark"] select,
+        html[data-theme="dark"] textarea {
+            background-color: #1a2536 !important;
+            color: #e6edf5 !important;
+            border-color: #3a4c68 !important;
+        }
+        html[data-theme="dark"] input::placeholder,
+        html[data-theme="dark"] textarea::placeholder { color: #6b7a91 !important; }
+        html[data-theme="dark"] option { background-color: #1a2536; color: #e6edf5; }
+
+        /* ---- الألوان الدلالية: نُبقي الصبغة ونخفض الإضاءة فقط ---- */
+        /* الأحمر = غياب · الكهرماني = تنبيه · الأخضر = حضور · النيلي = إجراء */
+        html[data-theme="dark"] .bg-red-50      { background-color: #3b1518 !important; }
+        html[data-theme="dark"] .text-red-800,
+        html[data-theme="dark"] .text-red-700   { color: #fca5a5 !important; }
+        html[data-theme="dark"] .bg-rose-50     { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .text-rose-700  { color: #fda4af !important; }
+        html[data-theme="dark"] .bg-amber-50    { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .text-amber-900,
+        html[data-theme="dark"] .text-amber-800 { color: #fcd34d !important; }
+        html[data-theme="dark"] .bg-emerald-50,
+        html[data-theme="dark"] .bg-green-50    { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .text-emerald-800,
+        html[data-theme="dark"] .text-green-800 { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .bg-indigo-50,
+        html[data-theme="dark"] .bg-blue-50     { background-color: #16233f !important; }
+        html[data-theme="dark"] .text-indigo-900,
+        html[data-theme="dark"] .text-blue-900,
+        html[data-theme="dark"] .text-indigo-800 { color: #a5b4fc !important; }
+        html[data-theme="dark"] .bg-teal-50     { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .text-teal-900  { color: #5eead4 !important; }
+        html[data-theme="dark"] .bg-purple-50   { background-color: #251640 !important; }
+        html[data-theme="dark"] .text-purple-700 { color: #c4b5fd !important; }
+
+        /* الأزرار الممتلئة والتدرّجات تبقى كما هي: هي أصلاً داكنة ومقروءة، */
+        /* وأصناف الشفافية (bg-white/20 وأخواتها) فوق ترويسات داكنة فلا تُمَس. */
+    }
+    </style>
 
 </head>
 <body>
@@ -1163,6 +1271,10 @@
             // حالات مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center)
             const [showRestoreCenterModal, setShowRestoreCenterModal] = useState(false);
             const [showSessionsModal, setShowSessionsModal] = useState(false);
+            // الوضع الليلي محفوظ على <html> ويُطبَّق قبل تحميل React؛ هذه الحالة لأيقونة الزر فقط
+            const [isDarkTheme, setIsDarkTheme] = useState(() => {
+                try { return document.documentElement.getAttribute('data-theme') === 'dark'; } catch (e) { return false; }
+            });
             const [availableSnapshots, setAvailableSnapshots] = useState([]);
             const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false);
             const [snapshotsError, setSnapshotsError] = useState(null);
@@ -5683,6 +5795,15 @@
                                     {(typeof cloudSyncStatus !== 'undefined' && cloudSyncStatus && cloudSyncStatus.connected) ? '☁️ متصل بالسحابة الحية (أونلاين 24/7)' : (syncStatus.connected ? `🟢 السيرفر المحلي نشط (${syncStatus.ip || 'Local'})` : '🟡 أوفلاين محلي')}
                                 </span>
                             </div>
+
+                            {/* مبدّل الوضع الليلي — متاح للجميع، حتى الزائر الذي يتصفّح ويطبع دون تسجيل دخول */}
+                            <button
+                                onClick={() => setIsDarkTheme(window.__toggleHrTheme())}
+                                className="px-3 py-1 bg-slate-900/50 hover:bg-slate-900/80 border border-white/20 text-white rounded-full text-xs font-bold shadow transition flex items-center gap-1 cursor-pointer flex-shrink-0 no-print"
+                                title={isDarkTheme ? "التبديل إلى الوضع النهاري" : "التبديل إلى الوضع الليلي (الطباعة تبقى بيضاء دائماً)"}
+                            >
+                                {isDarkTheme ? '☀️ نهاري' : '🌙 ليلي'}
+                            </button>
 
                             {/* شريط التحكم بالصفة وإدارة المستخدمين */}
                             {currentUserRole && (
