@@ -1270,7 +1270,6 @@
 
             // حالات مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center)
             const [showRestoreCenterModal, setShowRestoreCenterModal] = useState(false);
-            const [showSessionsModal, setShowSessionsModal] = useState(false);
             // الوضع الليلي محفوظ على <html> ويُطبَّق قبل تحميل React؛ هذه الحالة لأيقونة الزر فقط
             const [isDarkTheme, setIsDarkTheme] = useState(() => {
                 try { return document.documentElement.getAttribute('data-theme') === 'dark'; } catch (e) { return false; }
@@ -1282,6 +1281,8 @@
             const [isRestoringSnapshot, setIsRestoringSnapshot] = useState(false);
 
             const [loginInputRole, setLoginInputRole] = useState('operator');
+            // حين يكون الحساب مفتوحاً على جهاز آخر، نعرض الخيار بدل رسالة مسدودة
+            const [pendingTakeover, setPendingTakeover] = useState(null);
             const [loginEmail, setLoginEmail] = useState('');
             const [loginPassword, setLoginPassword] = useState('');
             const [loginError, setLoginError] = useState('');
@@ -1339,11 +1340,13 @@
                         if (sessData && sessData.sessionId && sessData.lastSeen) {
                             const elapsed = Date.now() - sessData.lastSeen;
                             if (elapsed < 15000 && sessData.sessionId !== currentSessionIdRef.current) {
+                                // لا نسدّ الطريق: من وصل هو من يقرّر. القرار يُستأنف في completeLogin.
                                 setIsCheckingLogin(false);
-                                signOutFirebase();
-                                setLoginError(`⛔ هذا الحساب (${targetUser.name}) قيد الاستخدام حالياً من جهاز آخر!
-لا يمكن لشخصين تسجيل الدخول بنفس الحساب في آن واحد.
-(يرجى تسجيل الخروج من الجهاز الآخر أولاً، أو الانتظار 15 ثانية في حال إغلاق المتصفح).`);
+                                setPendingTakeover({
+                                    targetUser: targetUser,
+                                    roleData: roleData,
+                                    otherDeviceSeconds: Math.max(1, Math.round(elapsed / 1000))
+                                });
                                 return;
                             }
                         }
@@ -1351,6 +1354,13 @@
                 } catch (err) {
                     console.warn("Session check error:", err);
                 }
+
+                await completeLogin(targetUser, roleData);
+            };
+
+            // إتمام الدخول بعد اجتياز فحص الجلسة — أو بعد أن يختار المستخدم إنهاء الجلسة الأخرى
+            const completeLogin = async (targetUser, roleData) => {
+                const enforcesSessionLock = targetUser.role !== 'viewer';
 
                 // حجز الجلسة الفردية للجهاز الحالي
                 const newSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 7);
@@ -1382,10 +1392,27 @@
                 }
                 logAuditEvent('login', targetUser.name);
                 setIsCheckingLogin(false);
+                setPendingTakeover(null);
                 setShowWelcome(false);
                 setLoginEmail('');
                 setLoginPassword('');
                 setShowLoginModal(false);
+            };
+
+            // المستخدم اختار المتابعة: نكتب معرّف جلسة جديداً، فيلتقطه نبض الجهاز الآخر
+            // خلال خمس ثوانٍ ويسجّل خروجه برسالة تشرح ما جرى.
+            const confirmSessionTakeover = async () => {
+                if (!pendingTakeover) return;
+                const { targetUser, roleData } = pendingTakeover;
+                setPendingTakeover(null);
+                setIsCheckingLogin(true);
+                await completeLogin(targetUser, roleData);
+            };
+
+            const cancelSessionTakeover = () => {
+                setPendingTakeover(null);
+                signOutFirebase();
+                setLoginPassword('');
             };
 
             const handleLogout = () => {
@@ -1455,7 +1482,7 @@
                 return () => window.removeEventListener('beforeunload', handleBeforeUnload);
             }, []);
 
-            // استطلاع الجلسات النشطة لكل مستخدم مسجّل — يغذّي قفل التحرير بين الأقران وقائمة الجلسات
+            // استطلاع الجلسات النشطة — يغذّي قفل التحرير بين الأقران ومؤشرات الاتصال في جدول المستخدمين
             React.useEffect(() => {
                 if (!currentUserRole || currentUserRole === 'viewer') return;
                 const fetchSessions = async () => {
@@ -5602,11 +5629,6 @@
 
 
 
-            const liveSessionUids = Object.keys(activeSessions || {}).filter(uid => {
-                const sess = activeSessions[uid];
-                return sess && sess.lastSeen && (Date.now() - sess.lastSeen < 15000);
-            });
-
             return (
                 <div className="min-h-screen bg-gray-50">
 
@@ -5834,16 +5856,6 @@
                                         >
                                             <span>🛡️</span>
                                             <span>{currentUserRole === 'admin' ? 'الأرشيف والاستعادة' : 'الأرشيف'}</span>
-                                        </button>
-                                    )}
-                                    {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
-                                        <button
-                                            onClick={() => setShowSessionsModal(true)}
-                                            className="px-3.5 py-1 bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-700 hover:to-blue-800 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
-                                            title="عرض الجلسات النشطة وفك أي جلسة عالقة"
-                                        >
-                                            <span>🔓</span>
-                                            <span>الجلسات النشطة</span>
                                         </button>
                                     )}
                                     <button
@@ -6262,7 +6274,36 @@
                                 />
                             </div>
 
-                            {loginError && (
+                            {pendingTakeover && (
+                                <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-xl text-right shadow-sm space-y-3">
+                                    <div className="flex items-start gap-2">
+                                        <span className="text-xl leading-none">⚠️</span>
+                                        <div className="text-xs font-bold text-amber-900 leading-relaxed">
+                                            <div className="font-black text-sm mb-1">هذا الحساب مفتوح على جهاز آخر</div>
+                                            <div>آخر نشاط على ذلك الجهاز قبل {pendingTakeover.otherDeviceSeconds} ثانية.</div>
+                                            <div className="mt-1">إن تابعت، سيُسجَّل خروج ذلك الجهاز تلقائياً وتظهر له رسالة توضّح السبب.</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={confirmSessionTakeover}
+                                            className="flex-1 py-2.5 bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 text-white font-black rounded-xl text-xs shadow transition active:scale-95 cursor-pointer"
+                                        >
+                                            متابعة وإنهاء الجلسة الأخرى
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={cancelSessionTakeover}
+                                            className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition cursor-pointer"
+                                        >
+                                            إلغاء
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {loginError && !pendingTakeover && (
                                 <div className="p-3 bg-red-50 border-2 border-red-300 text-red-700 text-xs font-bold rounded-xl text-center whitespace-pre-line leading-relaxed shadow-sm">
                                     {loginError}
                                 </div>
@@ -6676,37 +6717,6 @@
                 </div>
             )}
 
-            {showSessionsModal && (
-                <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[120] flex items-center justify-center p-4 no-print">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
-                        <div className="bg-gradient-to-r from-sky-700 to-blue-900 p-4 text-white flex justify-between items-center">
-                            <h3 className="text-base font-black flex items-center gap-2"><span>🔓</span><span>الجلسات النشطة</span></h3>
-                            <button onClick={() => setShowSessionsModal(false)} className="bg-white/10 hover:bg-white/20 w-8 h-8 rounded-full font-bold transition">✕</button>
-                        </div>
-                        <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
-                            {liveSessionUids.map(uid => (
-                                <div key={uid} className="flex items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                                    <div>
-                                        <div className="font-black text-sm text-slate-900">{activeSessions[uid].name}</div>
-                                        <div className="text-[11px] text-slate-500">{activeSessions[uid].role}</div>
-                                    </div>
-                                    <button
-                                        onClick={() => handleForceEvictSession(uid, activeSessions[uid].name)}
-                                        className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black transition"
-                                    >
-                                        🔓 فك القفل
-                                    </button>
-                                </div>
-                            ))}
-                            {liveSessionUids.length === 0 && (
-                                <div className="text-center text-slate-500 text-sm font-bold py-6">لا توجد جلسات نشطة حالياً.</div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* نافذة مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center Modal) */}
             {showRestoreCenterModal && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden animate-fadeInUp my-auto">
