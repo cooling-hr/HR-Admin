@@ -2442,10 +2442,31 @@
                 return parts.slice(0, 3).join(' ');
             };
 
+            // ===== الفترات المؤرَّخة للحالات (Dated Status Periods) =====
+            const PERIOD_TYPES = ['إجازة اعتيادية', 'في دورة', 'إيفاد', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
+
+            const periodsOf = (emp) => (emp && Array.isArray(emp.statusPeriods)) ? emp.statusPeriods : [];
+
+            // الفترة التي تغطّي تاريخاً بعينه. to فارغة تعني فترة مفتوحة النهاية.
+            // الحسابات القديمة التي تحمل حالة دائمة ولا فترات لها تُقرأ كفترة مفتوحة
+            // مشتقّة — بلا كتابة أي بيانات، فلا يتغيّر موقف أحد لحظة التحديث.
+            const getActivePeriod = (emp, dateStr) => {
+                if (!emp || !dateStr) return null;
+                const list = periodsOf(emp);
+                if (list.length > 0) {
+                    return list.find(p => p && p.from && dateStr >= p.from && (!p.to || dateStr <= p.to)) || null;
+                }
+                if (emp.status && emp.status !== 'نشط') {
+                    return { id: 'legacy_' + emp.id, type: emp.status, from: '1900-01-01', to: null, note: '', legacy: true };
+                }
+                return null;
+            };
+
             // الحصول على الموقف الطبيعي الافتراضي للمنتسب بدون أي تعديلات (الحضور/الدوام الأصلي)
             const getEmployeeDefaultNaturalStatus = (emp, dateStr) => {
-                if (emp.status && emp.status !== 'نشط') {
-                    return emp.status;
+                const activePeriod = getActivePeriod(emp, dateStr);
+                if (activePeriod) {
+                    return activePeriod.type;
                 }
                 const isOfficialHoliday = officialHolidays.includes(dateStr);
                 if (emp.workType === 'صباحي') {
@@ -2511,8 +2532,9 @@
                         return ov;
                     }
                 }
-                if (emp.status && emp.status !== 'نشط') {
-                    return emp.status;
+                const activePeriod = getActivePeriod(emp, dateStr);
+                if (activePeriod) {
+                    return activePeriod.type;
                 }
                 
                 // 2. فحص العطل الرسمية المحددة بالنظام
