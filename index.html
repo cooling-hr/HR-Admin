@@ -4831,6 +4831,18 @@
             
             const saveEmployeeEdit = () => {
                 if (!editingEmployee) return;
+                const periods = periodsOf(editingEmployee).filter(p => p.from);
+                for (let i = 0; i < periods.length; i++) {
+                    for (let j = i + 1; j < periods.length; j++) {
+                        const a = periods[i], b = periods[j];
+                        const aEnd = a.to || '9999-12-31';
+                        const bEnd = b.to || '9999-12-31';
+                        if (a.from <= bEnd && b.from <= aEnd) {
+                            alert('⛔ فترتان متداخلتان: «' + a.type + '» و«' + b.type + '».' + String.fromCharCode(10,10) + 'لا يمكن أن يكون الموظف في حالتين في اليوم نفسه. عدّل التواريخ ثم أعد الحفظ.');
+                            return;
+                        }
+                    }
+                }
                 if (!canEdit('staffMaster')) {
                     alert('⛔ عذراً، ليس لديك صلاحية إضافة أو تعديل بيانات الملاك العام والمنتسبين!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
                     return;
@@ -4951,6 +4963,25 @@
                 }
             };
             
+            const addPeriodToEditing = () => {
+                if (!editingEmployee) return;
+                const today = new Date().toISOString().split('T')[0];
+                const next = [...periodsOf(editingEmployee), { id: 'per_' + Date.now(), type: 'في دورة', from: today, to: '', note: '' }];
+                setEditingEmployee({ ...editingEmployee, statusPeriods: next });
+            };
+
+            const updateEditingPeriod = (index, key, value) => {
+                if (!editingEmployee) return;
+                const next = periodsOf(editingEmployee).map((p, i) => i === index ? { ...p, [key]: value } : p);
+                setEditingEmployee({ ...editingEmployee, statusPeriods: next });
+            };
+
+            const removeEditingPeriod = (index) => {
+                if (!editingEmployee) return;
+                const next = periodsOf(editingEmployee).filter((p, i) => i !== index);
+                setEditingEmployee({ ...editingEmployee, statusPeriods: next });
+            };
+
             const updateEditField = (field, value) => {
                 if (field === 'name' && value) {
                     const guessedGender = guessGender(value);
@@ -10528,6 +10559,58 @@
                                                 <option value="إجازة أمومة">إجازة أمومة</option>
                                             </select>
                                         </div>
+                                    <div className="md:col-span-2 space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-sm font-black text-slate-800">📅 فترات الحالة المؤرَّخة</span>
+                                            <button type="button" onClick={addPeriodToEditing} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black transition cursor-pointer">
+                                                ➕ إضافة فترة
+                                            </button>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                                            تُدخل الفترة مرة واحدة فتتولّى بقية الأيام. اترك حقل «إلى» فارغاً لفترة مفتوحة النهاية تستمر حتى تُنهيها — وهذا شكل الغياب.
+                                        </p>
+                                        {periodsOf(editingEmployee).length === 0 ? (
+                                            <div className="text-center text-slate-400 text-xs font-bold py-3">لا توجد فترات مسجّلة.</div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {periodsOf(editingEmployee).map((p, idx) => (
+                                                    <div key={p.id || idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-white border border-slate-200 rounded-lg p-2">
+                                                        <select
+                                                            value={p.type || ''}
+                                                            onChange={(e) => updateEditingPeriod(idx, 'type', e.target.value)}
+                                                            className="md:col-span-3 border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:border-indigo-600"
+                                                        >
+                                                            {PERIOD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                        </select>
+                                                        <input
+                                                            type="date"
+                                                            value={p.from || ''}
+                                                            onChange={(e) => updateEditingPeriod(idx, 'from', e.target.value)}
+                                                            title="من"
+                                                            className="md:col-span-3 border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-mono outline-none focus:border-indigo-600"
+                                                        />
+                                                        <input
+                                                            type="date"
+                                                            value={p.to || ''}
+                                                            onChange={(e) => updateEditingPeriod(idx, 'to', e.target.value)}
+                                                            title="إلى — اتركه فارغاً لفترة مفتوحة"
+                                                            className="md:col-span-3 border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-mono outline-none focus:border-indigo-600"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={p.note || ''}
+                                                            onChange={(e) => updateEditingPeriod(idx, 'note', e.target.value)}
+                                                            placeholder="ملاحظة"
+                                                            className="md:col-span-2 border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-indigo-600"
+                                                        />
+                                                        <button type="button" onClick={() => removeEditingPeriod(idx)} title="حذف الفترة" className="md:col-span-1 px-2 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-black transition cursor-pointer">
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                         
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">قياس البدلة</label>
