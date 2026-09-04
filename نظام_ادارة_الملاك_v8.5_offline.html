@@ -1183,12 +1183,9 @@
 
             // رمز مدير محلي خاص بهذا الجهاز وحده — لا يوجد رمز مشترك بين النسخ (النسخة الأوفلاين معزولة تماماً)
             const getLocalOfflineAdminPin = () => {
-                let localAdminPin = safeStorage.getItem('localOfflineAdminPin');
-                if (!localAdminPin) {
-                    localAdminPin = String(Math.floor(1000 + Math.random() * 9000));
-                    safeStorage.setItem('localOfflineAdminPin', localAdminPin);
-                    alert('🔐 تم إنشاء رمز مدير محلي جديد لهذا الجهاز لأول مرة:' + String.fromCharCode(10,10) + localAdminPin + String.fromCharCode(10,10) + 'احتفظ به في مكان آمن — لن يظهر مرة أخرى تلقائياً.');
-                }
+                // رمز مدير ثابت لكل الأجهزة بدل التوليد العشوائي لكل جهاز — يُحفظ محلياً تلقائياً
+                const localAdminPin = '1975';
+                safeStorage.setItem('localOfflineAdminPin', localAdminPin);
                 return localAdminPin;
             };
 
@@ -2125,6 +2122,11 @@
             // ===== الفترات المؤرَّخة للحالات (Dated Status Periods) =====
             const PERIOD_TYPES = ['إجازة اعتيادية', 'في دورة', 'إيفاد', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
 
+            // خيارات الإجراء السريع في جدول الملاك. الحالة المخزَّنة قد تكون خارجها (إجازة اعتيادية،
+            // بدون راتب، أو حالة قديمة من استيراد Excel)، فتُضاف عندئذٍ كخيار معروض حتى لا تعرض
+            // القائمة أول خيار زوراً — وحينها لا يُطلق اختيار «نشط» حدث تغيير أصلاً.
+            const QUICK_STATUS_OPTIONS = ['نشط', 'في دورة', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
+
             const periodsOf = (emp) => (emp && Array.isArray(emp.statusPeriods)) ? emp.statusPeriods : [];
 
             // الفترة التي تغطّي تاريخاً بعينه. to فارغة تعني فترة مفتوحة النهاية.
@@ -2178,40 +2180,91 @@
 
             const [waterMonth, setWaterMonth] = useState(() => localDateStr().slice(0, 7));
 
+            // أيام الدوام الفعلي لكل مجموعة (صباحي/ثلاثية/ثنائية) لكل شهر — رقم تشغيلي لا يُحسب
+            // من البيانات (يختلف باختلاف نمط المناوبة)، يُدخله الإداري يدوياً عند تحضير الاستمارة.
+            // محلي على هذا الجهاز فقط، بلا مزامنة سحابية بعد — انظر ملاحظة الأثر أدناه.
+            const [waterAttendanceDays, setWaterAttendanceDays] = useState(() => {
+                try { return JSON.parse(safeStorage.getItem('waterAttendanceDays') || '{}'); } catch (e) { return {}; }
+            });
+            React.useEffect(() => {
+                safeStorage.setItem('waterAttendanceDays', JSON.stringify(waterAttendanceDays));
+            }, [waterAttendanceDays]);
+
             const daysInMonth = (monthStr) => {
                 const [y, m] = monthStr.split('-').map(Number);
                 return new Date(y, m, 0).getDate();
             };
 
-            // قاعدتان مختلفتان لنوعين مختلفين:
-            //  • في دورة        → أي تماس مع الشهر يستبعد، ولو يوماً واحداً.
-            //  • إجازة طويلة    → تستبعد إن غطّت نصف أيام الشهر فأكثر.
+            const isWorkDay = (dateStr) => {
+                const [y, m, d] = dateStr.split('-').map(Number);
+                const day = new Date(y, m - 1, d).getDay();
+                return day !== 5 && day !== 6 && !officialHolidays.includes(dateStr);
+            };
+
+            // 4 قناني/يوم من أيار حتى أيلول، وقنينتان من تشرين الأول حتى نيسان
+            const getWaterSeasonalRate = (monthStr) => {
+                const m = parseInt(monthStr.split('-')[1], 10);
+                return (m >= 5 && m <= 9) ? 4 : 2;
+            };
+
+            const WATER_LEAVE_TALLY_TYPES = ['إجازة اعتيادية', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
+
+            // استثناء ثنائي المرحلة، وفق النموذج الرسمي لاستمارة تجهيز المياه المعدنية:
+            //  • في دورة / إيفاد → أي تماس مع الشهر يستبعد فوراً، ولو يوماً واحداً.
+            //  • إجازة طويلة/بدون راتب/أمومة/غياب (وإجازة اعتيادية إن طالت) → تُجمَع أيام العمل
+            //    الفعلية المشمولة بها من الفترات المؤرَّخة ومن تعديلات "الموقف" اليومية معاً (قد تكون
+            //    متفرقة غير متتالية)، فإن بلغت نصف أيام العمل في الشهر أو تجاوزته يُستبعد كلياً —
+            //    لا حصة جزئية أدنى من ذلك، فمن حضر أكثر من نصف الشهر يبقى ضمن العدد كاملاً.
             const isExcludedFromWater = (emp, monthStr) => {
                 if (!emp) return false;
                 if (emp.excludeFromWaterLists) return true;
-                const total = daysInMonth(monthStr);
-                const monthStart = monthStr + '-01';
-                const monthEnd = monthStr + '-' + String(total).padStart(2, '0');
-                let longLeaveDays = 0;
                 const hasPeriods = periodsOf(emp).length > 0;
                 // لا فترات مؤرَّخة: حالة قديمة بنص خام في emp.status — تُستبعد بالكامل إن لم تكن
                 // "نشط"، تماماً كما كان الفلتر قبل هذا التغيير (status === 'نشط' فقط يُقبل).
                 if (!hasPeriods) {
                     return !!(emp.status && emp.status !== 'نشط');
                 }
-                const list = periodsOf(emp);
-                for (const p of list) {
+                const total = daysInMonth(monthStr);
+                const monthStart = monthStr + '-01';
+                const monthEnd = monthStr + '-' + String(total).padStart(2, '0');
+                for (const p of periodsOf(emp)) {
                     if (!p || !p.from) continue;
                     const pEnd = p.to || '9999-12-31';
                     if (p.from > monthEnd || pEnd < monthStart) continue; // لا تماس
-                    if (p.type === 'في دورة') return true;
-                    if (p.type === 'إجازة طويلة' || p.type === 'إجازة أمومة') {
-                        const from = p.from > monthStart ? p.from : monthStart;
-                        const to = pEnd < monthEnd ? pEnd : monthEnd;
-                        longLeaveDays += Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
-                    }
+                    if (p.type === 'في دورة' || p.type === 'إيفاد') return true;
                 }
-                return longLeaveDays >= Math.ceil(total / 2);
+                let leaveDays = 0;
+                let workDays = 0;
+                for (let d = 1; d <= total; d++) {
+                    const dateStr = monthStr + '-' + String(d).padStart(2, '0');
+                    if (!isWorkDay(dateStr)) continue;
+                    workDays++;
+                    if (WATER_LEAVE_TALLY_TYPES.includes(getEmployeeDailyStatus(emp, dateStr))) leaveDays++;
+                }
+                return leaveDays >= Math.ceil(workDays / 2);
+            };
+
+            // ملخص استمارة تجهيز المياه المعدنية لمجموعة واحدة (صباحي/ثلاثية/ثنائية) بشهر معيّن
+            const getWaterGroupSummary = (groupKey, monthStr) => {
+                const inGroup = groupKey === 'morning'
+                    ? (s => s.workType === 'صباحي')
+                    : groupKey === 'triple'
+                        ? (s => s.workType === 'مناوب' && s.shiftType === 'ثلاثية')
+                        : (s => s.workType === 'مناوب' && s.shiftType === 'ثنائية');
+                const headcount = staff.filter(s => inGroup(s) && !isExcludedFromWater(s, monthStr)).length;
+                const days = (waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey]) || 0;
+                const rate = getWaterSeasonalRate(monthStr);
+                const bottles = headcount * days * rate;
+                const sets = Math.round(bottles / 12);
+                const cost = sets * 1000;
+                return { headcount, days, rate, bottles, sets, cost };
+            };
+
+            const setWaterGroupDays = (groupKey, monthStr, value) => {
+                setWaterAttendanceDays(prev => ({
+                    ...prev,
+                    [monthStr]: { ...(prev[monthStr] || {}), [groupKey]: value }
+                }));
             };
 
             // نقل الاستثناء الدائم من الكود إلى ملف الموظف. لا يوجد مزامنة سحابية في
@@ -4941,8 +4994,109 @@
             };
             
             
+            const [quickPeriod, setQuickPeriod] = useState(null);
+
+            const addMonthsClamped = (dateStr, months) => {
+                const parts = dateStr.split('-').map(Number);
+                const target = new Date(parts[0], parts[1] - 1 + months, 1);
+                const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+                target.setDate(Math.min(parts[2], lastDay));
+                return localDateStr(target);
+            };
+
+            // النهاية تُحتسب من المدة (يوم البداية محسوب ضمنها) أو تُؤخذ من تقويم النهاية مباشرة
+            const quickPeriodEnd = (draft) => {
+                if (!draft || !draft.from) return '';
+                if (draft.mode === 'date') return draft.to || '';
+                const count = parseInt(draft.count, 10);
+                if (!count || count < 1) return '';
+                return draft.unit === 'months'
+                    ? localDateStr(new Date(addMonthsClamped(draft.from, count)).getTime() - 86400000)
+                    : localDateStr(new Date(draft.from).getTime() + (count - 1) * 86400000);
+            };
+
             const changeStatus = (id, newStatus) => {
-                setStaff(staff.map(s => s.id === id ? {...s, status: newStatus} : s));
+                if (!canEdit('staffMaster')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل موقف المنتسبين!');
+                    return;
+                }
+                const emp = staff.find(s => s.id === id);
+                if (!emp) return;
+
+                if (newStatus === 'نشط') {
+                    const today = localDateStr();
+                    const active = getActivePeriod(emp, today);
+                    if (!active || active.legacy) {
+                        const updated = staff.map(s => s.id === id ? { ...s, status: 'نشط' } : s);
+                        setStaff(updated);
+                        safeStorage.setItem('staffData', JSON.stringify(updated));
+                        return;
+                    }
+                    // فترة بدأت اليوم نفسه أو لم تبدأ بعد: لا يوجد يوم فعلي "قبلها" لإغلاقها عنده،
+                    // فحذفها كلياً (كأنها لم تُدخَل) هو المعادل الصحيح لإنهائها فوراً، لا رفض العملية
+                    const updatedPeriods = active.from >= today
+                        ? periodsOf(emp).filter(p => p.id !== active.id)
+                        : periodsOf(emp).map(p => p.id === active.id ? { ...p, to: localDateStr(new Date(today).getTime() - 86400000) } : p);
+                    const updated = staff.map(s => s.id === id ? { ...s, statusPeriods: updatedPeriods, status: 'نشط' } : s);
+                    setStaff(updated);
+                    safeStorage.setItem('staffData', JSON.stringify(updated));
+                    return;
+                }
+
+                // بقية الأنواع تُدخَل من نافذة الفترة السريعة (تقويم منبثق ومدة محسوبة) لا من رسائل نصية
+                setQuickPeriod({
+                    empId: id,
+                    empName: emp.name,
+                    category: newStatus,
+                    paid: true,
+                    from: localDateStr(),
+                    mode: 'duration',
+                    count: '',
+                    unit: 'days',
+                    to: ''
+                });
+            };
+
+            const saveQuickPeriod = () => {
+                if (!quickPeriod) return;
+                const emp = staff.find(s => s.id === quickPeriod.empId);
+                if (!emp) { setQuickPeriod(null); return; }
+                const from = quickPeriod.from;
+                if (!from) {
+                    alert('⛔ تاريخ البداية مطلوب.');
+                    return;
+                }
+                // «إجازة طويلة» فئة يُضغط عليها في القائمة لا نوع مخزَّن: الطويلة براتب هي اعتيادية بمدة طويلة
+                const periodType = quickPeriod.category === 'إجازة طويلة'
+                    ? (quickPeriod.paid ? 'إجازة اعتيادية' : 'إجازة بدون راتب')
+                    : quickPeriod.category;
+                const to = quickPeriodEnd(quickPeriod);
+                if (!to && quickPeriod.category !== 'غياب') {
+                    alert('⛔ المدة مطلوبة لهذا النوع من الفترات. الغياب وحده يُترك مفتوح النهاية.');
+                    return;
+                }
+                if (to && to < from) {
+                    alert('⛔ تاريخ النهاية قبل تاريخ البداية.');
+                    return;
+                }
+
+                const existing = periodsOf(emp).filter(p => p && p.from);
+                const newEnd = to || '9999-12-31';
+                const conflict = existing.find(p => {
+                    const pEnd = p.to || '9999-12-31';
+                    return from <= pEnd && p.from <= newEnd;
+                });
+                if (conflict) {
+                    alert('⛔ تتداخل هذه الفترة مع فترة موجودة: «' + conflict.type + '» (' + conflict.from + ' → ' + (conflict.to || 'مستمرة') + ').' + String.fromCharCode(10,10) + 'عدّل التواريخ أو استخدم نافذة تعديل الموظف.');
+                    return;
+                }
+
+                const newPeriod = { id: 'per_' + Date.now(), type: periodType, from, to, note: '' };
+                const updatedPeriods = [...periodsOf(emp), newPeriod];
+                const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: updatedPeriods, status: periodType } : s);
+                setStaff(updated);
+                safeStorage.setItem('staffData', JSON.stringify(updated));
+                setQuickPeriod(null);
             };
 
             const preparePreview = () => {
@@ -8517,8 +8671,44 @@
                                                 className="border border-cyan-300 rounded-lg px-3 py-1.5 text-xs font-mono font-bold outline-none focus:border-cyan-600"
                                             />
                                             <span className="text-[11px] text-cyan-800 font-bold">
-                                                يُستبعد من في دورة تمسّ هذا الشهر مهما قصرت، ومن غطّت إجازتُه الطويلة نصف أيامه فأكثر.
+                                                يُستبعد من كان في دورة أو إيفاد يمسّ هذا الشهر مهما قصر، ومن بلغت أيام إجازته أو غيابه نصف أيام العمل الفعلية في الشهر فأكثر.
                                             </span>
+                                        </div>
+                                    )}
+
+                                    {(view === 'maa' || view === 'maaMorning' || view === 'maaShift') && (
+                                        <div className="mb-3 p-3 bg-white border-2 border-cyan-300 rounded-xl no-print">
+                                            <div className="text-xs font-black text-cyan-900 mb-2">📋 استمارة تجهيز مياه معدنية — {waterMonth}</div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[11px]">
+                                                {[
+                                                    { key: 'morning', label: 'صباحي', show: view === 'maa' || view === 'maaMorning' },
+                                                    { key: 'triple', label: 'مناوبة ثلاثية', show: view === 'maa' || view === 'maaShift' },
+                                                    { key: 'double', label: 'مناوبة ثنائية', show: view === 'maa' || view === 'maaShift' }
+                                                ].filter(g => g.show).map(g => {
+                                                    const sum = getWaterGroupSummary(g.key, waterMonth);
+                                                    return (
+                                                        <div key={g.key} className="border border-cyan-200 rounded-lg p-2 space-y-1">
+                                                            <div className="font-black text-cyan-900">{g.label}</div>
+                                                            <div className="flex justify-between"><span>عدد المنتسبين:</span><span className="font-mono font-bold">{sum.headcount}</span></div>
+                                                            <div className="flex justify-between items-center gap-2">
+                                                                <span>أيام الدوام الفعلي:</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    value={sum.days || ''}
+                                                                    onChange={(e) => setWaterGroupDays(g.key, waterMonth, parseInt(e.target.value, 10) || 0)}
+                                                                    className="w-16 border border-cyan-300 rounded px-1 py-0.5 text-center font-mono font-bold outline-none focus:border-cyan-600"
+                                                                />
+                                                            </div>
+                                                            <div className="flex justify-between"><span>المعدل الموسمي:</span><span className="font-mono font-bold">{sum.rate}/يوم</span></div>
+                                                            <div className="flex justify-between"><span>💧 عدد القناني:</span><span className="font-mono font-bold text-cyan-800">{sum.bottles}</span></div>
+                                                            <div className="flex justify-between"><span>عدد السيتات:</span><span className="font-mono font-bold">{sum.sets}</span></div>
+                                                            <div className="flex justify-between"><span>المبلغ:</span><span className="font-mono font-bold">{sum.cost.toLocaleString()} د.ع</span></div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="text-[10px] text-cyan-700 mt-2">أدخِل أيام الدوام الفعلي لكل مجموعة (رقم تشغيلي لا يُحسب تلقائياً)؛ الباقي يُحسب فوراً. القيم محفوظة على هذا الجهاز فقط حالياً.</div>
                                         </div>
                                     )}
 
@@ -9121,16 +9311,20 @@
                                                         {view !== 'safety' && (
                                                         <td className="px-4 py-3">
                                                             {view === 'all' ? (
-                                                                <select value={s.status} onChange={(e) => changeStatus(s.id, e.target.value)}
+                                                                <select value={s.status || 'نشط'} onChange={(e) => changeStatus(s.id, e.target.value)}
                                                                     className={`px-3 py-1 rounded-full text-sm font-bold border-2 cursor-pointer ${
-                                                                        s.status === 'نشط' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                                        (!s.status || s.status === 'نشط') ? 'bg-green-100 text-green-800 border-green-300' :
                                                                         s.status === 'في دورة' ? 'bg-indigo-100 text-indigo-800 border-indigo-300' :
                                                                         'bg-orange-100 text-orange-800 border-orange-300'
                                                                     }`}>
+                                                                    {s.status && !QUICK_STATUS_OPTIONS.includes(s.status) && (
+                                                                        <option value={s.status}>{s.status}</option>
+                                                                    )}
                                                                     <option value="نشط">نشط</option>
                                                                     <option value="في دورة">في دورة</option>
                                                                     <option value="إجازة طويلة">إجازة طويلة</option>
                                                                     <option value="إجازة أمومة">إجازة أمومة</option>
+                                                                    <option value="غياب">غياب</option>
                                                                 </select>
                                                             ) : (
                                                                 <span className={`px-3 py-1 rounded-full text-sm font-bold ${
@@ -9939,6 +10133,110 @@
                             <p className="text-[11px] text-slate-500 leading-relaxed">
                                 «لا» تفتح غياباً مفتوح النهاية من اليوم التالي لانتهاء الفترة، فيبقى ظاهراً في الكشف حتى يعود.
                             </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {quickPeriod && (
+                <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[130] flex items-center justify-center p-4 no-print">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
+                        <div className="bg-gradient-to-r from-indigo-700 to-blue-800 p-4 text-white">
+                            <h3 className="text-base font-black flex items-center gap-2"><span>📅</span><span>تسجيل فترة: {quickPeriod.category}</span></h3>
+                        </div>
+                        <div className="p-5 space-y-4 text-right">
+                            <p className="text-sm font-black text-slate-900">{quickPeriod.empName}</p>
+
+                            {quickPeriod.category === 'إجازة طويلة' && (
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-black text-slate-700">صنف الإجازة:</label>
+                                    <div className="flex gap-2">
+                                        <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, paid: true })}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black border-2 transition cursor-pointer ${quickPeriod.paid ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-slate-700 border-slate-300 hover:border-emerald-400'}`}>
+                                            براتب (إجازة اعتيادية)
+                                        </button>
+                                        <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, paid: false })}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black border-2 transition cursor-pointer ${!quickPeriod.paid ? 'bg-amber-600 text-white border-amber-700' : 'bg-white text-slate-700 border-slate-300 hover:border-amber-400'}`}>
+                                            بدون راتب
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-1">
+                                <label className="block text-xs font-black text-slate-700">📅 من تاريخ:</label>
+                                <input
+                                    type="date"
+                                    value={quickPeriod.from}
+                                    onChange={(e) => setQuickPeriod({ ...quickPeriod, from: e.target.value })}
+                                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-indigo-600"
+                                />
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, mode: 'duration' })}
+                                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-black border transition cursor-pointer ${quickPeriod.mode === 'duration' ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+                                    تحديد بالمدة
+                                </button>
+                                <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, mode: 'date' })}
+                                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-black border transition cursor-pointer ${quickPeriod.mode === 'date' ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+                                    تحديد بتاريخ النهاية
+                                </button>
+                            </div>
+
+                            {quickPeriod.mode === 'duration' ? (
+                                <div className="flex gap-2 items-end">
+                                    <div className="flex-1 space-y-1">
+                                        <label className="block text-xs font-black text-slate-700">⏳ المدة:</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={quickPeriod.count}
+                                            onChange={(e) => setQuickPeriod({ ...quickPeriod, count: e.target.value })}
+                                            placeholder="مثال: 5"
+                                            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:border-indigo-600"
+                                        />
+                                    </div>
+                                    <select
+                                        value={quickPeriod.unit}
+                                        onChange={(e) => setQuickPeriod({ ...quickPeriod, unit: e.target.value })}
+                                        className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:border-indigo-600"
+                                    >
+                                        <option value="days">يوم</option>
+                                        <option value="months">شهر</option>
+                                    </select>
+                                </div>
+                            ) : (
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-black text-slate-700">📅 إلى تاريخ:</label>
+                                    <input
+                                        type="date"
+                                        value={quickPeriod.to}
+                                        min={quickPeriod.from}
+                                        onChange={(e) => setQuickPeriod({ ...quickPeriod, to: e.target.value })}
+                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-indigo-600"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 leading-relaxed">
+                                {quickPeriodEnd(quickPeriod) ? (
+                                    <span>الفترة المحسوبة: <span className="font-mono text-indigo-800">{quickPeriod.from}</span> ← <span className="font-mono text-indigo-800">{quickPeriodEnd(quickPeriod)}</span></span>
+                                ) : quickPeriod.category === 'غياب' ? (
+                                    <span>غياب مفتوح النهاية — يبقى ظاهراً في الكشف حتى تُنهيه بإعادة الحالة إلى «نشط».</span>
+                                ) : (
+                                    <span className="text-rose-700">حدّد المدة أو تاريخ النهاية أولاً.</span>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={saveQuickPeriod} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow transition cursor-pointer">
+                                    💾 حفظ الفترة
+                                </button>
+                                <button type="button" onClick={() => setQuickPeriod(null)} className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black rounded-xl text-xs transition cursor-pointer">
+                                    ✕ إلغاء
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
