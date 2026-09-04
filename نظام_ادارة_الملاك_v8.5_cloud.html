@@ -2567,6 +2567,14 @@
                 return leaveDays >= Math.ceil(workDays / 2);
             };
 
+            // مجموعة معرّفات المستبعَدين من الماء لشهر waterMonth، محسوبة مرة واحدة لكل رسم بدل
+            // إعادة فحص كل موظف (بحلقته اليومية) من كل موضع فلترة يستخدمها على حدة
+            const excludedWaterIds = React.useMemo(() => {
+                const set = new Set();
+                (staff || []).forEach(s => { if (isExcludedFromWater(s, waterMonth)) set.add(s.id); });
+                return set;
+            }, [staff, waterMonth, officialHolidays, dailyStatusOverrides]);
+
             // ملخص استمارة تجهيز المياه المعدنية لمجموعة واحدة (صباحي/ثلاثية/ثنائية) بشهر معيّن
             const getWaterGroupSummary = (groupKey, monthStr) => {
                 const inGroup = groupKey === 'morning'
@@ -2574,7 +2582,7 @@
                     : groupKey === 'triple'
                         ? (s => s.workType === 'مناوب' && s.shiftType === 'ثلاثية')
                         : (s => s.workType === 'مناوب' && s.shiftType === 'ثنائية');
-                const headcount = staff.filter(s => inGroup(s) && !isExcludedFromWater(s, monthStr)).length;
+                const headcount = staff.filter(s => inGroup(s) && (monthStr === waterMonth ? !excludedWaterIds.has(s.id) : !isExcludedFromWater(s, monthStr))).length;
                 const days = (waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey]) || 0;
                 const rate = getWaterSeasonalRate(monthStr);
                 const bottles = headcount * days * rate;
@@ -3820,11 +3828,11 @@
                 contract: staff.filter(s => s.jobTitle === 'عقد').length,
                 maaMorning: staff.filter(s =>
                     s.workType === 'صباحي' &&
-                    !isExcludedFromWater(s, waterMonth)
+                    !excludedWaterIds.has(s.id)
                 ).length,
                 maaShift: staff.filter(s =>
                     s.workType === 'مناوب' &&
-                    !isExcludedFromWater(s, waterMonth)
+                    !excludedWaterIds.has(s.id)
                 ).length,
                 evaluation: staff.filter(s => {
                     if (s.jobTitle === 'عقد') return false;
@@ -3837,7 +3845,7 @@
                 female: staff.filter(s => s.gender === 'أنثى').length,
                 safety: staff.filter(s => s.gender === 'ذكر' && s.status === 'نشط' && s.jobNumber !== '811645').length,
                 missingData: staff.filter(s => getMissingFields(s).length > 0).length
-            }), [staff, waterMonth]);
+            }), [staff, waterMonth, excludedWaterIds]);
 
             const filtered = useMemo(() => {
                 if (!search) return staff;
@@ -4237,14 +4245,14 @@
                 else if (view === 'maaMorning') {
                     result = data.filter(s =>
                         s.workType === 'صباحي' &&
-                        !isExcludedFromWater(s, waterMonth)
+                        !excludedWaterIds.has(s.id)
                     );
                     result = sortByJobNumber(result);
                 }
                 else if (view === 'maaShift') {
                 result = data.filter(s =>
                     s.workType === 'مناوب' &&
-                    !isExcludedFromWater(s, waterMonth)
+                    !excludedWaterIds.has(s.id)
                 );
                 // نفس ترتيب المناوبين: حسب الموقع
                 const locationOrder = ['وحدة تبريد نهر بن عمر', 'وحدة تبريد باب الزبير', 'وحدة تبريد المركز الثقافي', 'وحدة تبريد المكينة', 'دار استراحة المشروع السكني'];
@@ -4272,7 +4280,7 @@
                     result = data;
                 }
                 else if (view === 'maa') {
-                    result = data.filter(s => !isExcludedFromWater(s, waterMonth));
+                    result = data.filter(s => !excludedWaterIds.has(s.id));
                     // ترتيب: صباحي أولاً (مرتب)، ثم مناوبين (مرتب حسب الوحدة)
                     const morning = result.filter(r => r.workType === 'صباحي');
                     const shift = result.filter(r => r.workType === 'مناوب');
@@ -4301,7 +4309,7 @@
                     const nonContracts = result.filter(s => s.jobTitle !== 'عقد');
                     return [...nonContracts, ...contracts];
                 }
-            }, [staff, filtered, search, view, waterMonth]);
+            }, [staff, filtered, search, view, waterMonth, excludedWaterIds]);
             
             const loadFile = (e) => {
                 const file = e.target.files[0];
@@ -5429,8 +5437,14 @@
                     return;
                 }
 
+                // موظف بحالة قديمة بلا فترات: إضافة أول فترة له تُسقِط الرجوع الضمني إلى emp.status
+                // (getActivePeriod يتوقف عن استخدامه بمجرد وجود أي فترة) — فتُرحَّل الحالة القديمة
+                // صراحةً كفترة تغطي كل ما قبل الفترة الجديدة، فلا يُفقَد شيء صمتاً.
+                const legacySeed = (periodsOf(emp).length === 0 && emp.status && emp.status !== 'نشط' && emp.status !== periodType)
+                    ? [{ id: 'per_legacy_' + Date.now(), type: emp.status, from: '1900-01-01', to: localDateStr(new Date(from).getTime() - 86400000), note: 'ترحيل تلقائي من الحالة القديمة' }]
+                    : [];
                 const newPeriod = { id: 'per_' + Date.now(), type: periodType, from, to, note: '' };
-                const updatedPeriods = [...periodsOf(emp), newPeriod];
+                const updatedPeriods = [...legacySeed, ...periodsOf(emp), newPeriod];
                 const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: updatedPeriods, status: periodType } : s);
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
@@ -9231,12 +9245,13 @@
                                                                 <input
                                                                     type="number"
                                                                     min="0"
-                                                                    value={sum.days || ''}
+                                                                    value={sum.days}
+                                                                    placeholder="0"
                                                                     onChange={(e) => setWaterGroupDays(g.key, waterMonth, parseInt(e.target.value, 10) || 0)}
                                                                     className="w-16 border border-cyan-300 rounded px-1 py-0.5 text-center font-mono font-bold outline-none focus:border-cyan-600"
                                                                 />
                                                             </div>
-                                                            <div className="flex justify-between"><span>المعدل الموسمي:</span><span className="font-mono font-bold">{sum.rate}/يوم</span></div>
+                                                            <div className="flex justify-between"><span>المعدل الموسمي:</span><span className="font-mono font-bold" title="٤ قناني/يوم صيفاً (أيار–أيلول)، وقنينتان شتاءً (تشرين الأول–نيسان)">{sum.rate}/يوم</span></div>
                                                             <div className="flex justify-between"><span>💧 عدد القناني:</span><span className="font-mono font-bold text-cyan-800">{sum.bottles}</span></div>
                                                             <div className="flex justify-between"><span>عدد السيتات:</span><span className="font-mono font-bold">{sum.sets}</span></div>
                                                             <div className="flex justify-between"><span>المبلغ:</span><span className="font-mono font-bold">{sum.cost.toLocaleString()} د.ع</span></div>
@@ -9244,7 +9259,7 @@
                                                     );
                                                 })}
                                             </div>
-                                            <div className="text-[10px] text-cyan-700 mt-2">أدخِل أيام الدوام الفعلي لكل مجموعة (رقم تشغيلي لا يُحسب تلقائياً)؛ الباقي يُحسب فوراً. القيم محفوظة على هذا الجهاز فقط حالياً.</div>
+                                            <div className="text-[10px] text-cyan-700 mt-2">أدخِل أيام الدوام الفعلي لكل مجموعة (رقم تشغيلي لا يُحسب تلقائياً)؛ الباقي يُحسب فوراً. المعدل الموسمي 4 قناني/يوم صيفاً (أيار–أيلول) وقنينتان شتاءً (تشرين الأول–نيسان). القيم محفوظة على هذا الجهاز فقط حالياً.</div>
                                         </div>
                                     )}
 
@@ -10710,15 +10725,18 @@
                                 />
                             </div>
 
-                            <div className="flex gap-2">
-                                <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, mode: 'duration' })}
-                                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-black border transition cursor-pointer ${quickPeriod.mode === 'duration' ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
-                                    تحديد بالمدة
-                                </button>
-                                <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, mode: 'date' })}
-                                    className={`flex-1 py-1.5 rounded-lg text-[11px] font-black border transition cursor-pointer ${quickPeriod.mode === 'date' ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
-                                    تحديد بتاريخ النهاية
-                                </button>
+                            <div className="space-y-1">
+                                <label className="block text-xs font-black text-slate-700">طريقة تحديد النهاية:</label>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, mode: 'duration' })}
+                                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-black border transition cursor-pointer ${quickPeriod.mode === 'duration' ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+                                        تحديد بالمدة
+                                    </button>
+                                    <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, mode: 'date' })}
+                                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-black border transition cursor-pointer ${quickPeriod.mode === 'date' ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+                                        تحديد بتاريخ النهاية
+                                    </button>
+                                </div>
                             </div>
 
                             {quickPeriod.mode === 'duration' ? (
@@ -10767,7 +10785,8 @@
                             </div>
 
                             <div className="flex gap-2">
-                                <button type="button" onClick={saveQuickPeriod} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow transition cursor-pointer">
+                                <button type="button" onClick={saveQuickPeriod} disabled={!quickPeriodEnd(quickPeriod) && quickPeriod.category !== 'غياب'}
+                                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">
                                     💾 حفظ الفترة
                                 </button>
                                 <button type="button" onClick={() => setQuickPeriod(null)} className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black rounded-xl text-xs transition cursor-pointer">
