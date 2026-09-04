@@ -3754,7 +3754,11 @@
                     s.workType === 'مناوب' &&
                     !isExcludedFromWater(s, waterMonth)
                 ).length,
-                evaluation: staff.filter(s => s.jobTitle !== 'عقد' && s.status !== 'إجازة طويلة' && s.status !== 'إجازة أمومة').length,
+                evaluation: staff.filter(s => {
+                    if (s.jobTitle === 'عقد') return false;
+                    const p = getActivePeriod(s, localDateStr());
+                    return !(p && (p.type === 'إجازة طويلة' || p.type === 'إجازة أمومة'));
+                }).length,
                 active: staff.filter(s => s.status === 'نشط').length,
                 inCourse: staff.filter(s => s.status === 'في دورة').length,
                 male: staff.filter(s => s.gender === 'ذكر').length,
@@ -4182,7 +4186,13 @@
                 });
             }
                 else if (view === 'evaluation') {
-                    result = data.filter(s => s.jobTitle !== 'عقد' && s.status !== 'إجازة طويلة' && s.status !== 'إجازة أمومة');
+                    // التقييم لحظة واحدة لا مدى شهري، فيُفحص تاريخ اليوم فقط
+                    const evalDate = localDateStr();
+                    result = data.filter(s => {
+                        if (s.jobTitle === 'عقد') return false;
+                        const p = getActivePeriod(s, evalDate);
+                        return !(p && (p.type === 'إجازة طويلة' || p.type === 'إجازة أمومة'));
+                    });
                     result = sortByJobNumber(result); // ترتيب حسب الأرقام الوظيفية
                 }
                 else if (view === 'units') {
