@@ -2589,9 +2589,11 @@
                     }
                     return count;
                 }
+                // shiftType ليس حقلاً مخزَّناً فعلياً في سجل الموظف — يُشتقّ من الموقع في كل موضع آخر
+                // بالملف (نهر بن عمر = ثلاثية، غيرها = ثنائية)، وهذا الاشتقاق نفسه يُستخدَم هنا
                 const inGroup = groupKey === 'triple'
-                    ? (s => s.workType === 'مناوب' && s.shiftType === 'ثلاثية' && s.squad)
-                    : (s => s.workType === 'مناوب' && s.shiftType === 'ثنائية' && s.squad);
+                    ? (s => s.workType === 'مناوب' && s.location && s.location.includes('نهر بن عمر') && s.squad)
+                    : (s => s.workType === 'مناوب' && s.location && !s.location.includes('نهر بن عمر') && s.squad);
                 const members = staff.filter(inGroup);
                 if (members.length === 0) return 0;
                 const counts = members.map(emp => {
@@ -2614,8 +2616,8 @@
                 const inGroup = groupKey === 'morning'
                     ? (s => s.workType === 'صباحي')
                     : groupKey === 'triple'
-                        ? (s => s.workType === 'مناوب' && s.shiftType === 'ثلاثية')
-                        : (s => s.workType === 'مناوب' && s.shiftType === 'ثنائية');
+                        ? (s => s.workType === 'مناوب' && s.location && s.location.includes('نهر بن عمر'))
+                        : (s => s.workType === 'مناوب' && s.location && !s.location.includes('نهر بن عمر'));
                 const headcount = staff.filter(s => inGroup(s) && (monthStr === waterMonth ? !excludedWaterIds.has(s.id) : !isExcludedFromWater(s, monthStr))).length;
                 const manualDays = waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey];
                 const isAuto = manualDays === undefined || manualDays === null;
