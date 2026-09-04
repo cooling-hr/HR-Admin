@@ -2462,11 +2462,22 @@
                 return null;
             };
 
+            // التاريخ المحلي بصيغة YYYY-MM-DD. لا تستعمل toISOString هنا: هي تعطي
+            // تاريخ UTC، وبغداد +3 — فبين منتصف الليل والثالثة فجراً يكون تاريخ
+            // UTC هو تاريخ الأمس، فتُصنَّف فترة انتهت أمس على أنها «توشك أن تنتهي».
+            const localDateStr = (input) => {
+                const d = (input === undefined || input === null) ? new Date() : new Date(input);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return y + '-' + m + '-' + day;
+            };
+
             // تنبيهات الفترات: ما يوشك على الانتهاء، وما انتهى ولم تُؤكَّد المباشرة.
             // يُحسب من الفترات في كل رسم — لا تخزين ولا وظيفة خلفية.
             const periodAlerts = React.useMemo(() => {
-                const today = new Date().toISOString().split('T')[0];
-                const soonLimit = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+                const today = localDateStr();
+                const soonLimit = localDateStr(Date.now() + 3 * 86400000);
                 const endingSoon = [];
                 const endedUnconfirmed = [];
                 (staff || []).forEach(emp => {
