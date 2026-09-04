@@ -2199,177 +2199,7 @@
                 safeStorage.setItem('waterAttendanceDays', JSON.stringify(waterAttendanceDays));
             }, [waterAttendanceDays]);
 
-            const daysInMonth = (monthStr) => {
-                const [y, m] = monthStr.split('-').map(Number);
-                return new Date(y, m, 0).getDate();
-            };
-
-            const isWorkDay = (dateStr) => {
-                const [y, m, d] = dateStr.split('-').map(Number);
-                const day = new Date(y, m - 1, d).getDay();
-                return day !== 5 && day !== 6 && !officialHolidays.includes(dateStr);
-            };
-
-            // 4 قناني/يوم من أيار حتى أيلول، وقنينتان من تشرين الأول حتى نيسان
-            const getWaterSeasonalRate = (monthStr) => {
-                const m = parseInt(monthStr.split('-')[1], 10);
-                return (m >= 5 && m <= 9) ? 4 : 2;
-            };
-
-            const WATER_LEAVE_TALLY_TYPES = ['إجازة اعتيادية', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
-
-            // استثناء ثنائي المرحلة، وفق النموذج الرسمي لاستمارة تجهيز المياه المعدنية:
-            //  • في دورة / إيفاد → أي تماس مع الشهر يستبعد فوراً، ولو يوماً واحداً.
-            //  • إجازة طويلة/بدون راتب/أمومة/غياب (وإجازة اعتيادية إن طالت) → تُجمَع أيام العمل
-            //    الفعلية المشمولة بها من الفترات المؤرَّخة ومن تعديلات "الموقف" اليومية معاً (قد تكون
-            //    متفرقة غير متتالية)، فإن بلغت نصف أيام العمل في الشهر أو تجاوزته يُستبعد كلياً —
-            //    لا حصة جزئية أدنى من ذلك، فمن حضر أكثر من نصف الشهر يبقى ضمن العدد كاملاً.
-            const isExcludedFromWater = (emp, monthStr) => {
-                if (!emp) return false;
-                if (emp.excludeFromWaterLists) return true;
-                const hasPeriods = periodsOf(emp).length > 0;
-                // لا فترات مؤرَّخة: حالة قديمة بنص خام في emp.status — تُستبعد بالكامل إن لم تكن
-                // "نشط"، تماماً كما كان الفلتر قبل هذا التغيير (status === 'نشط' فقط يُقبل).
-                if (!hasPeriods) {
-                    return !!(emp.status && emp.status !== 'نشط');
-                }
-                const total = daysInMonth(monthStr);
-                const monthStart = monthStr + '-01';
-                const monthEnd = monthStr + '-' + String(total).padStart(2, '0');
-                for (const p of periodsOf(emp)) {
-                    if (!p || !p.from) continue;
-                    const pEnd = p.to || '9999-12-31';
-                    if (p.from > monthEnd || pEnd < monthStart) continue; // لا تماس
-                    if (p.type === 'في دورة' || p.type === 'إيفاد') return true;
-                }
-                let leaveDays = 0;
-                let workDays = 0;
-                for (let d = 1; d <= total; d++) {
-                    const dateStr = monthStr + '-' + String(d).padStart(2, '0');
-                    if (!isWorkDay(dateStr)) continue;
-                    workDays++;
-                    if (WATER_LEAVE_TALLY_TYPES.includes(getEmployeeDailyStatus(emp, dateStr))) leaveDays++;
-                }
-                return leaveDays >= Math.ceil(workDays / 2);
-            };
-
-            // مجموعة معرّفات المستبعَدين من الماء لشهر waterMonth، محسوبة مرة واحدة لكل رسم بدل
-            // إعادة فحص كل موظف (بحلقته اليومية) من كل موضع فلترة يستخدمها على حدة
-            const excludedWaterIds = React.useMemo(() => {
-                const set = new Set();
-                (staff || []).forEach(s => { if (isExcludedFromWater(s, waterMonth)) set.add(s.id); });
-                return set;
-            }, [staff, waterMonth, officialHolidays, dailyStatusOverrides]);
-
-            const isShiftOnDutyStatus = (status) => status === 'دوام 24 ساعة' || status === 'دوام صباحي (12 ساعة)' || status === 'دوام مسائي (12 ساعة)';
-
-            // أيام الدوام الفعلي مُحتسَبة تلقائياً من نفس منظومة "الموقف" ودورة المناوبة الموجودة
-            // أصلاً (لا حاجة لإدخال يدوي): للصباحي = أيام العمل التقويمية، وللمناوَبين = عدد أيام
-            // الدوام الفعلية حسب دورة الوجبة (الأكثر تكراراً بين أفراد المجموعة، عادة متطابقة للجميع).
-            const getAutoWaterAttendanceDays = (groupKey, monthStr) => {
-                const total = daysInMonth(monthStr);
-                if (groupKey === 'morning') {
-                    let count = 0;
-                    for (let d = 1; d <= total; d++) {
-                        if (isWorkDay(monthStr + '-' + String(d).padStart(2, '0'))) count++;
-                    }
-                    return count;
-                }
-                // shiftType ليس حقلاً مخزَّناً فعلياً في سجل الموظف — يُشتقّ من الموقع في كل موضع آخر
-                // بالملف (نهر بن عمر = ثلاثية، غيرها = ثنائية)، وهذا الاشتقاق نفسه يُستخدَم هنا
-                const inGroup = groupKey === 'triple'
-                    ? (s => s.workType === 'مناوب' && s.location && s.location.includes('نهر بن عمر') && s.squad)
-                    : (s => s.workType === 'مناوب' && s.location && !s.location.includes('نهر بن عمر') && s.squad);
-                const members = staff.filter(inGroup);
-                if (members.length === 0) return 0;
-                const counts = members.map(emp => {
-                    let c = 0;
-                    for (let d = 1; d <= total; d++) {
-                        const dateStr = monthStr + '-' + String(d).padStart(2, '0');
-                        if (isShiftOnDutyStatus(getEmployeeDefaultNaturalStatus(emp, dateStr))) c++;
-                    }
-                    return c;
-                });
-                const freq = {};
-                counts.forEach(c => { freq[c] = (freq[c] || 0) + 1; });
-                let mode = counts[0], best = 0;
-                Object.keys(freq).forEach(k => { if (freq[k] > best) { best = freq[k]; mode = Number(k); } });
-                return mode;
-            };
-
-            // ملخص استمارة تجهيز المياه المعدنية لمجموعة واحدة (صباحي/ثلاثية/ثنائية) بشهر معيّن
-            const getWaterGroupSummary = (groupKey, monthStr) => {
-                const inGroup = groupKey === 'morning'
-                    ? (s => s.workType === 'صباحي')
-                    : groupKey === 'triple'
-                        ? (s => s.workType === 'مناوب' && s.location && s.location.includes('نهر بن عمر'))
-                        : (s => s.workType === 'مناوب' && s.location && !s.location.includes('نهر بن عمر'));
-                const headcount = staff.filter(s => inGroup(s) && (monthStr === waterMonth ? !excludedWaterIds.has(s.id) : !isExcludedFromWater(s, monthStr))).length;
-                const manualDays = waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey];
-                const isAuto = manualDays === undefined || manualDays === null;
-                const days = isAuto ? getAutoWaterAttendanceDays(groupKey, monthStr) : manualDays;
-                const rate = getWaterSeasonalRate(monthStr);
-                const bottles = headcount * days * rate;
-                const sets = Math.round(bottles / 12);
-                const cost = sets * 1000;
-                return { headcount, days, rate, bottles, sets, cost, isAuto };
-            };
-
-            // إعادة حقل الأيام إلى الحساب التلقائي بعد أن كان قد عُدِّل يدوياً
-            const resetWaterGroupDaysToAuto = (groupKey, monthStr) => {
-                setWaterAttendanceDays(prev => {
-                    const monthEntry = { ...(prev[monthStr] || {}) };
-                    delete monthEntry[groupKey];
-                    return { ...prev, [monthStr]: monthEntry };
-                });
-            };
-
-            const setWaterGroupDays = (groupKey, monthStr, value) => {
-                setWaterAttendanceDays(prev => ({
-                    ...prev,
-                    [monthStr]: { ...(prev[monthStr] || {}), [groupKey]: value }
-                }));
-            };
-
             const [waterMemoGroup, setWaterMemoGroup] = useState(null);
-
-            const ARABIC_MONTH_NAMES = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
-            const getArabicMonthLabel = (monthStr) => {
-                const [y, m] = monthStr.split('-').map(Number);
-                return ARABIC_MONTH_NAMES[m - 1] + ' / ' + y;
-            };
-
-            // تحويل رقم صحيح (0-999) إلى كلمات عربية — يُستخدَم فقط لعدد آلاف الدنانير هنا
-            const ARABIC_ONES = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
-            const ARABIC_TEENS = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
-            const ARABIC_TENS = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
-            const ARABIC_HUNDREDS = ['', 'مائة', 'مئتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
-            const numberChunkToArabicWords = (n) => {
-                if (n <= 0) return '';
-                const parts = [];
-                const h = Math.floor(n / 100);
-                const rem = n % 100;
-                if (h > 0) parts.push(ARABIC_HUNDREDS[h]);
-                if (rem > 0 && rem < 10) parts.push(ARABIC_ONES[rem]);
-                else if (rem >= 10 && rem < 20) parts.push(ARABIC_TEENS[rem - 10]);
-                else if (rem >= 20) {
-                    const tens = Math.floor(rem / 10);
-                    const ones = rem % 10;
-                    parts.push(ones > 0 ? (ARABIC_ONES[ones] + ' و' + ARABIC_TENS[tens]) : ARABIC_TENS[tens]);
-                }
-                return parts.join(' و');
-            };
-            // المبلغ هنا دائماً عدد سيتات × 1000 — نحوّل عدد السيتات فقط إلى كلمات ونلحقه بـ"ألف"
-            const amountToArabicWords = (amount) => {
-                const sets = Math.round(amount / 1000);
-                if (sets <= 0) return 'لا يوجد مبلغ';
-                let thousandsWord;
-                if (sets === 1) thousandsWord = 'ألف';
-                else if (sets === 2) thousandsWord = 'ألفان';
-                else if (sets <= 10) thousandsWord = numberChunkToArabicWords(sets) + ' آلاف';
-                else thousandsWord = numberChunkToArabicWords(sets) + ' ألف';
-                return thousandsWord + ' دينار عراقي فقط';
-            };
 
             // نقل الاستثناء الدائم من الكود إلى ملف الموظف. لا يوجد مزامنة سحابية في
             // هذه النسخة المحلية، فلا حاجة لانتظار اكتمال أي تحميل سحابي — تكفي
@@ -2579,6 +2409,179 @@
                     }
                 }
                 return 'غير محدد';
+            };
+
+            // ما يلي يُبنى فوق getEmployeeDailyStatus/getEmployeeDefaultNaturalStatus أعلاه، لذا
+            // يُصرَّح بعدهما — استدعاء أيٍّ منهما من useMemo قبل تعريفه يُنفَّذ أثناء الرسم مباشرة
+            // (لا بعده كما في معالِج حدث)، فيفشل بصمت رغم نجاح بوابتي التحقق سابقاً على بيانات فارغة.
+            const daysInMonth = (monthStr) => {
+                const [y, m] = monthStr.split('-').map(Number);
+                return new Date(y, m, 0).getDate();
+            };
+
+            const isWorkDay = (dateStr) => {
+                const [y, m, d] = dateStr.split('-').map(Number);
+                const day = new Date(y, m - 1, d).getDay();
+                return day !== 5 && day !== 6 && !officialHolidays.includes(dateStr);
+            };
+
+            // 4 قناني/يوم من أيار حتى أيلول، وقنينتان من تشرين الأول حتى نيسان
+            const getWaterSeasonalRate = (monthStr) => {
+                const m = parseInt(monthStr.split('-')[1], 10);
+                return (m >= 5 && m <= 9) ? 4 : 2;
+            };
+
+            const WATER_LEAVE_TALLY_TYPES = ['إجازة اعتيادية', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
+
+            // استثناء ثنائي المرحلة، وفق النموذج الرسمي لاستمارة تجهيز المياه المعدنية:
+            //  • في دورة / إيفاد → أي تماس مع الشهر يستبعد فوراً، ولو يوماً واحداً.
+            //  • إجازة طويلة/بدون راتب/أمومة/غياب (وإجازة اعتيادية إن طالت) → تُجمَع أيام العمل
+            //    الفعلية المشمولة بها من الفترات المؤرَّخة ومن تعديلات "الموقف" اليومية معاً (قد تكون
+            //    متفرقة غير متتالية)، فإن بلغت نصف أيام العمل في الشهر أو تجاوزته يُستبعد كلياً —
+            //    لا حصة جزئية أدنى من ذلك، فمن حضر أكثر من نصف الشهر يبقى ضمن العدد كاملاً.
+            const isExcludedFromWater = (emp, monthStr) => {
+                if (!emp) return false;
+                if (emp.excludeFromWaterLists) return true;
+                const hasPeriods = periodsOf(emp).length > 0;
+                // لا فترات مؤرَّخة: حالة قديمة بنص خام في emp.status — تُستبعد بالكامل إن لم تكن
+                // "نشط"، تماماً كما كان الفلتر قبل هذا التغيير (status === 'نشط' فقط يُقبل).
+                if (!hasPeriods) {
+                    return !!(emp.status && emp.status !== 'نشط');
+                }
+                const total = daysInMonth(monthStr);
+                const monthStart = monthStr + '-01';
+                const monthEnd = monthStr + '-' + String(total).padStart(2, '0');
+                for (const p of periodsOf(emp)) {
+                    if (!p || !p.from) continue;
+                    const pEnd = p.to || '9999-12-31';
+                    if (p.from > monthEnd || pEnd < monthStart) continue; // لا تماس
+                    if (p.type === 'في دورة' || p.type === 'إيفاد') return true;
+                }
+                let leaveDays = 0;
+                let workDays = 0;
+                for (let d = 1; d <= total; d++) {
+                    const dateStr = monthStr + '-' + String(d).padStart(2, '0');
+                    if (!isWorkDay(dateStr)) continue;
+                    workDays++;
+                    if (WATER_LEAVE_TALLY_TYPES.includes(getEmployeeDailyStatus(emp, dateStr))) leaveDays++;
+                }
+                return leaveDays >= Math.ceil(workDays / 2);
+            };
+
+            // مجموعة معرّفات المستبعَدين من الماء لشهر waterMonth، محسوبة مرة واحدة لكل رسم بدل
+            // إعادة فحص كل موظف (بحلقته اليومية) من كل موضع فلترة يستخدمها على حدة
+            const excludedWaterIds = React.useMemo(() => {
+                const set = new Set();
+                (staff || []).forEach(s => { if (isExcludedFromWater(s, waterMonth)) set.add(s.id); });
+                return set;
+            }, [staff, waterMonth, officialHolidays, dailyStatusOverrides]);
+
+            const isShiftOnDutyStatus = (status) => status === 'دوام 24 ساعة' || status === 'دوام صباحي (12 ساعة)' || status === 'دوام مسائي (12 ساعة)';
+
+            // أيام الدوام الفعلي مُحتسَبة تلقائياً من نفس منظومة "الموقف" ودورة المناوبة الموجودة
+            // أصلاً (لا حاجة لإدخال يدوي): للصباحي = أيام العمل التقويمية، وللمناوَبين = عدد أيام
+            // الدوام الفعلية حسب دورة الوجبة (الأكثر تكراراً بين أفراد المجموعة، عادة متطابقة للجميع).
+            const getAutoWaterAttendanceDays = (groupKey, monthStr) => {
+                const total = daysInMonth(monthStr);
+                if (groupKey === 'morning') {
+                    let count = 0;
+                    for (let d = 1; d <= total; d++) {
+                        if (isWorkDay(monthStr + '-' + String(d).padStart(2, '0'))) count++;
+                    }
+                    return count;
+                }
+                // shiftType ليس حقلاً مخزَّناً فعلياً في سجل الموظف — يُشتقّ من الموقع في كل موضع آخر
+                // بالملف (نهر بن عمر = ثلاثية، غيرها = ثنائية)، وهذا الاشتقاق نفسه يُستخدَم هنا
+                const inGroup = groupKey === 'triple'
+                    ? (s => s.workType === 'مناوب' && s.location && s.location.includes('نهر بن عمر') && s.squad)
+                    : (s => s.workType === 'مناوب' && s.location && !s.location.includes('نهر بن عمر') && s.squad);
+                const members = staff.filter(inGroup);
+                if (members.length === 0) return 0;
+                const counts = members.map(emp => {
+                    let c = 0;
+                    for (let d = 1; d <= total; d++) {
+                        const dateStr = monthStr + '-' + String(d).padStart(2, '0');
+                        if (isShiftOnDutyStatus(getEmployeeDefaultNaturalStatus(emp, dateStr))) c++;
+                    }
+                    return c;
+                });
+                const freq = {};
+                counts.forEach(c => { freq[c] = (freq[c] || 0) + 1; });
+                let mode = counts[0], best = 0;
+                Object.keys(freq).forEach(k => { if (freq[k] > best) { best = freq[k]; mode = Number(k); } });
+                return mode;
+            };
+
+            // ملخص استمارة تجهيز المياه المعدنية لمجموعة واحدة (صباحي/ثلاثية/ثنائية) بشهر معيّن
+            const getWaterGroupSummary = (groupKey, monthStr) => {
+                const inGroup = groupKey === 'morning'
+                    ? (s => s.workType === 'صباحي')
+                    : groupKey === 'triple'
+                        ? (s => s.workType === 'مناوب' && s.location && s.location.includes('نهر بن عمر'))
+                        : (s => s.workType === 'مناوب' && s.location && !s.location.includes('نهر بن عمر'));
+                const headcount = staff.filter(s => inGroup(s) && (monthStr === waterMonth ? !excludedWaterIds.has(s.id) : !isExcludedFromWater(s, monthStr))).length;
+                const manualDays = waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey];
+                const isAuto = manualDays === undefined || manualDays === null;
+                const days = isAuto ? getAutoWaterAttendanceDays(groupKey, monthStr) : manualDays;
+                const rate = getWaterSeasonalRate(monthStr);
+                const bottles = headcount * days * rate;
+                const sets = Math.round(bottles / 12);
+                const cost = sets * 1000;
+                return { headcount, days, rate, bottles, sets, cost, isAuto };
+            };
+
+            // إعادة حقل الأيام إلى الحساب التلقائي بعد أن كان قد عُدِّل يدوياً
+            const resetWaterGroupDaysToAuto = (groupKey, monthStr) => {
+                setWaterAttendanceDays(prev => {
+                    const monthEntry = { ...(prev[monthStr] || {}) };
+                    delete monthEntry[groupKey];
+                    return { ...prev, [monthStr]: monthEntry };
+                });
+            };
+
+            const setWaterGroupDays = (groupKey, monthStr, value) => {
+                setWaterAttendanceDays(prev => ({
+                    ...prev,
+                    [monthStr]: { ...(prev[monthStr] || {}), [groupKey]: value }
+                }));
+            };
+
+            const ARABIC_MONTH_NAMES = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
+            const getArabicMonthLabel = (monthStr) => {
+                const [y, m] = monthStr.split('-').map(Number);
+                return ARABIC_MONTH_NAMES[m - 1] + ' / ' + y;
+            };
+
+            // تحويل رقم صحيح (0-999) إلى كلمات عربية — يُستخدَم فقط لعدد آلاف الدنانير هنا
+            const ARABIC_ONES = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
+            const ARABIC_TEENS = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
+            const ARABIC_TENS = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+            const ARABIC_HUNDREDS = ['', 'مائة', 'مئتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+            const numberChunkToArabicWords = (n) => {
+                if (n <= 0) return '';
+                const parts = [];
+                const h = Math.floor(n / 100);
+                const rem = n % 100;
+                if (h > 0) parts.push(ARABIC_HUNDREDS[h]);
+                if (rem > 0 && rem < 10) parts.push(ARABIC_ONES[rem]);
+                else if (rem >= 10 && rem < 20) parts.push(ARABIC_TEENS[rem - 10]);
+                else if (rem >= 20) {
+                    const tens = Math.floor(rem / 10);
+                    const ones = rem % 10;
+                    parts.push(ones > 0 ? (ARABIC_ONES[ones] + ' و' + ARABIC_TENS[tens]) : ARABIC_TENS[tens]);
+                }
+                return parts.join(' و');
+            };
+            // المبلغ هنا دائماً عدد سيتات × 1000 — نحوّل عدد السيتات فقط إلى كلمات ونلحقه بـ"ألف"
+            const amountToArabicWords = (amount) => {
+                const sets = Math.round(amount / 1000);
+                if (sets <= 0) return 'لا يوجد مبلغ';
+                let thousandsWord;
+                if (sets === 1) thousandsWord = 'ألف';
+                else if (sets === 2) thousandsWord = 'ألفان';
+                else if (sets <= 10) thousandsWord = numberChunkToArabicWords(sets) + ' آلاف';
+                else thousandsWord = numberChunkToArabicWords(sets) + ' ألف';
+                return thousandsWord + ' دينار عراقي فقط';
             };
 
             const setEmployeeDailyStatusOverride = (empId, dateStr, status) => {
