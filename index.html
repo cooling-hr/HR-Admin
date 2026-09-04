@@ -2575,6 +2575,40 @@
                 return set;
             }, [staff, waterMonth, officialHolidays, dailyStatusOverrides]);
 
+            const isShiftOnDutyStatus = (status) => status === 'دوام 24 ساعة' || status === 'دوام صباحي (12 ساعة)' || status === 'دوام مسائي (12 ساعة)';
+
+            // أيام الدوام الفعلي مُحتسَبة تلقائياً من نفس منظومة "الموقف" ودورة المناوبة الموجودة
+            // أصلاً (لا حاجة لإدخال يدوي): للصباحي = أيام العمل التقويمية، وللمناوَبين = عدد أيام
+            // الدوام الفعلية حسب دورة الوجبة (الأكثر تكراراً بين أفراد المجموعة، عادة متطابقة للجميع).
+            const getAutoWaterAttendanceDays = (groupKey, monthStr) => {
+                const total = daysInMonth(monthStr);
+                if (groupKey === 'morning') {
+                    let count = 0;
+                    for (let d = 1; d <= total; d++) {
+                        if (isWorkDay(monthStr + '-' + String(d).padStart(2, '0'))) count++;
+                    }
+                    return count;
+                }
+                const inGroup = groupKey === 'triple'
+                    ? (s => s.workType === 'مناوب' && s.shiftType === 'ثلاثية' && s.squad)
+                    : (s => s.workType === 'مناوب' && s.shiftType === 'ثنائية' && s.squad);
+                const members = staff.filter(inGroup);
+                if (members.length === 0) return 0;
+                const counts = members.map(emp => {
+                    let c = 0;
+                    for (let d = 1; d <= total; d++) {
+                        const dateStr = monthStr + '-' + String(d).padStart(2, '0');
+                        if (isShiftOnDutyStatus(getEmployeeDefaultNaturalStatus(emp, dateStr))) c++;
+                    }
+                    return c;
+                });
+                const freq = {};
+                counts.forEach(c => { freq[c] = (freq[c] || 0) + 1; });
+                let mode = counts[0], best = 0;
+                Object.keys(freq).forEach(k => { if (freq[k] > best) { best = freq[k]; mode = Number(k); } });
+                return mode;
+            };
+
             // ملخص استمارة تجهيز المياه المعدنية لمجموعة واحدة (صباحي/ثلاثية/ثنائية) بشهر معيّن
             const getWaterGroupSummary = (groupKey, monthStr) => {
                 const inGroup = groupKey === 'morning'
@@ -2583,12 +2617,23 @@
                         ? (s => s.workType === 'مناوب' && s.shiftType === 'ثلاثية')
                         : (s => s.workType === 'مناوب' && s.shiftType === 'ثنائية');
                 const headcount = staff.filter(s => inGroup(s) && (monthStr === waterMonth ? !excludedWaterIds.has(s.id) : !isExcludedFromWater(s, monthStr))).length;
-                const days = (waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey]) || 0;
+                const manualDays = waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey];
+                const isAuto = manualDays === undefined || manualDays === null;
+                const days = isAuto ? getAutoWaterAttendanceDays(groupKey, monthStr) : manualDays;
                 const rate = getWaterSeasonalRate(monthStr);
                 const bottles = headcount * days * rate;
                 const sets = Math.round(bottles / 12);
                 const cost = sets * 1000;
-                return { headcount, days, rate, bottles, sets, cost };
+                return { headcount, days, rate, bottles, sets, cost, isAuto };
+            };
+
+            // إعادة حقل الأيام إلى الحساب التلقائي بعد أن كان قد عُدِّل يدوياً
+            const resetWaterGroupDaysToAuto = (groupKey, monthStr) => {
+                setWaterAttendanceDays(prev => {
+                    const monthEntry = { ...(prev[monthStr] || {}) };
+                    delete monthEntry[groupKey];
+                    return { ...prev, [monthStr]: monthEntry };
+                });
             };
 
             const setWaterGroupDays = (groupKey, monthStr, value) => {
@@ -9241,15 +9286,21 @@
                                                             <div className="font-black text-cyan-900">{g.label}</div>
                                                             <div className="flex justify-between"><span>عدد المنتسبين:</span><span className="font-mono font-bold">{sum.headcount}</span></div>
                                                             <div className="flex justify-between items-center gap-2">
-                                                                <span>أيام الدوام الفعلي:</span>
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    value={sum.days}
-                                                                    placeholder="0"
-                                                                    onChange={(e) => setWaterGroupDays(g.key, waterMonth, parseInt(e.target.value, 10) || 0)}
-                                                                    className="w-16 border border-cyan-300 rounded px-1 py-0.5 text-center font-mono font-bold outline-none focus:border-cyan-600"
-                                                                />
+                                                                <span>أيام الدوام الفعلي: {sum.isAuto && <span className="text-emerald-600 font-black" title="محسوبة تلقائياً من تبويب الموقف ودورة المناوبة">(تلقائي 🔄)</span>}</span>
+                                                                <div className="flex items-center gap-1">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        value={sum.days}
+                                                                        placeholder="0"
+                                                                        title={sum.isAuto ? 'قيمة محسوبة تلقائياً — عدّلها لتثبيت رقم يدوي بدلاً منها' : 'قيمة مُعدَّلة يدوياً'}
+                                                                        onChange={(e) => setWaterGroupDays(g.key, waterMonth, parseInt(e.target.value, 10) || 0)}
+                                                                        className={`w-16 border rounded px-1 py-0.5 text-center font-mono font-bold outline-none focus:border-cyan-600 ${sum.isAuto ? 'border-emerald-300 bg-emerald-50' : 'border-cyan-300'}`}
+                                                                    />
+                                                                    {!sum.isAuto && (
+                                                                        <button type="button" onClick={() => resetWaterGroupDaysToAuto(g.key, waterMonth)} title="إعادة للحساب التلقائي" className="text-cyan-700 hover:text-cyan-900 cursor-pointer">↺</button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             <div className="flex justify-between"><span>المعدل الموسمي:</span><span className="font-mono font-bold" title="٤ قناني/يوم صيفاً (أيار–أيلول)، وقنينتان شتاءً (تشرين الأول–نيسان)">{sum.rate}/يوم</span></div>
                                                             <div className="flex justify-between"><span>💧 عدد القناني:</span><span className="font-mono font-bold text-cyan-800">{sum.bottles}</span></div>
@@ -9259,7 +9310,7 @@
                                                     );
                                                 })}
                                             </div>
-                                            <div className="text-[10px] text-cyan-700 mt-2">أدخِل أيام الدوام الفعلي لكل مجموعة (رقم تشغيلي لا يُحسب تلقائياً)؛ الباقي يُحسب فوراً. المعدل الموسمي 4 قناني/يوم صيفاً (أيار–أيلول) وقنينتان شتاءً (تشرين الأول–نيسان). القيم محفوظة على هذا الجهاز فقط حالياً.</div>
+                                            <div className="text-[10px] text-cyan-700 mt-2">أيام الدوام الفعلي (🔄) تُحسب تلقائياً — للصباحي من أيام العمل التقويمية، وللمناوَبين من دورة الوجبة المسجَّلة (تبويب "الموقف والمناوبة"). عدِّل الرقم يدوياً لتثبيته بدل الحساب التلقائي، أو اضغط ↺ للعودة إليه. المعدل الموسمي 4 قناني/يوم صيفاً (أيار–أيلول) وقنينتان شتاءً (تشرين الأول–نيسان). أي تعديل يدوي محفوظ على هذا الجهاز فقط حالياً.</div>
                                         </div>
                                     )}
 
