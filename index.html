@@ -2496,6 +2496,50 @@
                 return { endingSoon, endedUnconfirmed };
             }, [staff]);
 
+            const [waterMonth, setWaterMonth] = useState(() => localDateStr().slice(0, 7));
+
+            const daysInMonth = (monthStr) => {
+                const [y, m] = monthStr.split('-').map(Number);
+                return new Date(y, m, 0).getDate();
+            };
+
+            // قاعدتان مختلفتان لنوعين مختلفين:
+            //  • في دورة        → أي تماس مع الشهر يستبعد، ولو يوماً واحداً.
+            //  • إجازة طويلة    → تستبعد إن غطّت نصف أيام الشهر فأكثر.
+            const isExcludedFromWater = (emp, monthStr) => {
+                if (!emp) return false;
+                if (emp.excludeFromWaterLists) return true;
+                const total = daysInMonth(monthStr);
+                const monthStart = monthStr + '-01';
+                const monthEnd = monthStr + '-' + String(total).padStart(2, '0');
+                let longLeaveDays = 0;
+                const list = periodsOf(emp).length ? periodsOf(emp) : (emp.status && emp.status !== 'نشط' ? [{ type: emp.status, from: '1900-01-01', to: null }] : []);
+                for (const p of list) {
+                    if (!p || !p.from) continue;
+                    const pEnd = p.to || '9999-12-31';
+                    if (p.from > monthEnd || pEnd < monthStart) continue; // لا تماس
+                    if (p.type === 'في دورة') return true;
+                    if (p.type === 'إجازة طويلة') {
+                        const from = p.from > monthStart ? p.from : monthStart;
+                        const to = pEnd < monthEnd ? pEnd : monthEnd;
+                        longLeaveDays += Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
+                    }
+                }
+                return longLeaveDays >= Math.ceil(total / 2);
+            };
+
+            // نقل الاستثناء الدائم من الكود إلى ملف الموظف — يجري مرة واحدة
+            const waterExclusionMigratedRef = React.useRef(false);
+            React.useEffect(() => {
+                if (waterExclusionMigratedRef.current) return;
+                if (!staff || staff.length === 0) return;
+                waterExclusionMigratedRef.current = true;
+                const target = staff.find(s => s.name && s.name.includes('جاسم عزيز'));
+                if (target && !target.excludeFromWaterLists) {
+                    setStaff(prev => prev.map(s => s.id === target.id ? { ...s, excludeFromWaterLists: true } : s));
+                }
+            }, [staff]);
+
             const [dismissedReturnIds, setDismissedReturnIds] = useState([]);
 
             // يُسأل عن موظف واحد في كل مرة، بترتيب تاريخ الانتهاء
@@ -3702,21 +3746,13 @@
                 shift: staff.filter(s => s.workType === 'مناوب').length,
                 morning: staff.filter(s => s.workType === 'صباحي' && s.jobTitle !== 'عقد').length,
                 contract: staff.filter(s => s.jobTitle === 'عقد').length,
-                maaMorning: staff.filter(s => 
-                    s.status === 'نشط' && 
+                maaMorning: staff.filter(s =>
                     s.workType === 'صباحي' &&
-                    !s.name.includes('جاسم عزيز') &&
-                    !s.status.includes('مجاز') &&
-                    !s.status.includes('دورة') &&
-                    !s.status.includes('إجازة')
+                    !isExcludedFromWater(s, waterMonth)
                 ).length,
-                maaShift: staff.filter(s => 
-                    s.status === 'نشط' && 
+                maaShift: staff.filter(s =>
                     s.workType === 'مناوب' &&
-                    !s.name.includes('جاسم عزيز') &&
-                    !s.status.includes('مجاز') &&
-                    !s.status.includes('دورة') &&
-                    !s.status.includes('إجازة')
+                    !isExcludedFromWater(s, waterMonth)
                 ).length,
                 evaluation: staff.filter(s => s.jobTitle !== 'عقد' && s.status !== 'إجازة طويلة' && s.status !== 'إجازة أمومة').length,
                 active: staff.filter(s => s.status === 'نشط').length,
@@ -3725,7 +3761,7 @@
                 female: staff.filter(s => s.gender === 'أنثى').length,
                 safety: staff.filter(s => s.gender === 'ذكر' && s.status === 'نشط' && s.jobNumber !== '811645').length,
                 missingData: staff.filter(s => getMissingFields(s).length > 0).length
-            }), [staff]);
+            }), [staff, waterMonth]);
 
             const filtered = useMemo(() => {
                 if (!search) return staff;
@@ -4122,26 +4158,17 @@
                     }
                     result = sortByJobNumber(result); // ترتيب حسب الأرقام الوظيفية، العقود في النهاية
                 }
-                else if (view === 'maaMorning') { 
-                    // استبعاد: غير النشط، المجازين، من في دورة، جاسم عزيز
-                    result = data.filter(s => 
-                        s.status === 'نشط' && 
-                        s.workType === 'صباحي' && 
-                        !s.name.includes('جاسم عزيز') &&
-                        !s.status.includes('مجاز') &&
-                        !s.status.includes('دورة') &&
-                        !s.status.includes('إجازة')
-                    ); 
-                    result = sortByJobNumber(result); 
+                else if (view === 'maaMorning') {
+                    result = data.filter(s =>
+                        s.workType === 'صباحي' &&
+                        !isExcludedFromWater(s, waterMonth)
+                    );
+                    result = sortByJobNumber(result);
                 }
                 else if (view === 'maaShift') {
-                // استبعاد: غير النشط، المجازين، من في دورة
-                result = data.filter(s => 
-                    s.status === 'نشط' && 
+                result = data.filter(s =>
                     s.workType === 'مناوب' &&
-                    !s.status.includes('مجاز') &&
-                    !s.status.includes('دورة') &&
-                    !s.status.includes('إجازة')
+                    !isExcludedFromWater(s, waterMonth)
                 );
                 // نفس ترتيب المناوبين: حسب الموقع
                 const locationOrder = ['وحدة تبريد نهر بن عمر', 'وحدة تبريد باب الزبير', 'وحدة تبريد المركز الثقافي', 'وحدة تبريد المكينة', 'دار استراحة المشروع السكني'];
@@ -4163,14 +4190,7 @@
                     result = data;
                 }
                 else if (view === 'maa') {
-                    // جدول الماء: استبعاد المجازين ومن في دورة وجاسم عزيز
-                    result = data.filter(s => 
-                        s.status === 'نشط' && 
-                        !s.name.includes('جاسم عزيز') &&
-                        !s.status.includes('مجاز') &&
-                        !s.status.includes('دورة') &&
-                        !s.status.includes('إجازة')
-                    );
+                    result = data.filter(s => !isExcludedFromWater(s, waterMonth));
                     // ترتيب: صباحي أولاً (مرتب)، ثم مناوبين (مرتب حسب الوحدة)
                     const morning = result.filter(r => r.workType === 'صباحي');
                     const shift = result.filter(r => r.workType === 'مناوب');
@@ -4199,7 +4219,7 @@
                     const nonContracts = result.filter(s => s.jobTitle !== 'عقد');
                     return [...nonContracts, ...contracts];
                 }
-            }, [staff, filtered, search, view]);
+            }, [staff, filtered, search, view, waterMonth]);
             
             const loadFile = (e) => {
                 const file = e.target.files[0];
@@ -5273,20 +5293,9 @@
                         }
                     });
                 } else if (view === 'maa') {
-                    // فصل الصباحي عن المناوبين مع استبعاد المجازين ومن في دورة
-                    const morning = current.filter(s => 
-                        s.workType === 'صباحي' &&
-                        !s.name.includes('جاسم عزيز') &&
-                        !s.status.includes('مجاز') &&
-                        !s.status.includes('دورة') &&
-                        !s.status.includes('إجازة')
-                    );
-                    const shift = current.filter(s => 
-                        s.workType === 'مناوب' &&
-                        !s.status.includes('مجاز') &&
-                        !s.status.includes('دورة') &&
-                        !s.status.includes('إجازة')
-                    );
+                    // current مُستبعد أصلاً بحسب isExcludedFromWater — لا حاجة لتكرار الاستبعاد هنا
+                    const morning = current.filter(s => s.workType === 'صباحي');
+                    const shift = current.filter(s => s.workType === 'مناوب');
                     
                     // فصل مناوبي الثلاثية (نهر بن عمر) عن الثنائي
                     const shiftThreeDay = shift.filter(s => s.unit === 'تبريد نهر بن عمر');
@@ -8992,7 +9001,22 @@
                                             )}
                                         </div>
                                     </div>
-                                    
+
+                                    {(view === 'maa' || view === 'maaMorning' || view === 'maaShift') && (
+                                        <div className="mb-3 p-3 bg-cyan-50 border border-cyan-200 rounded-xl flex flex-wrap items-center gap-3 no-print">
+                                            <span className="text-xs font-black text-cyan-900">💧 شهر قائمة الماء:</span>
+                                            <input
+                                                type="month"
+                                                value={waterMonth}
+                                                onChange={(e) => setWaterMonth(e.target.value)}
+                                                className="border border-cyan-300 rounded-lg px-3 py-1.5 text-xs font-mono font-bold outline-none focus:border-cyan-600"
+                                            />
+                                            <span className="text-[11px] text-cyan-800 font-bold">
+                                                يُستبعد من في دورة تمسّ هذا الشهر مهما قصرت، ومن غطّت إجازتُه الطويلة نصف أيامه فأكثر.
+                                            </span>
+                                        </div>
+                                    )}
+
                                     {/* ===== إحصاء القياسات — يظهر فقط في تجهيزات السلامة ===== */}
                                     {view === 'safety' && (() => {
                                         const total = current.length;
@@ -10718,7 +10742,19 @@
                                             </div>
                                         )}
                                     </div>
-                                        
+
+                                    <div className="md:col-span-2">
+                                        <label className="flex items-center gap-2 p-3 bg-cyan-50 border border-cyan-200 rounded-xl cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={!!editingEmployee.excludeFromWaterLists}
+                                                onChange={(e) => updateEditField('excludeFromWaterLists', e.target.checked)}
+                                                className="w-4 h-4 accent-cyan-600"
+                                            />
+                                            <span className="text-xs font-bold text-cyan-900">💧 مستثنى دائماً من قوائم الماء</span>
+                                        </label>
+                                    </div>
+
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">قياس البدلة</label>
                                             <select value={editingEmployee.uniformSize || ''}
