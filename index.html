@@ -2514,12 +2514,12 @@
                 const monthEnd = monthStr + '-' + String(total).padStart(2, '0');
                 let longLeaveDays = 0;
                 const hasPeriods = periodsOf(emp).length > 0;
-                const list = hasPeriods ? periodsOf(emp) : (emp.status && emp.status !== 'نشط' ? [{ type: emp.status, from: '1900-01-01', to: null }] : []);
-                // حالة قديمة بنص لا يطابق أياً من الأنواع السبعة (مثلاً "مجاز" من استيراد Excel)
-                // كانت تُستبعد بالكامل قبل هذا التغيير — تُستبعد الآن أيضاً، بلا قاعدة شهرية.
-                if (!hasPeriods && list.length === 1 && !PERIOD_TYPES.includes(list[0].type)) {
-                    return true;
+                // لا فترات مؤرَّخة: حالة قديمة بنص خام في emp.status — تُستبعد بالكامل إن لم تكن
+                // "نشط"، تماماً كما كان الفلتر قبل هذا التغيير (status === 'نشط' فقط يُقبل).
+                if (!hasPeriods) {
+                    return !!(emp.status && emp.status !== 'نشط');
                 }
+                const list = periodsOf(emp);
                 for (const p of list) {
                     if (!p || !p.from) continue;
                     const pEnd = p.to || '9999-12-31';
@@ -2562,11 +2562,18 @@
                 if (!pendingReturnPrompt) return;
                 const { emp, period } = pendingReturnPrompt;
                 const dayAfter = localDateStr(new Date(period.to).getTime() + 86400000);
+                // «لا» تفتح غياباً من اليوم التالي، لكن يجب ألا يتداخل مع فترة لاحقة مسجَّلة بالفعل —
+                // وإلا يُكتب مباشرة عبر setStaff متجاوزاً حارس التداخل في saveEmployeeEdit، فيصبح
+                // السجل محظوراً على أي حفظ مستقبلي بلا وسيلة لإصلاحه من الواجهة.
+                const laterPeriods = periodsOf(emp).filter(p => p.id !== period.id && p.from && p.from >= dayAfter);
+                const nextStart = laterPeriods.length > 0 ? laterPeriods.reduce((min, p) => p.from < min ? p.from : min, laterPeriods[0].from) : null;
+                const absenceTo = nextStart ? localDateStr(new Date(nextStart).getTime() - 86400000) : '';
+                const skipAbsence = nextStart === dayAfter;
                 const updated = (staff || []).map(s => {
                     if (s.id !== emp.id) return s;
                     const marked = periodsOf(s).map(p => p.id === period.id ? { ...p, confirmedReturn: true } : p);
                     // «لا» تفتح غياباً مفتوح النهاية من اليوم التالي، فلا يختفي من الكشف بصمت
-                    const withAbsence = didResume ? marked : [...marked, { id: 'per_' + Date.now(), type: 'غياب', from: dayAfter, to: '', note: 'لم يباشر بعد انتهاء ' + period.type }];
+                    const withAbsence = (didResume || skipAbsence) ? marked : [...marked, { id: 'per_' + Date.now(), type: 'غياب', from: dayAfter, to: absenceTo, note: 'لم يباشر بعد انتهاء ' + period.type }];
                     return { ...s, statusPeriods: withAbsence };
                 });
                 setStaff(updated);
@@ -3225,10 +3232,9 @@
                         });
 
                         const unitDailyStaff = unitStaff.filter(s => {
-                            if (isLongOrMaternityLeave(s.status)) return false;
                             const status = getEmployeeDailyStatus(s, dailyReportDate);
                             if (isLongOrMaternityLeave(status)) return false;
-                            
+
                             // المناوبون يظهرون دائماً (سواء بالدوام أو استراحة المناوبة)
                             if (s.workType === 'مناوب') {
                                 return true;
@@ -4578,7 +4584,9 @@
                                 lastSafetyDelivery: safetyDeliveryVal,
                                 email: emailVal,
                                 address: addressVal,
-                                relativePhone: relativePhoneVal
+                                relativePhone: relativePhoneVal,
+                                statusPeriods: existingEmp ? existingEmp.statusPeriods : undefined,
+                                excludeFromWaterLists: existingEmp ? existingEmp.excludeFromWaterLists : undefined
                             };
                         });
                         
@@ -4931,7 +4939,12 @@
             
             const saveEmployeeEdit = () => {
                 if (!editingEmployee) return;
-                const periods = periodsOf(editingEmployee).filter(p => p.from);
+                const rawPeriods = periodsOf(editingEmployee);
+                if (rawPeriods.some(p => p && !p.from)) {
+                    alert('⛔ إحدى الفترات بلا تاريخ بداية. الرجاء تحديد تاريخ البداية لكل فترة أو حذفها.');
+                    return;
+                }
+                const periods = rawPeriods;
                 for (let i = 0; i < periods.length; i++) {
                     for (let j = i + 1; j < periods.length; j++) {
                         const a = periods[i], b = periods[j];
@@ -5065,7 +5078,7 @@
             
             const addPeriodToEditing = () => {
                 if (!editingEmployee) return;
-                const today = new Date().toISOString().split('T')[0];
+                const today = localDateStr();
                 const next = [...periodsOf(editingEmployee), { id: 'per_' + Date.now(), type: 'في دورة', from: today, to: '', note: '' }];
                 setEditingEmployee({ ...editingEmployee, statusPeriods: next });
             };
@@ -8310,7 +8323,6 @@
                                                 if (unitStaff.length === 0) return null;
                                                 
                                                 const unitDailyStaff = unitStaff.filter(s => {
-                                                    if (isLongOrMaternityLeave(s.status)) return false;
                                                     const status = getEmployeeDailyStatus(s, dailyReportDate);
                                                     if (isLongOrMaternityLeave(status)) return false;
                                                     return true;
@@ -8989,7 +9001,7 @@
                                         <div>
                                             <h2 className="text-2xl font-bold">{current.length} موظف</h2>
                                             <p className="text-sm opacity-90 mt-1">
-                                                {view === 'maa' && 'فقط النشطين (استبعاد الإجازات الطويلة ودورات)'}
+                                                {view === 'maa' && 'استبعاد من في دورة، ومن غاب نصف الشهر فأكثر بإجازة طويلة أو أمومة، ومن استُثني دائماً'}
                                                 {view === 'evaluation' && 'استبعاد الإجازات الطويلة طويلة وأمومة'}
                                                 {view === 'morning' && 'الاسم الثلاثي فقط'}
                                                 {view === 'contract' && ''}
@@ -10024,9 +10036,9 @@
                                               view === 'shift' ? 'جدول المناوبين' : 
                                               view === 'morning' ? 'جدول الصباحي' : 
                                               view === 'contract' ? 'جدول العقود (موظفو العقود)' : 
-                                              view === 'maa' ? 'جدول الماء' : 
-                                              view === 'maaMorning' ? 'ماء صباحي' :
-                                              view === 'maaShift' ? 'ماء مناوبين' :
+                                              view === 'maa' ? `جدول الماء - ${waterMonth}` :
+                                              view === 'maaMorning' ? `ماء صباحي - ${waterMonth}` :
+                                              view === 'maaShift' ? `ماء مناوبين - ${waterMonth}` :
                                               view === 'evaluation' ? 'جدول التقييم' : 
                                               view === 'units' && selectedUnit ? `منتسبو ${selectedUnit.name}` :
                                               view === 'dashboard' ? 'نتائج البحث والاستعلام' :
