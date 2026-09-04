@@ -2513,13 +2513,19 @@
                 const monthStart = monthStr + '-01';
                 const monthEnd = monthStr + '-' + String(total).padStart(2, '0');
                 let longLeaveDays = 0;
-                const list = periodsOf(emp).length ? periodsOf(emp) : (emp.status && emp.status !== 'نشط' ? [{ type: emp.status, from: '1900-01-01', to: null }] : []);
+                const hasPeriods = periodsOf(emp).length > 0;
+                const list = hasPeriods ? periodsOf(emp) : (emp.status && emp.status !== 'نشط' ? [{ type: emp.status, from: '1900-01-01', to: null }] : []);
+                // حالة قديمة بنص لا يطابق أياً من الأنواع السبعة (مثلاً "مجاز" من استيراد Excel)
+                // كانت تُستبعد بالكامل قبل هذا التغيير — تُستبعد الآن أيضاً، بلا قاعدة شهرية.
+                if (!hasPeriods && list.length === 1 && !PERIOD_TYPES.includes(list[0].type)) {
+                    return true;
+                }
                 for (const p of list) {
                     if (!p || !p.from) continue;
                     const pEnd = p.to || '9999-12-31';
                     if (p.from > monthEnd || pEnd < monthStart) continue; // لا تماس
                     if (p.type === 'في دورة') return true;
-                    if (p.type === 'إجازة طويلة') {
+                    if (p.type === 'إجازة طويلة' || p.type === 'إجازة أمومة') {
                         const from = p.from > monthStart ? p.from : monthStart;
                         const to = pEnd < monthEnd ? pEnd : monthEnd;
                         longLeaveDays += Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
@@ -2528,17 +2534,21 @@
                 return longLeaveDays >= Math.ceil(total / 2);
             };
 
-            // نقل الاستثناء الدائم من الكود إلى ملف الموظف — يجري مرة واحدة
+            // نقل الاستثناء الدائم من الكود إلى ملف الموظف — يجري بعد اكتمال أول تحميل
+            // سحابي فعلياً، لا عند أول رسم محلي: التحميل السحابي يستبدل staff بالكامل،
+            // فتنفيذها قبله يُفقَد فوراً ولا تُعاد المحاولة أبداً.
             const waterExclusionMigratedRef = React.useRef(false);
             React.useEffect(() => {
                 if (waterExclusionMigratedRef.current) return;
+                if (!isInitialCloudLoadCompleteRef.current) return;
                 if (!staff || staff.length === 0) return;
-                waterExclusionMigratedRef.current = true;
                 const target = staff.find(s => s.name && s.name.includes('جاسم عزيز'));
-                if (target && !target.excludeFromWaterLists) {
+                if (!target) return;
+                waterExclusionMigratedRef.current = true;
+                if (!target.excludeFromWaterLists) {
                     setStaff(prev => prev.map(s => s.id === target.id ? { ...s, excludeFromWaterLists: true } : s));
                 }
-            }, [staff]);
+            }, [staff, isInitialCloudLoadCompleteRef.current]);
 
             const [dismissedReturnIds, setDismissedReturnIds] = useState([]);
 
