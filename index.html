@@ -1159,6 +1159,8 @@
             const [userFormName, setUserFormName] = useState('');
             const [userFormRole, setUserFormRole] = useState('operator');
             const [userFormUid, setUserFormUid] = useState('');
+            const [userFormPassword, setUserFormPassword] = useState('');
+            const [userFormManualUid, setUserFormManualUid] = useState(false);
             const [userFormPriority, setUserFormPriority] = useState('99');
             const [userFormPerms, setUserFormPerms] = useState({
                 dailyReport: true,
@@ -1287,6 +1289,23 @@
                 };
                 setStoredAuth(session);
                 return session;
+            };
+
+            // إنشاء حساب Firebase حقيقي مباشرة (بلا خادم خلفي — نفس مفتاح الويب المستخدم للدخول
+            // يكفي لهذا الاستدعاء، فهو إنشاء حساب جديد لا وصولاً لحساب طرف آخر). يعيد الـUID فوراً
+            // فلا حاجة لنسخه يدوياً من Firebase Console بعد الآن.
+            const signUpWithEmail = async (email, password) => {
+                const res = await fetch(`${FIREBASE_AUTH_BASE}/accounts:signUp?key=${FIREBASE_WEB_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, returnSecureToken: true })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    const msg = (data.error && data.error.message) || 'SIGNUP_FAILED';
+                    throw new Error(msg);
+                }
+                return data.localId;
             };
 
             // عدّاد حقب المصادقة: كل خروج يبدأ حقبة جديدة، فتُهمَل نتيجة أي تجديد كان في الطريق
@@ -1624,13 +1643,31 @@
                 return activeAdmins.length === 1 && activeAdmins[0].id === userId;
             };
 
-            const handleSaveUser = (e) => {
+            const handleSaveUser = async (e) => {
                 if (e) e.preventDefault();
                 const name = userFormName.trim();
-                const targetUid = userFormUid.trim();
                 if (!name) {
                     alert('⚠️ يرجى إدخال اسم المستخدم!');
                     return;
+                }
+
+                let targetUid = userFormUid.trim();
+                // مستخدم جديد بلا UID مُلصَق يدوياً: يُنشأ له حساب Firebase حقيقي هنا مباشرة —
+                // بريد تقني تلقائي (لا يحتاج المدير كتابته)، وكلمة مرور يختارها هو فقط.
+                if (!editingUserId && !targetUid) {
+                    const password = userFormPassword.trim();
+                    if (!password || password.length < 6) {
+                        alert('⚠️ يرجى إدخال كلمة مرور من 6 أحرف على الأقل لإنشاء حساب هذا المستخدم!');
+                        return;
+                    }
+                    const autoEmail = 'usr' + Date.now() + '@hr-cooling.local';
+                    try {
+                        targetUid = await signUpWithEmail(autoEmail, password);
+                    } catch (err) {
+                        alert('⛔ تعذّر إنشاء حساب Firebase لهذا المستخدم:' + String.fromCharCode(10,10) + ((err && err.message) || 'خطأ غير معروف'));
+                        return;
+                    }
+                    alert('✅ أُنشئ حساب الدخول بنجاح:' + String.fromCharCode(10,10) + 'البريد: ' + autoEmail + String.fromCharCode(10) + 'كلمة المرور: (كما أدخلتها الآن)' + String.fromCharCode(10,10) + 'سلّم هذين للمستخدم — لن يظهر البريد مرة أخرى تلقائياً.');
                 }
                 if (!targetUid) {
                     alert('⚠️ يرجى إدخال معرّف حساب Firebase (UID) الخاص بهذا المستخدم! تنسخه من Firebase Console ← Authentication ← Users.');
@@ -1713,6 +1750,8 @@
                 setUserFormName('');
                 setUserFormRole('operator');
                 setUserFormUid('');
+                setUserFormPassword('');
+                setUserFormManualUid(false);
                 setUserFormPriority('99');
                 setUserFormPerms({
                     dailyReport: true,
@@ -1727,6 +1766,8 @@
                 setUserFormName(u.name);
                 setUserFormRole(u.role);
                 setUserFormUid(u.uid || '');
+                setUserFormPassword('');
+                setUserFormManualUid(true);
                 setUserFormPriority(String(u.editPriority || 99));
                 setUserFormPerms(u.permissions || {
                     dailyReport: true,
@@ -1753,6 +1794,8 @@
                 setUserFormName('');
                 setUserFormRole('operator');
                 setUserFormUid('');
+                setUserFormPassword('');
+                setUserFormManualUid(false);
                 setUserFormPriority('99');
                 setUserFormPerms({
                     dailyReport: true,
@@ -7011,15 +7054,38 @@
                                     </div>
 
                                     <div className="md:col-span-3 space-y-1">
-                                        <label className="block text-[11px] font-black text-slate-700">🆔 معرّف حساب Firebase (UID):</label>
-                                        <input
-                                            id="userFormUidInput"
-                                            type="text"
-                                            value={userFormUid}
-                                            onChange={(e) => setUserFormUid(e.target.value)}
-                                            placeholder="UID من Firebase"
-                                            className="w-full bg-white border border-amber-400 focus:border-indigo-600 rounded-xl px-3 py-2 text-[11px] font-mono font-bold text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
-                                        />
+                                        {(editingUserId || userFormManualUid) ? (
+                                            <>
+                                                <label className="block text-[11px] font-black text-slate-700">🆔 معرّف حساب Firebase (UID):</label>
+                                                <input
+                                                    id="userFormUidInput"
+                                                    type="text"
+                                                    value={userFormUid}
+                                                    onChange={(e) => setUserFormUid(e.target.value)}
+                                                    placeholder="UID من Firebase"
+                                                    className="w-full bg-white border border-amber-400 focus:border-indigo-600 rounded-xl px-3 py-2 text-[11px] font-mono font-bold text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
+                                                />
+                                                {!editingUserId && (
+                                                    <button type="button" onClick={() => { setUserFormManualUid(false); setUserFormUid(''); }} className="text-[10px] text-indigo-700 hover:underline cursor-pointer">
+                                                        ← إنشاء حساب جديد بدل الربط اليدوي
+                                                    </button>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <label className="block text-[11px] font-black text-slate-700">🔑 كلمة مرور الحساب الجديد:</label>
+                                                <input
+                                                    type="text"
+                                                    value={userFormPassword}
+                                                    onChange={(e) => setUserFormPassword(e.target.value)}
+                                                    placeholder="6 أحرف على الأقل"
+                                                    className="w-full bg-white border border-amber-400 focus:border-indigo-600 rounded-xl px-3 py-2 text-[11px] font-mono font-bold text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
+                                                />
+                                                <button type="button" onClick={() => setUserFormManualUid(true)} className="text-[10px] text-indigo-700 hover:underline cursor-pointer">
+                                                    لدي حساب Firebase موجود مسبقاً →
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                     <div className="md:col-span-2 space-y-1">
                                         <label className="block text-[11px] font-black text-slate-700">🥇 أولوية التحرير:</label>
