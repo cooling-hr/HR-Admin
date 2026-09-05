@@ -1884,6 +1884,11 @@
             // حارس عدم التداخل: فعلٌ واحد قد يغيّر حالتين فيُطلق دفعتين متزامنتين
             const isPushingRef = React.useRef(false);
             const pendingPushRef = React.useRef(false);
+            // الحزمة الصريحة (إن وُجدت) المؤجَّلة أثناء انشغال الدفع — تُستخدَم عند إعادة المحاولة
+            // بدل حالة عامة قد تكون التُقطت قبل أن يُطبِّق React تحديث الحالة الذي استدعى هذه الدفعة
+            // أصلاً، فتُفقَد البيانات المحفوظة للتو صمتاً (وليس فقط UID المستخدم — أي حفظة بحزمة
+            // صريحة تتزامن مع دفعة أخرى قيد التنفيذ).
+            const pendingBundleRef = React.useRef(null);
             // بصمة آخر حمولة نعلم أنها على الخادم — تمنع إعادة بثّ ما استقبلناه للتو
             const lastSyncedSignatureRef = React.useRef(null);
             const CLOUD_SIGNATURE_KEYS = ['staffData', 'systemUsersList', 'officialHolidaysList', 'hourlyLeaveRecords', 'overtimeHoursRecords', 'dailyStatusOverrides', 'shiftAnchorDate', 'threeShiftAnchorSquad', 'twoShiftAnchorSquad', 'dataEntryOperator', 'overtimeSelectedIds', 'pendingDeletionRequest'];
@@ -1946,9 +1951,12 @@
                 if (!isInitialCloudLoadCompleteRef.current && !bundle) {
                     return;
                 }
-                // 3. حارس عدم التداخل: دفعتان متزامنتان تُكدّسان نافذتي تحذير وتُطفئان مؤشر المزامنة قبل الأوان
+                // 3. حارس عدم التداخل: دفعتان متزامنتان تُكدّسان نافذتي تحذير وتُطفئان مؤشر المزامنة قبل الأوان.
+                // الحزمة الصريحة (إن وُجدت) تُحفَظ لإعادة المحاولة بها بعينها — لا بحالة عامة قد تكون
+                // أقدم من التعديل الذي استدعى هذه الدفعة أصلاً.
                 if (isPushingRef.current) {
                     pendingPushRef.current = true;
+                    if (bundle) pendingBundleRef.current = bundle;
                     return;
                 }
                 isPushingRef.current = true;
@@ -2053,7 +2061,9 @@
                     isPushingRef.current = false;
                     if (pendingPushRef.current) {
                         pendingPushRef.current = false;
-                        setTimeout(() => pushDataToCloud(), 0);
+                        const queuedBundle = pendingBundleRef.current;
+                        pendingBundleRef.current = null;
+                        setTimeout(() => pushDataToCloud(queuedBundle), 0);
                     }
                 }
             };
