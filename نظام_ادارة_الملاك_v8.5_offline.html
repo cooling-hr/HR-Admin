@@ -2084,6 +2084,20 @@
             const [showEditModal, setShowEditModal] = useState(false);
             const [showWelcome, setShowWelcome] = useState(true);
             const [showLoginModal, setShowLoginModal] = useState(false);
+
+            // شاشة الترحيب: Enter يفتح نافذة الدخول كما لو ضُغط الزر — نافذة الدخول نفسها
+            // نموذج (form) فيُرسله Enter تلقائياً، فلا حاجة لمعالجة إضافية هناك
+            React.useEffect(() => {
+                if (!showWelcome || showLoginModal) return;
+                const onKeyDown = (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setShowLoginModal(true);
+                    }
+                };
+                window.addEventListener('keydown', onKeyDown);
+                return () => window.removeEventListener('keydown', onKeyDown);
+            }, [showWelcome, showLoginModal]);
             const [showPreview, setShowPreview] = useState(false);
             const [showPrintForm, setShowPrintForm] = useState(false);
             const [previewData, setPreviewData] = useState([]);
@@ -5924,7 +5938,7 @@
                                             className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-bold text-lg transition-all transform hover:scale-105 shadow-xl border-2 border-white border-opacity-30">
                                             ✓ ابدأ العمل الآن
                                         </button>
-                                        <p className="text-xs text-green-200 mt-2 font-semibold animate-pulse-custom">← اضغط هنا للبدء</p>
+                                        <p className="text-xs text-green-200 mt-2 font-semibold animate-pulse-custom">← اضغط هنا أو زر Enter للبدء</p>
                                     </div>
                                 </div>
                             </div>
@@ -8043,8 +8057,22 @@
                                                             key={u.id}
                                                             onClick={() => {
                                                                 setSelectedDailyUnitTab(u.id);
-                                                                // الانتقال والتمركز التلقائي السلس لبداية أسماء الوحدة
-                                                                window.scrollTo({ top: 340, behavior: 'smooth' });
+                                                                // الانتقال المباشر لكشف الوحدة المختارة نفسه بدل قفزة ثابتة لأعلى الصفحة.
+                                                                // التأخير يمنح React فرصة إعادة الرسم أولاً ليصير عنصر الوحدة موجوداً.
+                                                                setTimeout(() => {
+                                                                    if (u.id === 'all') {
+                                                                        window.scrollTo({ top: 340, behavior: 'smooth' });
+                                                                        return;
+                                                                    }
+                                                                    const section = document.getElementById('unitSection-' + u.id);
+                                                                    if (!section) {
+                                                                        window.scrollTo({ top: 340, behavior: 'smooth' });
+                                                                        return;
+                                                                    }
+                                                                    // 150 بكسل تعويضاً عن الشريطين المثبّتين أعلى الصفحة (التنقل + شريط الوحدات)
+                                                                    const target = section.getBoundingClientRect().top + window.scrollY - 150;
+                                                                    window.scrollTo({ top: target > 0 ? target : 0, behavior: 'smooth' });
+                                                                }, 60);
                                                             }}
                                                             className={`py-2 px-3.5 rounded-xl font-black text-xs md:text-sm whitespace-nowrap transition cursor-pointer flex items-center gap-2 active:scale-95 shadow-sm ${
                                                                 isActive
@@ -8083,7 +8111,7 @@
                                                 });
                                                 
                                                 return (
-                                                    <div key={unitName} className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
+                                                    <div key={unitName} id={'unitSection-' + unitName} className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
                                                         <div className="bg-slate-50/90 px-4 md:px-5 py-3 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2">
                                                             <div className="flex items-center gap-2">
                                                                 <h3 className="font-black text-slate-800 text-sm md:text-base flex items-center gap-2">
