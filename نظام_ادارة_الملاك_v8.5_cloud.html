@@ -1160,6 +1160,7 @@
             const [userFormRole, setUserFormRole] = useState('operator');
             const [userFormUid, setUserFormUid] = useState('');
             const [userFormPassword, setUserFormPassword] = useState('');
+            const [userFormLocalPart, setUserFormLocalPart] = useState('');
             const [userFormManualUid, setUserFormManualUid] = useState(false);
             const [userFormPriority, setUserFormPriority] = useState('99');
             const [userFormPerms, setUserFormPerms] = useState({
@@ -1660,11 +1661,19 @@
                         alert('⚠️ يرجى إدخال كلمة مرور من 6 أحرف على الأقل لإنشاء حساب هذا المستخدم!');
                         return;
                     }
-                    const autoEmail = 'usr' + Date.now() + '@hr-cooling.local';
+                    const localPart = userFormLocalPart.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                    if (!localPart) {
+                        alert('⚠️ يرجى إدخال اسم الدخول بأحرف إنجليزية (مثال: fatima) — يُستخدم بريداً تقنياً للحساب، لذا يجب أن يكون سهل الحفظ والكتابة.');
+                        return;
+                    }
+                    const autoEmail = localPart + '@hr-cooling.local';
                     try {
                         targetUid = await signUpWithEmail(autoEmail, password);
                     } catch (err) {
-                        alert('⛔ تعذّر إنشاء حساب Firebase لهذا المستخدم:' + String.fromCharCode(10,10) + ((err && err.message) || 'خطأ غير معروف'));
+                        const isDuplicate = err && String(err.message || '').includes('EMAIL_EXISTS');
+                        alert(isDuplicate
+                            ? ('⛔ اسم الدخول "' + localPart + '" مُستخدَم بالفعل لحساب آخر. جرّب اسماً مختلفاً (مثلاً بإضافة الاسم الثاني).')
+                            : ('⛔ تعذّر إنشاء حساب Firebase لهذا المستخدم:' + String.fromCharCode(10,10) + ((err && err.message) || 'خطأ غير معروف')));
                         return;
                     }
                     alert('✅ أُنشئ حساب الدخول بنجاح:' + String.fromCharCode(10,10) + 'البريد: ' + autoEmail + String.fromCharCode(10) + 'كلمة المرور: (كما أدخلتها الآن)' + String.fromCharCode(10,10) + 'سلّم هذين للمستخدم — لن يظهر البريد مرة أخرى تلقائياً.');
@@ -1751,6 +1760,7 @@
                 setUserFormRole('operator');
                 setUserFormUid('');
                 setUserFormPassword('');
+                setUserFormLocalPart('');
                 setUserFormManualUid(false);
                 setUserFormPriority('99');
                 setUserFormPerms({
@@ -1767,6 +1777,7 @@
                 setUserFormRole(u.role);
                 setUserFormUid(u.uid || '');
                 setUserFormPassword('');
+                setUserFormLocalPart('');
                 setUserFormManualUid(true);
                 setUserFormPriority(String(u.editPriority || 99));
                 setUserFormPerms(u.permissions || {
@@ -1795,6 +1806,7 @@
                 setUserFormRole('operator');
                 setUserFormUid('');
                 setUserFormPassword('');
+                setUserFormLocalPart('');
                 setUserFormManualUid(false);
                 setUserFormPriority('99');
                 setUserFormPerms({
@@ -7066,13 +7078,22 @@
                                                     className="w-full bg-white border border-amber-400 focus:border-indigo-600 rounded-xl px-3 py-2 text-[11px] font-mono font-bold text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
                                                 />
                                                 {!editingUserId && (
-                                                    <button type="button" onClick={() => { setUserFormManualUid(false); setUserFormUid(''); }} className="text-[10px] text-indigo-700 hover:underline cursor-pointer">
-                                                        ← إنشاء حساب جديد بدل الربط اليدوي
+                                                    <button type="button" onClick={() => { setUserFormManualUid(false); setUserFormUid(''); }} className="w-full text-center border-t border-dashed border-slate-300 pt-1 text-[10px] text-indigo-700 hover:underline cursor-pointer">
+                                                        🔄 بدلاً من ذلك: إنشاء حساب جديد بكلمة مرور
                                                     </button>
                                                 )}
                                             </>
                                         ) : (
                                             <>
+                                                <label className="block text-[11px] font-black text-slate-700">🔤 اسم الدخول (أحرف إنجليزية):</label>
+                                                <input
+                                                    type="text"
+                                                    value={userFormLocalPart}
+                                                    onChange={(e) => setUserFormLocalPart(e.target.value)}
+                                                    placeholder="مثال: fatima"
+                                                    dir="ltr"
+                                                    className="w-full bg-white border border-amber-400 focus:border-indigo-600 rounded-xl px-3 py-2 text-[11px] font-mono font-bold text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
+                                                />
                                                 <label className="block text-[11px] font-black text-slate-700">🔑 كلمة مرور الحساب الجديد:</label>
                                                 <input
                                                     type="text"
@@ -7081,8 +7102,8 @@
                                                     placeholder="6 أحرف على الأقل"
                                                     className="w-full bg-white border border-amber-400 focus:border-indigo-600 rounded-xl px-3 py-2 text-[11px] font-mono font-bold text-indigo-900 text-center outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm"
                                                 />
-                                                <button type="button" onClick={() => setUserFormManualUid(true)} className="text-[10px] text-indigo-700 hover:underline cursor-pointer">
-                                                    لدي حساب Firebase موجود مسبقاً →
+                                                <button type="button" onClick={() => setUserFormManualUid(true)} className="w-full text-center border-t border-dashed border-slate-300 pt-1 text-[10px] text-indigo-700 hover:underline cursor-pointer">
+                                                    🔄 بدلاً من ذلك: ربط حساب Firebase موجود مسبقاً
                                                 </button>
                                             </>
                                         )}
