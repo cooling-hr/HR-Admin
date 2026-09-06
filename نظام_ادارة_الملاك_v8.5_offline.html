@@ -9440,31 +9440,39 @@
                                                         )}
                                                         {view !== 'safety' && (
                                                         <td className="px-4 py-3">
-                                                            {view === 'all' ? (
-                                                                <select value={s.status || 'نشط'} onChange={(e) => changeStatus(s.id, e.target.value)}
-                                                                    className={`px-3 py-1 rounded-full text-sm font-bold border-2 cursor-pointer ${
-                                                                        (!s.status || s.status === 'نشط') ? 'bg-green-100 text-green-800 border-green-300' :
-                                                                        s.status === 'في دورة' ? 'bg-indigo-100 text-indigo-800 border-indigo-300' :
-                                                                        'bg-orange-100 text-orange-800 border-orange-300'
+                                                            {(() => {
+                                                                // الحالة المعروضة يجب أن تعكس الفترة الفعلية السارية اليوم، لا حقل
+                                                                // emp.status الخام وحده — دمج قاعدة بيانات خارجية (Excel) قد يُحدِّث
+                                                                // هذا الحقل مباشرة بمعزل عن الفترات المؤرَّخة، فيُظهر حالة قديمة/خاطئة
+                                                                // بينما الفترة الحقيقية (وكل ما يعتمد عليها: الموقف اليومي، الماء)
+                                                                // ما تزال صحيحة تماماً.
+                                                                const resolvedStatus = (getActivePeriod(s, localDateStr()) || {}).type || s.status || 'نشط';
+                                                                return view === 'all' ? (
+                                                                    <select value={resolvedStatus} onChange={(e) => changeStatus(s.id, e.target.value)}
+                                                                        className={`px-3 py-1 rounded-full text-sm font-bold border-2 cursor-pointer ${
+                                                                            resolvedStatus === 'نشط' ? 'bg-green-100 text-green-800 border-green-300' :
+                                                                            resolvedStatus === 'في دورة' ? 'bg-indigo-100 text-indigo-800 border-indigo-300' :
+                                                                            'bg-orange-100 text-orange-800 border-orange-300'
+                                                                        }`}>
+                                                                        {!QUICK_STATUS_OPTIONS.includes(resolvedStatus) && (
+                                                                            <option value={resolvedStatus}>{resolvedStatus}</option>
+                                                                        )}
+                                                                        <option value="نشط">نشط</option>
+                                                                        <option value="في دورة">في دورة</option>
+                                                                        <option value="إجازة طويلة">إجازة طويلة</option>
+                                                                        <option value="إجازة أمومة">إجازة أمومة</option>
+                                                                        <option value="غياب">غياب</option>
+                                                                    </select>
+                                                                ) : (
+                                                                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                                                        resolvedStatus === 'نشط' ? 'bg-green-100 text-green-800' :
+                                                                        resolvedStatus === 'في دورة' ? 'bg-indigo-100 text-indigo-800' :
+                                                                        'bg-orange-100 text-orange-800'
                                                                     }`}>
-                                                                    {s.status && !QUICK_STATUS_OPTIONS.includes(s.status) && (
-                                                                        <option value={s.status}>{s.status}</option>
-                                                                    )}
-                                                                    <option value="نشط">نشط</option>
-                                                                    <option value="في دورة">في دورة</option>
-                                                                    <option value="إجازة طويلة">إجازة طويلة</option>
-                                                                    <option value="إجازة أمومة">إجازة أمومة</option>
-                                                                    <option value="غياب">غياب</option>
-                                                                </select>
-                                                            ) : (
-                                                                <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                                                                    s.status === 'نشط' ? 'bg-green-100 text-green-800' :
-                                                                    s.status === 'في دورة' ? 'bg-indigo-100 text-indigo-800' :
-                                                                    'bg-orange-100 text-orange-800'
-                                                                }`}>
-                                                                    {s.status}
-                                                                </span>
-                                                            )}
+                                                                        {resolvedStatus}
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         )}
                                                     </tr>
