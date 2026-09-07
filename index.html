@@ -1633,6 +1633,9 @@
                 setPinInput('');
                 setPinError('');
                 setPinAttempts(0);
+                // بيانات الملاك لم تعد مقروءة بلا حساب، فجلبها عند فتح الصفحة (قبل الدخول) يُرفض.
+                // نُعيد الجلب فور اكتمال الدخول بدل انتظار الدورة التالية للاستطلاع بعد خمس ثوانٍ
+                fetchCloudData();
             };
 
             // الدخول السريع بالرمز الرباعي: يجدّد التوكن المخزَّن أصلاً (refreshToken) بدل طلب
@@ -2223,7 +2226,9 @@
                 }
                 try {
                     setCloudSyncStatus(prev => ({ ...prev, syncing: true }));
-                    const res = await fetch(FIREBASE_DB_URL + '?t=' + Date.now(), {
+                    // موثَّق عمداً: بيانات الملاك (أسماء وهواتف وعناوين) لم تعد مقروءة للعموم،
+                    // فقراءتها تحتاج توكن حساب له دور مسند — لذا cloudFetch لا fetch عارياً
+                    const res = await cloudFetch(FIREBASE_DB_URL + '?t=' + Date.now(), {
                         method: 'GET',
                         headers: { 'Cache-Control': 'no-cache' }
                     });
@@ -2307,7 +2312,7 @@
 
                     // قراءة صغيرة تسبق الحفظ: هل كتب زميل شيئاً بعد آخر ما رآه هذا الجهاز؟
                     try {
-                        const stampRes = await fetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now());
+                        const stampRes = await cloudFetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now());
                         if (stampRes.ok) {
                             const serverStamp = await stampRes.json();
                             if (serverStamp && knownServerUpdateRef.current && serverStamp > knownServerUpdateRef.current) {
