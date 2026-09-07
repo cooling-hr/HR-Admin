@@ -2434,7 +2434,16 @@
             const [unifiedQuery, setUnifiedQuery] = useState('');
             const [unifiedFilters, setUnifiedFilters] = useState({ location:'', unit:'', selectedUnits:[], workType:'', education:'', yearsOfService:'', graduationYear:'', hireYear:'', gender:'', hasMissingInfo:'' });
             const [showUnitDropdown, setShowUnitDropdown] = useState(false);
-            const [unifiedResults, setUnifiedResults] = useState(null);
+            // نتائج البحث والاستعلام تُحسب مرة واحدة عند الضغط على "بحث" وتُخزَّن كلقطة.
+            // لكن الحفظ يُنشئ كائناً جديداً للموظف داخل staff، فتبقى اللقطة ممسكة بالكائن القديم
+            // وتعرض بياناته السابقة حتى إعادة تحميل الصفحة. لذا تُخزَّن اللقطة خاماً، ويُعاد
+            // ربطها بأحدث نسخة من كل موظف عند كل رسم، مع إسقاط من حُذف من الملاك.
+            const [unifiedResultsRaw, setUnifiedResults] = useState(null);
+            const unifiedResults = useMemo(() => {
+                if (unifiedResultsRaw === null) return null;
+                const byId = new Map(staff.map(s => [s.id, s]));
+                return unifiedResultsRaw.map(r => (r && r.id) ? byId.get(r.id) : r).filter(Boolean);
+            }, [unifiedResultsRaw, staff]);
             const [editingEmployee, setEditingEmployee] = useState(null);
             const [selectedEmployeeCard, setSelectedEmployeeCard] = useState(null);
             
