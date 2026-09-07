@@ -3812,12 +3812,9 @@
                                 content: `━━━ ${unitName} ━━━`
                             });
                             
-                            let sortedStaff = [...unitDailyStaff].sort((a, b) => {
-                                if (a.workType !== b.workType) {
-                                    return a.workType === 'صباحي' ? -1 : 1;
-                                }
-                                return 0;
-                            });
+                            // نفس معيار الترتيب المعروض على الشاشة ("الوحدات والموقف" و"الموقف اليومي")،
+                            // فلا يختلف التصدير/الطباعة عمّا يراه المدخِل حيّاً — والعقود تنتهي آخر كل وحدة
+                            let sortedStaff = sortByJobTitleHierarchy(unitDailyStaff, unitName);
                             if (unitName === 'مقر الشعبة') {
                                 sortedStaff = ensureTopTwo(sortedStaff);
                             }
@@ -9211,12 +9208,10 @@
                                                     return true;
                                                 });
                                                  if (unitDailyStaff.length === 0) return null;
-                                                 const sortedStaff = [...unitDailyStaff].sort((a, b) => {
-                                                    if (a.workType !== b.workType) {
-                                                        return a.workType === 'صباحي' ? -1 : 1;
-                                                    }
-                                                    return 0;
-                                                });
+                                                 // نفس دالة ترتيب "الوحدات والموقف" — معيار واحد موحَّد في كل شاشات الوحدات:
+                                                 // أولويات عامة، ثم مسؤولو الوحدة، ثم الهرمية الوظيفية، والعقود تُحسَب دائماً
+                                                 // أدنى رتبة (mainCategory=100) فتنتهي في آخر كل قائمة وحدة تلقائياً
+                                                 const sortedStaff = sortByJobTitleHierarchy(unitDailyStaff, unitName);
                                                 
                                                 return (
                                                     <div key={unitName} id={'unitSection-' + unitName} className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
