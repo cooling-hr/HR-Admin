@@ -1281,30 +1281,78 @@
                 return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
             };
 
-            const getDevicePinLock = () => {
+            // الجهاز يحمل قائمة حسابات مسجَّلة لا حساباً واحداً: في شعبة تُستعمل فيها أجهزة مشتركة،
+            // خانة رمز واحدة تعني عملياً أن أول من يضبط رمزه يمنع بقية زملائه من الميزة كلياً.
+            // كل حساب يحمل تجزئة رمزه وجلسته المحفوظة معه، فلا يتداخل مع غيره ولا يمحوه.
+            const getDevicePinLocks = () => {
                 try {
-                    const raw = safeStorage.getItem('devicePinLock');
-                    return raw ? JSON.parse(raw) : null;
-                } catch (e) { return null; }
+                    const raw = safeStorage.getItem('devicePinLocks');
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        return Array.isArray(parsed) ? parsed.filter(l => l && l.uid && l.hash) : [];
+                    }
+                    // ترحيل الصيغة القديمة (حساب واحد) تلقائياً حتى لا يفقد من ضبط رمزه سابقاً رمزه.
+                    // لا يُرحَّل إلا إن وُجدت جلسته فعلاً: تسجيل بلا جلسة لا يفتح شيئاً، ووجوده
+                    // يجعل عرض التفعيل بعد الدخول الكامل يظنّه مسجَّلاً فلا يعرضه — فيعلق بلا مخرج
+                    const legacyRaw = safeStorage.getItem('devicePinLock');
+                    if (legacyRaw) {
+                        const legacy = JSON.parse(legacyRaw);
+                        const session = getStoredAuth();
+                        const usable = session && session.refreshToken && legacy && session.uid === legacy.uid;
+                        safeStorage.removeItem('devicePinLock');
+                        if (usable && legacy.hash) {
+                            const migrated = [{ uid: legacy.uid, hash: legacy.hash, name: legacy.name || '', session }];
+                            safeStorage.setItem('devicePinLocks', JSON.stringify(migrated));
+                            return migrated;
+                        }
+                    }
+                    return [];
+                } catch (e) { return []; }
+            };
+
+            const getDevicePinLockFor = (uid) => getDevicePinLocks().find(l => l.uid === uid) || null;
+            // تسجيل صالح فعلاً = يحمل جلسة قابلة للتجديد؛ ما دونه لا يفتح شيئاً
+            const hasUsableDevicePinLock = (uid) => {
+                const l = getDevicePinLockFor(uid);
+                return !!(l && l.session && l.session.refreshToken);
+            };
+
+            // تعديل تسجيل واحد بعينه دون المساس ببقية الحسابات على الجهاز
+            const updateDevicePinLock = (uid, patch) => {
+                const locks = getDevicePinLocks().map(l => l.uid === uid ? { ...l, ...patch } : l);
+                safeStorage.setItem('devicePinLocks', JSON.stringify(locks));
             };
 
             const setDevicePinLock = async (uid, pin, name) => {
+                const session = getStoredAuth();
+                // الجلسة تُلتقط مرة واحدة ويُتحقق أنها لصاحب الرمز نفسه: لو التقطنا جلسة حساب آخر
+                // (سباق مصادقة أو خطأ استدعاء) لارتبط رمز فلان بجلسة فلان، ولفشل فتحه دائماً
+                if (!session || !session.refreshToken || session.uid !== uid) return false;
                 const hash = await hashDevicePin(pin);
-                // الاسم يُحفَظ ليظهر على شاشة الرمز نفسها — على جهاز مشترك بين أكثر من موظف،
-                // من يفتح الجهاز يرى فوراً لمن هذا الرمز قبل أن يخمّن أرقاماً تمحو جلسة زميله
-                safeStorage.setItem('devicePinLock', JSON.stringify({ uid, hash, name: name || '' }));
+                const locks = getDevicePinLocks().filter(l => l.uid !== uid);
+                locks.push({ uid, hash, name: name || '', session, lockedUntil: 0 });
+                safeStorage.setItem('devicePinLocks', JSON.stringify(locks));
+                return true;
             };
 
-            const clearDevicePinLock = () => {
+            // بلا uid تمسح الجهاز كله؛ مع uid تمسح صاحبه وحده وتترك بقية الزملاء كما هم
+            const clearDevicePinLock = (uid) => {
+                if (!uid) {
+                    safeStorage.removeItem('devicePinLocks');
+                    safeStorage.removeItem('devicePinLock');
+                    return;
+                }
+                const remaining = getDevicePinLocks().filter(l => l.uid !== uid);
+                if (remaining.length > 0) {
+                    safeStorage.setItem('devicePinLocks', JSON.stringify(remaining));
+                } else {
+                    safeStorage.removeItem('devicePinLocks');
+                }
                 safeStorage.removeItem('devicePinLock');
             };
 
-            // هل هذا الجهاز مؤهَّل لشاشة الرمز السريع؟ جلسة محفوظة + رمز مضبوط لصاحبها نفسه
-            const isPinEligibleNow = () => {
-                const session = getStoredAuth();
-                const lock = getDevicePinLock();
-                return !!(session && lock && lock.uid === session.uid);
-            };
+            // مؤهَّل للدخول السريع إن كان على الجهاز حساب واحد على الأقل يحمل رمزاً وجلسة محفوظة
+            const isPinEligibleNow = () => getDevicePinLocks().some(l => l.session && l.session.refreshToken);
 
             const signInWithEmail = async (email, password) => {
                 const res = await fetch(`${FIREBASE_AUTH_BASE}/accounts:signInWithPassword?key=${FIREBASE_WEB_API_KEY}`, {
@@ -1503,7 +1551,7 @@
                 // بعد نجاح دخول كامل ببريد وكلمة مرور فعلياً (لا حين توقّف الأمر عند مطالبة
                 // بإنهاء جلسة جهاز آخر) اعرض إتاحة رمز رباعي لهذا الجهاز — لا يُعرض بعد دخول
                 // بالرمز نفسه (يملكه أصلاً)، ولا لحساب الاطلاع (بلا فائدة تُذكر)
-                if (loggedIn && targetUser.role !== 'viewer' && !getDevicePinLock() && !safeStorage.getItem('pinOfferDeclined_' + targetUser.id)) {
+                if (loggedIn && targetUser.role !== 'viewer' && !hasUsableDevicePinLock(targetUser.id) && !safeStorage.getItem('pinOfferDeclined_' + targetUser.id)) {
                     setPendingPinOfferUser(targetUser);
                     setShowSetPinOffer(true);
                 }
@@ -1595,18 +1643,27 @@
             // (لا حالة React) يُقفَل فوراً ومتزامناً في أول سطر، فلا نافذة زمنية للتسابق.
             const isPinSubmittingRef = React.useRef(false);
 
-            const handlePinLogin = async () => {
+            const handlePinLogin = async (uid) => {
                 if (isPinSubmittingRef.current) return;
                 isPinSubmittingRef.current = true;
                 try {
                     setPinError('');
-                    const lock = getDevicePinLock();
-                    const storedSession = getStoredAuth();
-                    if (!lock || !storedSession || lock.uid !== storedSession.uid) {
-                        clearDevicePinLock();
+                    const lock = getDevicePinLockFor(uid);
+                    if (!lock || !lock.session || !lock.session.refreshToken) {
+                        clearDevicePinLock(uid);
                         pinGateOpenRef.current = true;
                         setShowPinScreen(false);
+                        setSelectedPinUid(null);
                         setShowWelcome(true);
+                        return;
+                    }
+
+                    // تهدئة زمنية بدل الحذف: على جهاز مشترك، من يجرّب رموزاً على حساب زميله
+                    // (عن قصد أو خطأ) لا يجوز أن يُلغي تسجيله ويُجبره على دخول كامل — يُجمَّد مؤقتاً فقط
+                    if (lock.lockedUntil && Date.now() < lock.lockedUntil) {
+                        const mins = Math.max(1, Math.ceil((lock.lockedUntil - Date.now()) / 60000));
+                        setPinInput('');
+                        setPinError(`⏳ أُوقف إدخال الرمز لهذا الحساب مؤقتاً بعد محاولات خاطئة. أعد المحاولة بعد ${mins} دقيقة، أو ادخل بالبريد وكلمة المرور.`);
                         return;
                     }
 
@@ -1615,13 +1672,11 @@
                         const attempts = pinAttempts + 1;
                         setPinInput('');
                         if (attempts >= 5) {
-                            clearDevicePinLock();
-                            setStoredAuth(null);
-                            pinGateOpenRef.current = true;
-                            setShowPinScreen(false);
-                            setShowWelcome(true);
-                            setShowLoginModal(true);
-                            setLoginError('⛔ تجاوزت عدد المحاولات المسموح. سجّل الدخول الكامل من جديد.');
+                            updateDevicePinLock(uid, { lockedUntil: Date.now() + 15 * 60 * 1000 });
+                            setPinAttempts(0);
+                            // يبقى على شاشة هذا الحساب ليقرأ سبب التوقف — إعادته لقائمة الاختيار
+                            // تُخفي الرسالة فيظنّ أن الزر معطّل بلا سبب
+                            setPinError('⛔ تجاوزت عدد المحاولات المسموح. أُوقف رمز هذا الحساب 15 دقيقة — تسجيله لم يُحذف، ويمكن لصاحبه الدخول بالبريد وكلمة المرور.');
                             return;
                         }
                         setPinAttempts(attempts);
@@ -1629,23 +1684,32 @@
                         return;
                     }
 
-                    // الرمز صحيح: تُفتح البوابة الآن فقط، فتُتاح cloudFetch لإكمال الدخول أدناه —
-                    // وتبقى مغلقة تماماً طوال أي محاولة رمز خاطئة سابقة.
-                    pinGateOpenRef.current = true;
+                    // الرمز صحيح: تُنصَّب جلسة صاحبه لتُستعمل في التجديد (تجديد التوكن يمرّ بـ fetch
+                    // مباشر لا بـ cloudFetch، فلا تحتاج فتح البوابة) — والبوابة تبقى مغلقة عمداً حتى
+                    // يثبت أن الجلسة المجدَّدة تخصّ فعلاً صاحب الرمز، فلا يُستعمل توكن غير مُتحقَّق منه
+                    setStoredAuth(lock.session);
 
                     setIsCheckingLogin(true);
                     const refreshed = await refreshIdTokenIfNeeded();
                     // إعادة التحقق من الحساب بعد التجديد غير المتزامن: لو بدّل تبويب آخر الجلسة
                     // المخزَّنة أثناء هذا الانتظار، لا نكمل الدخول بحساب غير الذي تحقّق منه الرمز
                     if (!refreshed || refreshed.uid !== lock.uid) {
-                        clearDevicePinLock();
+                        // الجلسة غير موثوقة: تُمحى ولا تُترك منصَّبة، والتسجيل يبقى لصاحبه
+                        signOutFirebase();
+                        pinGateOpenRef.current = true;
                         setIsCheckingLogin(false);
                         setShowPinScreen(false);
+                        setSelectedPinUid(null);
                         setShowWelcome(true);
                         setShowLoginModal(true);
                         setLoginError('⚠️ انتهت جلستك المحفوظة على هذا الجهاز. سجّل الدخول الكامل من جديد.');
                         return;
                     }
+
+                    // ثبتت هوية الجلسة الآن: تُفتح البوابة، ويُحدَّث التسجيل بالجلسة المجدَّدة حتى
+                    // لا يُعاد استعمال توكن قديم في المرات القادمة (رموز التجديد تُدوَّر أحياناً)
+                    pinGateOpenRef.current = true;
+                    updateDevicePinLock(uid, { session: refreshed, lockedUntil: 0 });
 
                     // نميّز عطل الاتصال العابر (لا اتصال إنترنت لحظياً) عن رفض الخادم الصريح —
                     // بلا هذا التمييز، رمز صحيح يُدخَل أثناء انقطاع شبكة وجيز كان يُفسَّر بالخطأ
@@ -1672,10 +1736,11 @@
 
                     if (!roleData || !roleData.role) {
                         // هنا فقط الخادم ردّ فعلاً بعدم وجود صلاحية — رفض حقيقي، لا عطل شبكة
-                        clearDevicePinLock();
+                        clearDevicePinLock(uid);
                         signOutFirebase();
                         setIsCheckingLogin(false);
                         setShowPinScreen(false);
+                        setSelectedPinUid(null);
                         setShowWelcome(true);
                         setShowLoginModal(true);
                         setLoginError('❌ هذا الحساب لم يعد مخوّلاً للدخول. راجع مدير النظام.');
@@ -1689,15 +1754,18 @@
                 }
             };
 
+            // «دخول بحساب آخر» لا يمحو أرصدة الزملاء على الجهاز — يفتح الدخول الكامل فقط،
+            // ومن يُتمّه يُضاف إلى قائمة الجهاز بجانبهم لا بدلاً منهم
             const useAnotherAccount = () => {
-                clearDevicePinLock();
                 setStoredAuth(null);
                 pinGateOpenRef.current = true;
                 setShowPinScreen(false);
+                setSelectedPinUid(null);
                 setPinInput('');
                 setPinError('');
                 setPinAttempts(0);
                 setShowWelcome(true);
+                setShowLoginModal(true);
             };
 
             // المستخدم اختار المتابعة: نكتب معرّف جلسة جديداً، فيلتقطه نبض الجهاز الآخر
@@ -1721,15 +1789,24 @@
                     const uid = currentUserIdRef.current;
                     cloudFetch(`${FIREBASE_SESSIONS_URL}/${uid}.json`, { method: 'DELETE' }).catch(() => {});
                 }
+                // الخروج يُنهي الجلسة الفاعلة على الشاشة فقط، ولا يُلغي تسجيل الرمز: على جهاز
+                // مشترك، خروج الموظف ليُسلّم الجهاز لزميله يجب ألا يُجبره على دخول كامل في دوره
+                // القادم. جلسته محفوظة داخل تسجيله هو (لا في الجلسة الفاعلة التي تُمسح الآن)،
+                // ومن أراد إلغاء وصوله السريع فعلاً فزرّ «إلغاء رمزي» موجود لذلك صراحةً.
                 signOutFirebase();
-                // خروج صريح ينهي إمكانية الدخول السريع أيضاً — الرمز يفتح الجلسة المحفوظة نفسها
-                // التي أُلغيت للتو، فإبقاؤه سيعرض شاشة رمز عاطلة لا يمكن أن تنجح أبداً
-                clearDevicePinLock();
                 currentUserIdRef.current = null;
                 currentSessionIdRef.current = null;
                 setCurrentUserRole(null);
                 setCurrentUserName('');
                 setCurrentUserPermissions({});
+                // الخروج يُعيد شاشة الترحيب: بدونها يبقى الخارج (أو زميله على جهاز مشترك) أمام
+                // صفحة بلا أي مدخل للدخول من جديد إلا بإعادة تحميل الصفحة يدوياً
+                setShowWelcome(true);
+                setShowPinScreen(false);
+                setSelectedPinUid(null);
+                setPinInput('');
+                setPinError('');
+                setPinAttempts(0);
             };
 
             // فحص نبض الجلسة النشطة وطرد الجلسات في حال تسجيل الدخول من مكان آخر
@@ -2659,6 +2736,8 @@
 
             // رمز الدخول الرباعي — حالات شاشة الدخول السريع وعرض إتاحته بعد أول دخول كامل
             const [showPinScreen, setShowPinScreen] = useState(false);
+            // الحساب المختار من قائمة الجهاز؛ يُملأ تلقائياً حين يكون على الجهاز حساب واحد فقط
+            const [selectedPinUid, setSelectedPinUid] = useState(null);
             const [pinInput, setPinInput] = useState('');
             const [pinError, setPinError] = useState('');
             const [pinAttempts, setPinAttempts] = useState(0);
@@ -2670,11 +2749,17 @@
             // ملاحظة: pinGateOpenRef يُغلَق أصلاً منذ الرسم الأول (أعلاه)، فلا فرق أمنياً بين
             // إظهار شاشة الرمز فوراً أو بعد ضغطة — الغلق لا يعتمد على أي منهما.
             const proceedFromWelcome = () => {
-                if (isPinEligibleNow()) {
-                    setShowPinScreen(true);
-                } else {
+                const locks = getDevicePinLocks().filter(l => l.session && l.session.refreshToken);
+                if (locks.length === 0) {
                     setShowLoginModal(true);
+                    return;
                 }
+                // حساب واحد على الجهاز: لا داعي لخطوة اختيار — تُفتح شاشة رمزه مباشرة
+                setSelectedPinUid(locks.length === 1 ? locks[0].uid : null);
+                setPinInput('');
+                setPinError('');
+                setPinAttempts(0);
+                setShowPinScreen(true);
             };
 
             // شاشة الترحيب: Enter يفتح الوجهة المناسبة كما لو ضُغط الزر — نافذة الدخول الكامل
@@ -6572,64 +6657,96 @@
                         </div>
                     )}
 
-                    {/* شاشة الدخول السريع بالرمز الرباعي — تظهر بدل شاشة الترحيب حين توجد جلسة محفوظة ورمز مضبوط لصاحبها */}
+                    {/* شاشة الدخول السريع بالرمز الرباعي — الجهاز قد يحمل رموز عدة موظفين معاً */}
                     {showPinScreen && (() => {
-                        // على جهاز يتشاركه أكثر من موظف، هذا الاسم هو ما يمنع شخصاً آخر من تخمين
-                        // أرقام عشوائية على قفل ليس له أصلاً — القفل يُمحى تلقائياً بعد 5 محاولات خاطئة
-                        const lockOwnerName = (getDevicePinLock() || {}).name || '';
+                        const deviceLocks = getDevicePinLocks().filter(l => l.session && l.session.refreshToken);
+                        const activeLock = selectedPinUid ? deviceLocks.find(l => l.uid === selectedPinUid) : null;
                         return (
                         <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full overflow-hidden animate-fadeInUp">
                                 <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-6 text-white text-center">
                                     <div className="text-4xl mb-2">🔒</div>
                                     <h2 className="text-xl font-black">
-                                        {lockOwnerName ? `مرحباً بعودتك، ${lockOwnerName}` : 'مرحباً بعودتك'}
+                                        {activeLock ? `مرحباً بعودتك، ${activeLock.name || ''}` : 'من أنت؟'}
                                     </h2>
-                                    <p className="text-xs text-blue-200 mt-1">أدخل الرمز الرباعي لهذا الجهاز</p>
-                                    {lockOwnerName && (
-                                        <p className="text-[10px] text-amber-200 mt-2 bg-black/20 rounded-lg px-2 py-1">
-                                            ليس أنت؟ اضغط "دخول بحساب آخر" أدناه — لا تخمّن أرقاماً، فبعد 5 محاولات خاطئة يُحذف رمز {lockOwnerName} من هذا الجهاز نهائياً
-                                        </p>
-                                    )}
+                                    <p className="text-xs text-blue-200 mt-1">
+                                        {activeLock ? 'أدخل رمزك الرباعي على هذا الجهاز' : 'اختر حسابك من المسجَّلين على هذا الجهاز'}
+                                    </p>
                                 </div>
-                                <form
-                                    onSubmit={(e) => { e.preventDefault(); if (pinInput.length === 4) handlePinLogin(); }}
-                                    className="p-6 space-y-4"
-                                >
-                                    <input
-                                        type="password"
-                                        inputMode="numeric"
-                                        maxLength={4}
-                                        autoFocus
-                                        placeholder="••••"
-                                        value={pinInput}
-                                        onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                        className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-4 py-3 text-center text-3xl tracking-[0.5em] font-mono font-bold text-indigo-900 outline-none focus:border-indigo-600 transition shadow-inner"
-                                    />
-                                    {pinError && (
-                                        <div className="p-2.5 bg-red-50 border-2 border-red-300 text-red-700 text-xs font-bold rounded-xl text-center">
-                                            {pinError}
-                                        </div>
-                                    )}
-                                    <button
-                                        type="submit"
-                                        disabled={pinInput.length !== 4 || isCheckingLogin}
-                                        className={`w-full py-3.5 text-white font-bold rounded-xl text-sm shadow-lg transition transform active:scale-95 ${
-                                            pinInput.length !== 4 || isCheckingLogin
-                                                ? 'bg-slate-400 cursor-not-allowed'
-                                                : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-700 hover:from-green-700 hover:to-teal-800 cursor-pointer'
-                                        }`}
+
+                                {!activeLock ? (
+                                    /* خطوة الاختيار: تظهر فقط حين يتشارك الجهاز أكثر من موظف */
+                                    <div className="p-6 space-y-2">
+                                        {deviceLocks.map(l => (
+                                            <button
+                                                key={l.uid}
+                                                type="button"
+                                                onClick={() => { setSelectedPinUid(l.uid); setPinInput(''); setPinError(''); setPinAttempts(0); }}
+                                                className="w-full flex items-center gap-3 p-3 rounded-2xl border-2 border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40 transition text-right cursor-pointer active:scale-95"
+                                            >
+                                                <span className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-blue-700 text-white flex items-center justify-center font-black">
+                                                    {(l.name || '؟').trim().charAt(0)}
+                                                </span>
+                                                <span className="font-bold text-sm text-slate-800">{l.name || 'حساب بلا اسم'}</span>
+                                            </button>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={useAnotherAccount}
+                                            className="w-full text-center pt-2 text-xs text-slate-500 hover:text-indigo-700 hover:underline cursor-pointer"
+                                        >
+                                            + دخول بحساب آخر غير مسجَّل هنا
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <form
+                                        onSubmit={(e) => { e.preventDefault(); if (pinInput.length === 4) handlePinLogin(activeLock.uid); }}
+                                        className="p-6 space-y-4"
                                     >
-                                        {isCheckingLogin ? '⏳ جارٍ الدخول...' : '🔓 دخول'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={useAnotherAccount}
-                                        className="w-full text-center text-xs text-slate-500 hover:text-indigo-700 hover:underline cursor-pointer"
-                                    >
-                                        دخول بحساب آخر
-                                    </button>
-                                </form>
+                                        <input
+                                            type="password"
+                                            inputMode="numeric"
+                                            maxLength={4}
+                                            autoFocus
+                                            placeholder="••••"
+                                            value={pinInput}
+                                            onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                            className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-4 py-3 text-center text-3xl tracking-[0.5em] font-mono font-bold text-indigo-900 outline-none focus:border-indigo-600 transition shadow-inner"
+                                        />
+                                        {pinError && (
+                                            <div className="p-2.5 bg-red-50 border-2 border-red-300 text-red-700 text-xs font-bold rounded-xl text-center">
+                                                {pinError}
+                                            </div>
+                                        )}
+                                        <button
+                                            type="submit"
+                                            disabled={pinInput.length !== 4 || isCheckingLogin}
+                                            className={`w-full py-3.5 text-white font-bold rounded-xl text-sm shadow-lg transition transform active:scale-95 ${
+                                                pinInput.length !== 4 || isCheckingLogin
+                                                    ? 'bg-slate-400 cursor-not-allowed'
+                                                    : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-700 hover:from-green-700 hover:to-teal-800 cursor-pointer'
+                                            }`}
+                                        >
+                                            {isCheckingLogin ? '⏳ جارٍ الدخول...' : '🔓 دخول'}
+                                        </button>
+                                        {deviceLocks.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setSelectedPinUid(null); setPinInput(''); setPinError(''); setPinAttempts(0); }}
+                                                className="w-full text-center text-xs text-indigo-700 hover:underline cursor-pointer"
+                                            >
+                                                ← لست {activeLock.name || ''}؟ اختر حساباً آخر
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={useAnotherAccount}
+                                            className="w-full text-center text-xs text-slate-500 hover:text-indigo-700 hover:underline cursor-pointer"
+                                        >
+                                            دخول بحساب آخر غير مسجَّل هنا
+                                        </button>
+                                    </form>
+                                )}
                             </div>
                         </div>
                         );
@@ -6654,10 +6771,12 @@
                                             if (!/^\d{4}$/.test(pin)) { alert('⚠️ يجب أن يتكون الرمز من 4 أرقام بالضبط.'); return; }
                                             const confirmPin = prompt('أعد كتابة الرمز للتأكيد:');
                                             if (confirmPin !== pin) { alert('⚠️ الرمزان غير متطابقين. حاول من جديد لاحقاً.'); return; }
-                                            await setDevicePinLock(pendingPinOfferUser.id, pin, pendingPinOfferUser.name);
+                                            const enrolled = await setDevicePinLock(pendingPinOfferUser.id, pin, pendingPinOfferUser.name);
                                             setShowSetPinOffer(false);
                                             setPendingPinOfferUser(null);
-                                            alert('✅ تم ضبط الرمز الرباعي لهذا الجهاز.');
+                                            alert(enrolled
+                                                ? '✅ تم ضبط رمزك الرباعي على هذا الجهاز. يمكن لزملائك ضبط رموزهم عليه أيضاً بلا تعارض.'
+                                                : '⚠️ تعذّر ضبط الرمز: جلستك غير مكتملة على هذا الجهاز. سجّل الدخول من جديد ثم أعد المحاولة.');
                                         }}
                                         className="flex-1 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-700 hover:from-indigo-700 hover:to-blue-800 text-white font-black rounded-xl text-xs shadow transition active:scale-95 cursor-pointer"
                                     >
@@ -6813,17 +6932,17 @@
                                             <span>{currentUserRole === 'admin' ? 'الأرشيف والاستعادة' : 'الأرشيف'}</span>
                                         </button>
                                     )}
-                                    {getDevicePinLock() && (
+                                    {getDevicePinLockFor(currentUserIdRef.current) && (
                                         <button
                                             onClick={() => {
-                                                if (!confirm('إلغاء الرمز الرباعي لهذا الجهاز؟\n\nستحتاج بريدك وكلمة مرورك عند الدخول القادم.')) return;
-                                                clearDevicePinLock();
-                                                alert('✅ أُلغي الرمز الرباعي لهذا الجهاز.');
+                                                if (!confirm('إلغاء رمزك الرباعي على هذا الجهاز؟\n\nستحتاج بريدك وكلمة مرورك عند دخولك القادم. رموز زملائك على هذا الجهاز لن تتأثر.')) return;
+                                                clearDevicePinLock(currentUserIdRef.current);
+                                                alert('✅ أُلغي رمزك الرباعي على هذا الجهاز.');
                                             }}
                                             className="px-3 py-1 bg-slate-500/80 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow transition flex items-center gap-1 cursor-pointer"
-                                            title="إلغاء الرمز الرباعي المضبوط لهذا الجهاز"
+                                            title="إلغاء رمزك الرباعي على هذا الجهاز (لا يمسّ رموز الزملاء)"
                                         >
-                                            🔢 إلغاء الرمز
+                                            🔢 إلغاء رمزي
                                         </button>
                                     )}
                                     <button
