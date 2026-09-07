@@ -3564,7 +3564,21 @@
                     .trim()
                     .toLowerCase();
             };
-            
+
+            // موظفو العقود على صنفين: "عقد 315" و"عقد المحافظة" — والسجلات القديمة بعنوان "عقد" وحده
+            // لا تزال قائمة. لذا يُعرَّف العقد بورود كلمة "عقد" في العنوان لا بمطابقتها حرفياً،
+            // وإلا خرج كل عقد مصنَّف من تبويب العقود ومن الإحصاءات وعُدّ موظفاً اعتيادياً.
+            const CONTRACT_TITLES = ['عقد 315', 'عقد المحافظة'];
+            const isContractEmployee = (s) => normalizeArabicText(s && s.jobTitle).includes('عقد');
+            // نوع العقد كما يُعرض ويُعدّ؛ العقود القديمة غير المصنَّفة تُجمَع تحت "غير مصنّف"
+            const contractTypeOf = (s) => {
+                if (!isContractEmployee(s)) return null;
+                const t = normalizeArabicText(s.jobTitle);
+                if (t.includes('315')) return 'عقد 315';
+                if (t.includes('محافظه')) return 'عقد المحافظة';
+                return 'غير مصنّف';
+            };
+
             // إحصائيات ذكية
             const smartStats = useMemo(() => {
                 const locationCounts = {};
@@ -3605,8 +3619,11 @@
             const stats = useMemo(() => ({
                 total: staff.length,
                 shift: staff.filter(s => s.workType === 'مناوب').length,
-                morning: staff.filter(s => s.workType === 'صباحي' && s.jobTitle !== 'عقد').length,
-                contract: staff.filter(s => s.jobTitle === 'عقد').length,
+                morning: staff.filter(s => s.workType === 'صباحي' && !isContractEmployee(s)).length,
+                contract: staff.filter(s => isContractEmployee(s)).length,
+                contract315: staff.filter(s => contractTypeOf(s) === 'عقد 315').length,
+                contractGov: staff.filter(s => contractTypeOf(s) === 'عقد المحافظة').length,
+                contractUnclassified: staff.filter(s => contractTypeOf(s) === 'غير مصنّف').length,
                 maaMorning: staff.filter(s =>
                     s.workType === 'صباحي' &&
                     !excludedWaterIds.has(s.id)
@@ -3616,7 +3633,7 @@
                     !excludedWaterIds.has(s.id)
                 ).length,
                 evaluation: staff.filter(s => {
-                    if (s.jobTitle === 'عقد') return false;
+                    if (isContractEmployee(s)) return false;
                     const p = getActivePeriod(s, localDateStr());
                     return !(p && (p.type === 'إجازة طويلة' || p.type === 'إجازة أمومة'));
                 }).length,
@@ -3689,11 +3706,11 @@
                 
                 // فصل العقود عن الباقي
                 const contracts = arr.filter(s => 
-                    !priorityNumbers.includes(cleanJobNumber(s.jobNumber)) && s.jobTitle === 'عقد'
+                    !priorityNumbers.includes(cleanJobNumber(s.jobNumber)) && isContractEmployee(s)
                 );
                 
                 const regularItems = arr.filter(s => 
-                    !priorityNumbers.includes(cleanJobNumber(s.jobNumber)) && s.jobTitle !== 'عقد'
+                    !priorityNumbers.includes(cleanJobNumber(s.jobNumber)) && !isContractEmployee(s)
                 );
                 
                 // ترتيب الأولويات: أسامة (49158) أولاً، ثم وسام (79944)
@@ -3997,7 +4014,7 @@
                 let result = [];
                 
                 if (view === 'all') result = sortByUnit(data); // ترتيب حسب الوحدات
-                else if (view === 'morning') { result = data.filter(s => s.workType === 'صباحي' && s.jobTitle !== 'عقد'); result = sortByJobNumber(result); }
+                else if (view === 'morning') { result = data.filter(s => s.workType === 'صباحي' && !isContractEmployee(s)); result = sortByJobNumber(result); }
                 else if (view === 'shift') {
                 result = data.filter(s => s.workType === 'مناوب');
                 // ترتيب حسب الموقع
@@ -4011,7 +4028,7 @@
                     return indexA - indexB;
                 });
             }
-                else if (view === 'contract') result = data.filter(s => s.jobTitle === 'عقد');
+                else if (view === 'contract') result = data.filter(s => isContractEmployee(s));
                 else if (view === 'safety') {
                     result = data.filter(s => 
                         s.gender === 'ذكر' && 
@@ -4050,7 +4067,7 @@
                     // التقييم لحظة واحدة لا مدى شهري، فيُفحص تاريخ اليوم فقط
                     const evalDate = localDateStr();
                     result = data.filter(s => {
-                        if (s.jobTitle === 'عقد') return false;
+                        if (isContractEmployee(s)) return false;
                         const p = getActivePeriod(s, evalDate);
                         return !(p && (p.type === 'إجازة طويلة' || p.type === 'إجازة أمومة'));
                     });
@@ -4086,8 +4103,8 @@
                     return result;
                 } else {
                     // في التبويبات الأخرى، العقود في النهاية
-                    const contracts = result.filter(s => s.jobTitle === 'عقد');
-                    const nonContracts = result.filter(s => s.jobTitle !== 'عقد');
+                    const contracts = result.filter(s => isContractEmployee(s));
+                    const nonContracts = result.filter(s => !isContractEmployee(s));
                     return [...nonContracts, ...contracts];
                 }
             }, [staff, filtered, search, view, waterMonth, excludedWaterIds]);
@@ -8779,7 +8796,7 @@
                                                 {view === 'maa' && 'استبعاد من في دورة، ومن غاب نصف الشهر فأكثر بإجازة طويلة أو أمومة، ومن استُثني دائماً'}
                                                 {view === 'evaluation' && 'استبعاد الإجازات الطويلة طويلة وأمومة'}
                                                 {view === 'morning' && 'الاسم الثلاثي فقط'}
-                                                {view === 'contract' && ''}
+                                                {view === 'contract' && `عقود 315: ${stats.contract315} · عقود المحافظة: ${stats.contractGov}${stats.contractUnclassified ? ` · غير مصنّف: ${stats.contractUnclassified}` : ''}`}
                                                 {view === 'shift' && 'مرتب حسب المواقع'}
                                             </p>
                                         </div>
@@ -10566,7 +10583,31 @@
                                             <label className="block text-sm font-bold text-gray-700 mb-2">العنوان الوظيفي</label>
                                             <input type="text" value={editingEmployee.jobTitle}
                                                 onChange={(e) => updateEditField('jobTitle', e.target.value)}
+                                                list="contractTitleSuggestions"
                                                 className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none" />
+                                            {/* اقتراحات صنفَي العقود دون تقييد الحقل — بقية العناوين تُكتب بحرية */}
+                                            <datalist id="contractTitleSuggestions">
+                                                {CONTRACT_TITLES.map(t => <option key={t} value={t} />)}
+                                            </datalist>
+                                            {isContractEmployee(editingEmployee) && (
+                                                <div className="mt-1.5 flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-gray-500">نوع العقد:</span>
+                                                    {CONTRACT_TITLES.map(t => (
+                                                        <button
+                                                            key={t}
+                                                            type="button"
+                                                            onClick={() => updateEditField('jobTitle', t)}
+                                                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                                                                editingEmployee.jobTitle === t
+                                                                    ? 'bg-blue-600 text-white border-blue-600'
+                                                                    : 'bg-white text-blue-700 border-blue-300 hover:bg-blue-50'
+                                                            }`}
+                                                        >
+                                                            {t}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         <div className="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
