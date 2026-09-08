@@ -418,6 +418,33 @@
         .animate-fadeIn {
             animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
+
+        /* ================================================================= */
+        /* حركة فتح التبويبات                                                 */
+        /*                                                                   */
+        /* على حاوية المحتوى وحدها لا على صفوف الجدول: عند 144 موظفاً تكون    */
+        /* الحركة على كل صف تعثّراً لا زينة. opacity وtransform فقط — الاثنان  */
+        /* يُنفَّذان على المعالج الرسومي بلا إعادة تخطيط (layout).             */
+        /*                                                                   */
+        /* داخل @media screen عمداً: الطباعة لا ترى حركة ولا شفافية جزئية،    */
+        /* فلا تخرج كشوفات باهتة لو طُبعت أثناء الحركة.                       */
+        /* ================================================================= */
+        @media screen {
+            @keyframes tabEnter {
+                from { opacity: 0; transform: translateY(6px); }
+                to   { opacity: 1; transform: none; }
+            }
+            /* both يُبقي الحالة النهائية (transform: none) فلا يبقى محوَّلاً بعد
+               انتهائها — عنصر محوَّل يصير مرجعاً للعناصر ذات position: fixed. */
+            .tab-enter {
+                animation: tabEnter 170ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+        }
+
+        /* من يضبط نظامه على «تقليل الحركة» (دوار الحركة، حساسية بصرية) يراها فوراً بلا انتقال */
+        @media (prefers-reduced-motion: reduce) {
+            .tab-enter { animation: none !important; }
+        }
     </style>
 
     <!-- ================================================================= -->
@@ -825,6 +852,41 @@
                 }
             }, [staff]);
             const [view, setView] = useState('dashboard');
+
+            // حركة فتح التبويب: تُعاد بضبط الصنف يدوياً لا بـ key={view}.
+            // key كان سيُجبر React على إعادة تركيب الشجرة كاملة عند كل تنقّل،
+            // فيُفقد حالة أي مكوّن مشترك بين تبويبين (بحث مفتوح، فرز، تمرير).
+            //
+            // تحذير بنيوي — سبب كل قيد هنا:
+            // نوافذ النظام (الدخول، المزامنة، الدمج) مرسومة داخل <main> بـ z-50،
+            // وتعلو شاشة الترحيب (z-50 أيضاً، خارج main) بترتيب DOM وحده لا بالرقم.
+            // وأي حركة CSS تُنشئ «سياق تكديس» (stacking context) على حاويتها، فيصير
+            // z-50 الداخلي نسبياً إليها وتُحبس النوافذ تحت شاشة الترحيب. لذلك:
+            //   • لا حركة عند أول رسم — وقتها شاشة الترحيب ونافذة الدخول فوق المحتوى.
+            //   • يُنزع الصنف فور انتهاء الحركة، فلا يبقى العنصر سياق تكديس بعدها.
+            // كسرَ إغفالُ هذا تسجيلَ الدخول كلياً قبل أن يلتقطه اختبار المتصفح.
+            const mainContentRef = React.useRef(null);
+            const isFirstViewRenderRef = React.useRef(true);
+            React.useEffect(() => {
+                const el = mainContentRef.current;
+                if (!el) return;
+                if (isFirstViewRenderRef.current) { isFirstViewRenderRef.current = false; return; }
+                // نافذة مفتوحة داخل الحاوية لحظة التبديل: تُترك بلا حركة بدل حبسها في سياق تكديس.
+                // هذه الحالة الوحيدة القابلة للحدوث فعلاً — بقية النوافذ تُفتح بنقرة المستخدم،
+                // ولا نقرة ممكنة خلال 170ms التي تلي نقرته على التبويب.
+                if (el.querySelector('.fixed.inset-0')) return;
+
+                el.classList.remove('tab-enter');
+                void el.offsetWidth; // قراءة إجبارية تُنهي الحركة السابقة، وبدونها لا تُعاد
+                el.classList.add('tab-enter');
+
+                // اسم الحركة مفحوص: أحداث حركات الأبناء تصعد إلى هنا أيضاً
+                const onEnd = (e) => { if (e.animationName === 'tabEnter') el.classList.remove('tab-enter'); };
+                el.addEventListener('animationend', onEnd);
+                // احتياط: مع «تقليل الحركة» لا يقع حدث انتهاء أصلاً
+                const t = setTimeout(() => el.classList.remove('tab-enter'), 400);
+                return () => { clearTimeout(t); el.removeEventListener('animationend', onEnd); };
+            }, [view]);
             const [selectedUnit, setSelectedUnit] = useState(null);
             const [selectedSafetyIds, setSelectedSafetyIds] = useState([]);
             const [bulkSafetyDate, setBulkSafetyDate] = useState('');
@@ -6291,6 +6353,9 @@
                                 )}
                             </div>
                         )}
+                        {/* حاوية الحركة تلفّ محتوى التبويب وحده — لا تنبيهات الفترات فوقها،
+                            فتنبيه «انتهت فترته ولم تُؤكَّد المباشرة» يبقى ثابتاً لا يومض مع كل نقرة */}
+                        <div ref={mainContentRef}>
                         {view === 'dashboard' ? (
                             <div className="space-y-5">
 
@@ -9795,6 +9860,7 @@
                                 </div>
                             </div>
                                                 )}
+                        </div>
                     </main>
 
                     {showMergeModal && incomingStaff && (() => {
