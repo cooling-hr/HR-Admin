@@ -887,6 +887,11 @@
                 const t = setTimeout(() => el.classList.remove('tab-enter'), 400);
                 return () => { clearTimeout(t); el.removeEventListener('animationend', onEnd); };
             }, [view]);
+            // آخر شريحة زارها المستخدم في كل قسم — العودة إلى «الملاك» تعيده إلى شريحته
+            // لا إلى «الكل» دائماً، وهو ما يتوقّعه من يعمل على «المناوبين» طوال اليوم
+            const [sectionMemory, setSectionMemory] = useState({});
+            const [showUserMenu, setShowUserMenu] = useState(false);
+
             const [selectedUnit, setSelectedUnit] = useState(null);
             const [selectedSafetyIds, setSelectedSafetyIds] = useState([]);
             const [bulkSafetyDate, setBulkSafetyDate] = useState('');
@@ -6377,73 +6382,136 @@
                                 {isDarkTheme ? '☀️ نهاري' : '🌙 ليلي'}
                             </button>
 
-                            {/* شريط التحكم بالصفة وإدارة المستخدمين */}
+                            {/* ============================================================= */}
+                            {/* قائمة المستخدم: إدارة النظام تحتها لا بجانب هوية الشعبة.     */}
+                            {/* الأرشيف والحسابات يُستخدمان مرة في الشهر، ووجودهما كزرّين    */}
+                            {/* بألوان صارخة في الرأس كان يرفع شأنهما فوق العمل اليومي.      */}
+                            {/* ============================================================= */}
                             {currentUserRole && (
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full border border-white/20 text-xs font-extrabold text-white shadow-sm">
-                                        <span>{currentUserRole === 'admin' ? `👑 ${currentUserName || 'مدير النظام'}` : (currentUserRole === 'operator' ? `✍️ ${currentUserName || 'إداري مُدخل'}` : `👁️ ${currentUserName || 'مستعرض'}`)}</span>
-                                    </div>
-                                    {currentUserRole === 'admin' && (
-                                        <>
-                                            <button
-                                                onClick={handleOpenUserManagement}
-                                                className="px-3.5 py-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
-                                                title="إدارة الحسابات والمستخدمين والصلاحيات وكلمات المرور"
-                                            >
-                                                <span>👥</span>
-                                                <span>إدارة الحسابات والمستخدمين</span>
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    fetchAvailableSnapshots();
-                                                    setShowRestoreCenterModal(true);
-                                                }}
-                                                className="px-3.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-full text-xs font-black shadow transition flex items-center gap-1 cursor-pointer active:scale-95"
-                                                title="مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية"
-                                            >
-                                                <span>🛡️</span>
-                                                <span>الأرشيف والاستعادة</span>
-                                            </button>
-                                        </>
-                                    )}
+                                <div className="relative flex-shrink-0 no-print flex items-center gap-2">
+                                    {/* «خروج» يبقى ظاهراً بنقرة واحدة عمداً: الأجهزة هنا مشتركة بين
+                                        عدة موظفين، وإخفاؤه داخل قائمة يجعل نسيان الخروج أرجح — وجلسة
+                                        متروكة مفتوحة على جهاز مشترك ثغرة لا تحسيناً بصرياً. */}
                                     <button
                                         onClick={handleLogout}
-                                        className="px-3 py-1 bg-red-500/80 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow transition flex items-center gap-1 cursor-pointer"
+                                        className="px-3 py-1 bg-red-500/80 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow transition flex items-center gap-1 cursor-pointer order-2"
                                         title="تسجيل الخروج أو تبديل المستخدم"
                                     >
                                         🚪 خروج
                                     </button>
+                                    <button
+                                        onClick={() => setShowUserMenu(v => !v)}
+                                        className="flex items-center gap-1.5 px-3 py-1 bg-white/15 hover:bg-white/25 backdrop-blur-md rounded-full border border-white/20 text-xs font-extrabold text-white shadow-sm transition cursor-pointer"
+                                        title="حسابك وإدارة النظام"
+                                    >
+                                        <span>{currentUserRole === 'admin' ? `👑 ${currentUserName || 'مدير النظام'}` : (currentUserRole === 'operator' ? `✍️ ${currentUserName || 'إداري مُدخل'}` : `👁️ ${currentUserName || 'مستعرض'}`)}</span>
+                                        <span className={`text-[9px] transition-transform ${showUserMenu ? 'rotate-180' : ''}`}>▼</span>
+                                    </button>
+
+                                    {showUserMenu && (
+                                        <>
+                                            {/* طبقة الإغلاق بالنقر خارج القائمة — تحتها في التكديس لا فوقها */}
+                                            <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)}></div>
+                                            <div className="absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 z-50 text-right animate-fadeIn">
+                                                {currentUserRole === 'admin' && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => { setShowUserMenu(false); handleOpenUserManagement(); }}
+                                                            className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
+                                                            title="إدارة الحسابات والمستخدمين والصلاحيات وكلمات المرور"
+                                                        >
+                                                            <span>👥</span><span>الحسابات والصلاحيات</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowUserMenu(false);
+                                                                fetchAvailableSnapshots();
+                                                                setShowRestoreCenterModal(true);
+                                                            }}
+                                                            className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
+                                                            title="مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية"
+                                                        >
+                                                            <span>🛡️</span><span>الأرشيف والاستعادة</span>
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
                     </header>
                     
-                    {/* شريط التنقل الزجاجي الحديث */}
+                    {/* ================================================================= */}
+                    {/* شريط التنقل: أقسام في الأعلى، وشرائح تصفية داخل القسم            */}
+                    {/*                                                                   */}
+                    {/* كانت تسعة تبويبات، سبعة منها يرسمها فرع واحد مشترك في هذا الملف   */}
+                    {/* (جدول واحد تتبدّل أعمدته وفلاتره بشرط view === 'x'). أي أنها       */}
+                    {/* مرشِّحات لا وجهات، وصعودها إلى مستوى الوجهة أفاض الشريط —          */}
+                    {/* وoverflow-x مع scrollbar-none كان يُخفي الأواخر بلا أي دليل عليها. */}
+                    {/*                                                                   */}
+                    {/* الآن: أربعة أقسام = أربع مهام مختلفة فعلاً، والمرشِّحات شرائح       */}
+                    {/* داخل قسمها. `view` نفسه لم يتغيّر ولا أيٌّ من شروطه في كل الملف —   */}
+                    {/* تغيّر من يضبط قيمته فقط، فلا منطق عرض واحد مسّه هذا التعديل.       */}
+                    {/* ================================================================= */}
+                    {(() => {
+                        const sections = [
+                            { id: 'dashboard', icon: '📊', label: 'لوحة التحكم',
+                              views: [{ v: 'dashboard', l: 'لوحة التحكم' }] },
+                            // العدد على «الملاك» وحده: 144 رقم يعرفه الجميع ويُطمئن أن البيانات محمَّلة.
+                            // ولا عدد على «التجهيز» — الماء والسلامة فئتان مختلفتان، وجمعهما في رقم
+                            // واحد يُنتج عدداً لا يعني شيئاً. كل شريحة تحمل عددها الصحيح.
+                            { id: 'staff', icon: '👥', label: 'الملاك', badge: stats.total,
+                              views: [
+                                { v: 'all', l: `الكل (${stats.total})` },
+                                { v: 'morning', l: `صباحي (${stats.morning})` },
+                                { v: 'shift', l: `مناوب (${stats.shift})` },
+                                { v: 'contract', l: `عقود (${stats.contract})` },
+                                { v: 'evaluation', l: `المشمولون بالتقييم (${stats.evaluation})` }
+                              ] },
+                            { id: 'attendance', icon: '🏢', label: 'الدوام والموقف',
+                              views: [{ v: 'units', l: 'الدوام والموقف' }] },
+                            { id: 'issuance', icon: '📦', label: 'التجهيز والاستحقاقات',
+                              views: [
+                                { v: 'maa', l: `حصص الماء (${stats.maaMorning + stats.maaShift})` },
+                                { v: 'safety', l: `تجهيزات السلامة (${stats.safety})` }
+                              ] }
+                        ];
+                        const activeSection = sections.find(s => s.views.some(x => x.v === view));
+                        const openSection = (s) => {
+                            const remembered = sectionMemory[s.id];
+                            const target = (remembered && s.views.some(x => x.v === remembered))
+                                ? remembered : s.views[0].v;
+                            setView(target);
+                        };
+                        return (
                     <nav className="bg-white/85 backdrop-blur-md border-b border-slate-100 sticky top-0 z-30 px-4 py-3 shadow-sm transition-all duration-300">
-                        <div className="max-w-7xl mx-auto flex gap-2 overflow-x-auto scrollbar-none pr-1">
-                            {[
-                                {v: 'dashboard', l: '📊 لوحة التحكم'},
-                                {v: 'all', l: `👥 الكل (${stats.total})`},
-                                {v: 'morning', l: `☀️ الصباحي (${stats.morning})`},
-                                {v: 'shift', l: `🔄 المناوبين (${stats.shift})`},
-                                {v: 'maa', l: `💧 الماء (${stats.maaMorning + stats.maaShift})`},
-                                {v: 'units', l: `🏢 الوحدات والموقف`},
-                                {v: 'evaluation', l: `⭐ التقييم (${stats.evaluation})`},
-                                {v: 'contract', l: `📄 العقود (${stats.contract})`},
-                                {v: 'safety', l: `🦺 تجهيزات سلامة (${stats.safety})`}
-                            ].map(t => {
-                                const isActive = view === t.v;
+                        {/* flex-wrap لا overflow-x مع scrollbar-none: الشريط المخفيّ تمريره
+                            كان يُخفي أواخر التبويبات بلا أي دليل عليها. الالتفاف لا يُخفي شيئاً أبداً. */}
+                        {/* لا role="tablist": نمط التبويبات يقتضي aria-controls وتنقّلاً بالأسهم
+                            لم يُبنيا هنا، وادّعاء النمط ناقصاً أسوأ لقارئ الشاشة من أزرار صريحة
+                            تحمل aria-current. */}
+                        <div className="max-w-7xl mx-auto flex flex-wrap gap-2 pr-1" aria-label="أقسام النظام">
+                            {sections.map(s => {
+                                const isActive = activeSection && activeSection.id === s.id;
                                 return (
-                                    <button 
-                                        key={t.v} 
-                                        onClick={() => setView(t.v)}
+                                    <button
+                                        key={s.id}
+                                        aria-current={isActive ? 'page' : undefined}
+                                        onClick={() => openSection(s)}
                                         className={`px-4 py-2 rounded-xl text-xs md:text-sm font-bold whitespace-nowrap transition-all duration-300 relative ${
-                                            isActive 
-                                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
+                                            isActive
+                                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                                         }`}
                                     >
-                                        {t.l}
+                                        {s.icon} {s.label}
+                                        {typeof s.badge === 'number' && (
+                                            <span className={`mr-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                                                isActive ? 'bg-white/25 text-white' : 'bg-white text-slate-600'
+                                            }`}>{s.badge}</span>
+                                        )}
                                         {isActive && (
                                             <span className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-white rounded-full"></span>
                                         )}
@@ -6451,7 +6519,35 @@
                                 );
                             })}
                         </div>
+                        {/* الشرائح تظهر فقط حيث تعني شيئاً: قسم يضمّ أكثر من عرض */}
+                        {activeSection && activeSection.views.length > 1 && (
+                            <div className="max-w-7xl mx-auto flex flex-wrap gap-1.5 pr-1 mt-2 pt-2 border-t border-slate-100"
+                                 aria-label={`شرائح ${activeSection.label}`}>
+                                {activeSection.views.map(x => {
+                                    const on = view === x.v;
+                                    return (
+                                        <button
+                                            key={x.v}
+                                            aria-pressed={on ? 'true' : 'false'}
+                                            onClick={() => {
+                                                setView(x.v);
+                                                setSectionMemory(m => ({ ...m, [activeSection.id]: x.v }));
+                                            }}
+                                            className={`px-3 py-1 rounded-full text-[11px] md:text-xs font-bold whitespace-nowrap border transition ${
+                                                on
+                                                    ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
+                                                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                                            }`}
+                                        >
+                                            {x.l}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </nav>
+                        );
+                    })()}
                     
                     <main className="container mx-auto p-4">
                         {(periodAlerts.endingSoon.length > 0 || periodAlerts.endedUnconfirmed.length > 0) && (
