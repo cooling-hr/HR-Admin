@@ -517,6 +517,9 @@
         html[data-theme="dark"] .border-gray-200   { border-color: #2b3a52 !important; }
         html[data-theme="dark"] .border-slate-300,
         html[data-theme="dark"] .border-gray-300   { border-color: #3a4c68 !important; }
+        /* حدّ الشريحة النشطة في شريط التنقّل — أُضيف مع الشرائح ولولاه لبقي
+           بلونه النهاري الفاتح فوق سطح داكن، بصمت وبلا خطأ في وحدة التحكم */
+        html[data-theme="dark"] .border-indigo-300 { border-color: #4c5f9e !important; }
 
         /* ---- حقول الإدخال ---- */
         html[data-theme="dark"] input,
@@ -9338,30 +9341,43 @@
 
 ) : view === 'units' ? (
                             <div className="space-y-5 animate-fadeIn">
-                                {/* تبديل العرض الفرعي للوحدات */}
-                                <div className="bg-white/80 backdrop-blur-md p-1.5 rounded-xl border border-slate-200/60 max-w-md mx-auto flex gap-2 no-print shadow-sm">
-                                    <button 
-                                        onClick={() => setUnitsSubView('roster')}
-                                        className={`flex-1 py-2 px-4 rounded-lg font-bold text-xs md:text-sm transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                                            unitsSubView === 'roster'
-                                                ? 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md'
-                                                : 'text-slate-600 hover:bg-slate-100/80'
-                                        }`}
-                                    >
-                                        <span>👥</span>
-                                        <span>ملاك الوحدات والعمل الإضافي</span>
-                                    </button>
-                                    <button 
-                                        onClick={() => setUnitsSubView('dailyStatus')}
-                                        className={`flex-1 py-2 px-4 rounded-lg font-bold text-xs md:text-sm transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                                            unitsSubView === 'dailyStatus'
-                                                ? 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-md'
-                                                : 'text-slate-600 hover:bg-slate-100/80'
-                                        }`}
-                                    >
-                                        <span>📋</span>
-                                        <span>الموقف وحضور اليوم</span>
-                                    </button>
+                                {/* ============================================================= */}
+                                {/* شاشات القسم الثلاث — وجهات نظيرة بلغة الشرائح نفسها في الأعلى. */}
+                                {/*                                                               */}
+                                {/* كانت اثنتين فقط، و«تقرير الفترة» يُدخَل إليه من زرّ داخل      */}
+                                {/* الموقف اليومي ويُخرَج بزرّ عودة في ترويسته. فكان الشريط يعرض   */}
+                                {/* خيارين مطفأين معاً وأنت في الثالث — أي يقول «أنت في لا مكان». */}
+                                {/*                                                               */}
+                                {/* القاعدة: ما يُدخَل إليه ويُخرَج منه وجهةٌ مكانها الشريط؛ وما   */}
+                                {/* يبدّل شكل العرض وحده يبقى مفتاحاً داخل شاشته — ولهذا تبقى     */}
+                                {/* «مصفوفة الأيام» مفتاحاً داخل تقرير الفترة لا وجهة رابعة.      */}
+                                {/* ============================================================= */}
+                                <div className="flex flex-wrap gap-1.5 no-print" aria-label="شاشات الدوام والموقف">
+                                    {[
+                                        { v: 'roster', icon: '👥', l: 'ملاك الوحدات',
+                                          t: 'ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد للشعبة' },
+                                        { v: 'dailyStatus', icon: '📋', l: 'الموقف اليومي',
+                                          t: 'موقف وحضور اليوم' },
+                                        { v: 'periodReport', icon: '📊', l: 'تقرير الفترة',
+                                          t: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' }
+                                    ].map(sub => {
+                                        const on = unitsSubView === sub.v;
+                                        return (
+                                            <button
+                                                key={sub.v}
+                                                onClick={() => setUnitsSubView(sub.v)}
+                                                aria-pressed={on ? 'true' : 'false'}
+                                                title={sub.t}
+                                                className={`px-3 py-1 rounded-full text-[11px] md:text-xs font-bold whitespace-nowrap border transition cursor-pointer ${
+                                                    on
+                                                        ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
+                                                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                {sub.icon} {sub.l}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
 
                                 {unitsSubView === 'dailyStatus' ? (
@@ -9810,13 +9826,9 @@
                                                     </p>
                                                 </div>
                                                 <div className="flex gap-2 flex-wrap w-full md:w-auto">
-                                                    <button 
-                                                        onClick={() => setUnitsSubView('dailyStatus')} 
-                                                        className="bg-slate-800 hover:bg-slate-900 text-amber-400 border border-slate-700 px-4 py-2.5 rounded-xl font-bold text-xs md:text-sm shadow-md transition active:scale-95 flex items-center gap-1.5 flex-1 md:flex-initial justify-center cursor-pointer"
-                                                    >
-                                                        <span>📋</span>
-                                                        <span>العودة للموقف اليومي</span>
-                                                    </button>
+                                                    {/* حُذف زرّ «العودة للموقف اليومي»: صار تقرير الفترة وجهة في
+                                                        الشريط الفرعي، فالخروج منه كالدخول إليه — من الشريط نفسه.
+                                                        وزرّ تنقّل ثالث في موضع ثالث كان يشتّت لا يساعد. */}
                                                     <button 
                                                         onClick={exportPeriodReportExcel} 
                                                         className="bg-white text-indigo-700 hover:bg-blue-50 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm shadow-md transition active:scale-95 flex items-center gap-1.5 flex-1 md:flex-initial justify-center cursor-pointer"
