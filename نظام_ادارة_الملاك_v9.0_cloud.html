@@ -4872,6 +4872,29 @@
                 // ضمان أن أسامة ووسام في البداية دائماً
                 return ensureTopTwo(result);
             };
+
+            // صفوف تقرير موقف الفترة مرتَّبة بأساس قوائم الوحدات نفسه — العقود آخر كل وحدة.
+            //
+            // لماذا هنا لا داخل periodReportData: قيمة useMemo تُنفَّذ أثناء الرسم، وsortByUnit
+            // وsortByJobTitleHierarchy وnormalizeArabicText كلها معرَّفة بعده في الملف،
+            // فقراءتها من هناك خطأ ترتيب تصريح (TDZ) يُسقط التطبيق بشاشة بيضاء.
+            //
+            // الترتيب يُبنى على الموظفين ثم يُسقَط على الصفوف بخريطة مواضع، فتبقى المصفوفة
+            // وجدول الملخّص وقالب الطباعة على ترتيب واحد لا ثلاثة.
+            const periodReportRows = useMemo(() => {
+                const rows = periodReportData.employees;
+                if (!Array.isArray(rows) || rows.length < 2) return rows || [];
+                const position = new Map();
+                sortByUnit(rows.map(r => r.employee)).forEach((emp, i) => {
+                    if (emp && emp.id != null) position.set(emp.id, i);
+                });
+                // من لم يظهر في الترتيب (بلا معرّف مثلاً) يذهب إلى الآخر بدل أن يختفي
+                const at = (row) => {
+                    const id = row && row.employee && row.employee.id;
+                    return position.has(id) ? position.get(id) : Number.MAX_SAFE_INTEGER;
+                };
+                return rows.slice().sort((a, b) => at(a) - at(b));
+            }, [periodReportData]);
             
             const current = useMemo(() => {
                 const data = search ? filtered : staff;
@@ -9804,7 +9827,7 @@
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                {periodReportData.employees.map((item, idx) => (
+                                                                {periodReportRows.map((item, idx) => (
                                                                     <tr key={item.employee.id || idx} className="border-b border-slate-100 hover:bg-indigo-50/30">
                                                                         <td className="px-2 py-1.5 text-center font-mono text-slate-400 text-[11px] sticky right-0 bg-white z-10">{idx + 1}</td>
                                                                         <td className="px-3 py-1.5 text-right font-bold text-slate-800 text-[11px] sticky right-8 bg-white z-10 whitespace-nowrap">
@@ -9857,7 +9880,7 @@
                                                                 </td>
                                                             </tr>
                                                         ) : (
-                                                            periodReportData.employees.map((item, idx) => {
+                                                            periodReportRows.map((item, idx) => {
                                                                 const emp = item.employee;
                                                                 const isExpanded = expandedEmpPeriod === emp.id;
                                                                 return (
@@ -11173,7 +11196,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {periodReportData.employees.map((item, idx) => (
+                                {periodReportRows.map((item, idx) => (
                                     <tr key={item.employee.id || idx}>
                                         <td>{idx + 1}</td>
                                         <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{item.employee.name}</td>
