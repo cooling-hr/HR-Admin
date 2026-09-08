@@ -12177,22 +12177,12 @@
                                             />
                                         </div>
                                         
-                                    {/* حُذف من الاستمارة بقرار صريح: حقل «الحالة» القديم ومحرّر «الفترات المؤرَّخة».
-                                        الموقف يُدخَل حصراً من شاشة الموقف اليومي والنافذة السريعة، فلا يبقى مدخلان
-                                        متنافسان لنفس المعلومة. الحقلان باقيان في البيانات ولم يُحذف أيٌّ منهما — emp.status
-                                        تقرؤه عشرات المواضع، و statusPeriods هي مصدر الموقف المعتمد. */}
-
-                                    <div className="md:col-span-2">
-                                        <label className="flex items-center gap-2 p-3 bg-cyan-50 border border-cyan-200 rounded-xl cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={!!editingEmployee.excludeFromWaterLists}
-                                                onChange={(e) => updateEditField('excludeFromWaterLists', e.target.checked)}
-                                                className="w-4 h-4 accent-cyan-600"
-                                            />
-                                            <span className="text-xs font-bold text-cyan-900">💧 مستثنى دائماً من قوائم الماء</span>
-                                        </label>
-                                    </div>
+                                    {/* الاستمارة للبيانات الثابتة عن الشخص وحدها. حُذف منها بقرار صريح:
+                                        حقل «الحالة» القديم ومحرّر «الفترات المؤرَّخة» — الموقف يُدخَل حصراً من شاشة
+                                        الموقف اليومي والنافذة السريعة؛ ومربّع «مستثنى دائماً من قوائم الماء» —
+                                        الاستثناء يُحدَّد بالكود لا بإدخال المستخدم. لم يُحذف أي حقل من البيانات:
+                                        emp.status تقرؤه عشرات المواضع، و statusPeriods مصدر الموقف المعتمد،
+                                        و excludeFromWaterLists ما زال يُقرأ في isExcludedFromWater ويُضبَط برمجياً. */}
 
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">قياس البدلة</label>
