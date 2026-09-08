@@ -4135,13 +4135,21 @@
                             const incVal = String(inc[field] || '').trim();
                             const extVal = String(existing[field] || '').trim();
 
-                            // ندمج فقط إذا كانت القيمة الواردة ليست فارغة وتختلف عن القيمة الحالية
+                            // فرق «إملائي» = يتطابقان بعد التطبيع ويختلفان حرفياً: مسافة زائدة،
+                            // أو "ة" مقابل "ه". لا يُسقَط — فقد يكون الملف يحمل تصحيحاً مقصوداً،
+                            // وإسقاطه يترك المستخدم بلا أي طريق لتطبيقه — بل يُعرَض موسوماً وبلا
+                            // تأشير تلقائي، فلا يُغرق القائمة بضجيج ولا يختفي.
+                            const isCosmetic = extVal !== '' &&
+                                normalizeArabicText(incVal) === normalizeArabicText(extVal);
                             if (incVal !== '' && incVal !== extVal) {
                                 employeeChanges.push({
                                     field: field,
                                     fieldNameAr: FIELD_NAMES_AR[field],
                                     oldVal: extVal || 'فارغ',
-                                    newVal: incVal
+                                    newVal: incVal,
+                                    // علامة صريحة لا استنتاج من نص "فارغ": قد تكون قيمةً حقيقية لحقل ما
+                                    wasEmpty: extVal === '',
+                                    cosmeticOnly: isCosmetic
                                 });
                             }
                         });
@@ -4197,30 +4205,45 @@
                 }
             };
 
-            const handleSmartMerge = (incoming) => {
+            // selection: خريطة "رقم::حقل" ← منطقي. addSelection: خريطة رقم ← منطقي للموظفين الجدد.
+            // أيٌّ منهما لم يُمرَّر ⇒ يُطبَّق كل ما في بابه (سلوك النداءات القديمة، وتوافق خلفي).
+            //
+            // التحليل يُعاد اشتقاقه هنا عمداً بدل استعمال mergeAnalysis: لو تغيّرت `staff` بين
+            // فتح النافذة والضغط (وصول مزامنة سحابية مثلاً)، فالاشتقاق الآن يضمن مطابقة الفروقات
+            // للبيانات الحيّة. والمفاتيح (رقم، حقل) تبقى صالحة، وأي فرق جديد لم يره المستخدم
+            // لا مفتاح له في selection فلا يُطبَّق — الاتجاه الآمن.
+            const handleSmartMerge = (incoming, selection = null, addSelection = null) => {
                 const analysis = analyzeMerge(incoming, staff);
-                
+                const isPicked = (jobNumber, field) =>
+                    selection === null ? true : !!selection[`${jobNumber}::${field}`];
+                const isAddPicked = (jobNumber) =>
+                    addSelection === null ? true : !!addSelection[String(jobNumber || '').trim()];
+
                 const currentMap = {};
                 staff.forEach(s => {
                     const key = String(s.jobNumber || '').trim();
                     if (key) currentMap[key] = { ...s };
                 });
 
-                // 1. الموظفون الجدد تماماً
-                const newEmployees = analysis.added.map(inc => ({
-                    ...inc,
-                    lastModified: new Date().toISOString()
-                }));
+                // 1. الموظفون الجدد تماماً — المؤشَّرون منهم وحدهم
+                const newEmployees = analysis.added
+                    .filter(inc => isAddPicked(inc.jobNumber))
+                    .map(inc => ({ ...inc, lastModified: new Date().toISOString() }));
 
-                // 2. تحديث الموظفين الحاليين (دمج الحقول غير الفارغة فقط)
+                // 2. تحديث الموظفين الحاليين — الحقول المؤشَّرة وحدها.
+                //    lastModified لا يُلمس إن لم يُطبَّق شيء على الموظف، وإلا بدا معدَّلاً بلا تعديل.
+                let appliedFieldCount = 0;
                 analysis.updated.forEach(upd => {
                     const existing = currentMap[upd.jobNumber];
-                    if (existing) {
-                        upd.changes.forEach(ch => {
-                            existing[ch.field] = ch.newVal;
-                        });
-                        existing.lastModified = new Date().toISOString();
-                    }
+                    if (!existing) return;
+                    let touched = false;
+                    upd.changes.forEach(ch => {
+                        if (!isPicked(upd.jobNumber, ch.field)) return;
+                        existing[ch.field] = ch.newVal;
+                        touched = true;
+                        appliedFieldCount++;
+                    });
+                    if (touched) existing.lastModified = new Date().toISOString();
                 });
 
                 // دمج القائمتين مع بقية الموظفين الذين لم يتغيروا
@@ -4246,7 +4269,10 @@
                 setShowMergeModal(false);
                 setIncomingStaff([]);
                 
-                alert(`📊 تم إكمال الدمج والمزامنة الذكية بنجاح!\n\n• تم إضافة: ${analysis.added.length} موظف جديد\n• تم تحديث بيانات: ${analysis.updated.length} موظف.`);
+                const touchedEmployees = analysis.updated.filter(
+                    upd => upd.changes.some(ch => isPicked(upd.jobNumber, ch.field))
+                ).length;
+                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}`);
             };
 
             const handleFullOverwrite = (incoming) => {
@@ -4441,6 +4467,78 @@
                 if (t.includes('315')) return 'عقد 315';
                 if (t.includes('محافظه')) return 'عقد المحافظة';
                 return 'غير مصنّف';
+            };
+
+            // ===== انتقاء فروقات الدمج حقلاً حقلاً =====
+            //
+            // تحليل الدمج يُحسب هنا لا داخل نافذة العرض: كان يُعاد حسابه في كل رسم،
+            // ومربّعات الاختيار تحتاج تحليلاً ثابتاً تُبنى عليه.
+            // وموضعه بعد normalizeArabicText مقصود — analyzeMerge صارت تستدعيه للمقارنة،
+            // وقيمة useMemo تُنفَّذ أثناء الرسم فتقرأه قبل تعريفه لو وُضع أعلاه (TDZ).
+            const mergeKeyOf = (jobNumber, field) => `${jobNumber}::${field}`;
+            const mergeAnalysis = useMemo(() => {
+                if (!showMergeModal || !Array.isArray(incomingStaff) || incomingStaff.length === 0) return null;
+                return analyzeMerge(incomingStaff, staff);
+            }, [showMergeModal, incomingStaff, staff]);
+
+            // الحقول المؤشَّرة للتطبيق، والموظفون الجدد المؤشَّرون للإضافة (كلٌّ على حدة:
+            // ملف زميل قديم قد يحمل من حُذف عمداً، أو من أُضيف عنده بالخطأ)
+            const [mergeSelection, setMergeSelection] = useState({});
+            const [mergeAddSelection, setMergeAddSelection] = useState({});
+
+            // الافتراض مبني على الخطر لا على المساواة: ما كان حقله الحالي فارغاً كسبٌ خالص
+            // فيُؤشَّر تلقائياً، وما له قيمة حالية — تعارضاً كان أو فرقاً إملائياً — يحتاج قرار
+            // المستخدم فيبقى بلا تأشير. افتراض قابل للتجاوز في كل سطر، لا قاعدة تمنع.
+            React.useEffect(() => {
+                if (!mergeAnalysis) { setMergeSelection({}); setMergeAddSelection({}); return; }
+                const initial = {};
+                mergeAnalysis.updated.forEach(upd => {
+                    upd.changes.forEach(ch => { initial[mergeKeyOf(upd.jobNumber, ch.field)] = ch.wasEmpty; });
+                });
+                setMergeSelection(initial);
+                // الإضافة كسبٌ لا تعارض فيه، فالافتراض قبولها — والانتقاء متاح
+                const adds = {};
+                mergeAnalysis.added.forEach(emp => { adds[String(emp.jobNumber || '').trim()] = true; });
+                setMergeAddSelection(adds);
+            }, [mergeAnalysis]);
+
+            const toggleMergeAdd = (jobNumber) =>
+                setMergeAddSelection(prev => ({ ...prev, [jobNumber]: !prev[jobNumber] }));
+            const setMergeAddScope = (value) => {
+                if (!mergeAnalysis) return;
+                const next = {};
+                mergeAnalysis.added.forEach(emp => { next[String(emp.jobNumber || '').trim()] = value; });
+                setMergeAddSelection(next);
+            };
+            const mergeAddCount = useMemo(
+                () => Object.values(mergeAddSelection).filter(Boolean).length,
+                [mergeAddSelection]
+            );
+
+            const mergeSelectedCount = useMemo(
+                () => Object.values(mergeSelection).filter(Boolean).length,
+                [mergeSelection]
+            );
+            const mergeTotalChanges = useMemo(
+                () => mergeAnalysis ? mergeAnalysis.updated.reduce((n, u) => n + u.changes.length, 0) : 0,
+                [mergeAnalysis]
+            );
+
+            const toggleMergeField = (jobNumber, field) => {
+                const key = mergeKeyOf(jobNumber, field);
+                setMergeSelection(prev => ({ ...prev, [key]: !prev[key] }));
+            };
+            // scope: 'all' لكل الفروقات، أو رقم وظيفي لموظف واحد
+            const setMergeScope = (scope, value) => {
+                if (!mergeAnalysis) return;
+                setMergeSelection(prev => {
+                    const next = { ...prev };
+                    mergeAnalysis.updated.forEach(upd => {
+                        if (scope !== 'all' && upd.jobNumber !== scope) return;
+                        upd.changes.forEach(ch => { next[mergeKeyOf(upd.jobNumber, ch.field)] = value; });
+                    });
+                    return next;
+                });
             };
 
             // إحصائيات ذكية
@@ -10983,7 +11081,10 @@
                     </main>
 
                     {showMergeModal && incomingStaff && (() => {
-                        const analysis = analyzeMerge(incomingStaff, staff);
+                        // التحليل يأتي جاهزاً من useMemo — مربّعات الاختيار مبنية عليه،
+                        // وإعادة حسابه هنا في كل رسم كانت تُعيد ترقيم ما يشير إليه الاختيار
+                        const analysis = mergeAnalysis;
+                        if (!analysis) return null;
                         return (
                             <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[110] p-4 animate-fadeIn no-print">
                                 <div className="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200 animate-scaleUp">
@@ -11011,43 +11112,129 @@
                                                 <span>{incomingStaff.length} موظف</span>
                                             </div>
 
+                                            {analysis.added.length > 0 && (
+                                                <div className="mt-2 bg-white bg-opacity-80 p-3 rounded-xl border border-indigo-100 font-normal space-y-1.5 text-right">
+                                                    <div className="flex justify-between items-center flex-wrap gap-1.5 border-b pb-1.5">
+                                                        <span className="font-black text-indigo-950">من يُضاف من غير الموجودين لديك:</span>
+                                                        <span className="flex items-center gap-1.5">
+                                                            <button type="button" onClick={() => setMergeAddScope(true)}
+                                                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100">الكل</button>
+                                                            <button type="button" onClick={() => setMergeAddScope(false)}
+                                                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">لا أحد</button>
+                                                        </span>
+                                                    </div>
+                                                    <div className="max-h-28 overflow-y-auto space-y-0.5 text-[11px]">
+                                                        {analysis.added.map((emp, aIdx) => {
+                                                            const num = String(emp.jobNumber || '').trim();
+                                                            const picked = !!mergeAddSelection[num];
+                                                            return (
+                                                                <label key={num || aIdx}
+                                                                    className={`flex items-center gap-1.5 cursor-pointer rounded px-1 py-0.5 ${picked ? 'bg-indigo-50/60' : ''}`}>
+                                                                    <input type="checkbox" checked={picked}
+                                                                        onChange={() => toggleMergeAdd(num)}
+                                                                        className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
+                                                                    <span className={picked ? 'text-indigo-950 font-bold' : 'text-slate-400'}>
+                                                                        {emp.name} <span className="font-mono">({num})</span>
+                                                                    </span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="border-t pt-1.5 text-[11px] font-black text-indigo-900">
+                                                        سيُضاف {mergeAddCount} من أصل {analysis.added.length}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {analysis.updated.length > 0 && (
-                                                <div className="mt-3 bg-white bg-opacity-80 p-3 rounded-xl border border-indigo-100 max-h-40 overflow-y-auto font-normal space-y-2 text-right">
-                                                    <div className="font-black text-indigo-950 border-b pb-1">تفاصيل الفروقات (تغيير البيانات الحالية):</div>
+                                                <div className="mt-3 bg-white bg-opacity-80 p-3 rounded-xl border border-indigo-100 font-normal space-y-2 text-right">
+                                                    <div className="flex justify-between items-center flex-wrap gap-1.5 border-b pb-1.5">
+                                                        <span className="font-black text-indigo-950">اختر ما تريد تطبيقه:</span>
+                                                        <span className="flex items-center gap-1.5">
+                                                            <button type="button" onClick={() => setMergeScope('all', true)}
+                                                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100">تحديد الكل</button>
+                                                            <button type="button" onClick={() => setMergeScope('all', false)}
+                                                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">إلغاء الكل</button>
+                                                        </span>
+                                                    </div>
+                                                    {/* المؤشَّر تلقائياً هو ما كان حقلك فيه فارغاً — كسبٌ بلا تعارض */}
+                                                    <div className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                                                        المؤشَّر تلقائياً: الحقول الفارغة لديك (لا تعارض فيها). ما وُسم <span className="text-amber-700">تعارض</span> لديك فيه قيمة مختلفة، وما وُسم <span className="text-sky-700">إملائي</span> نفس النص بصيغة كتابة أخرى — تُركا بلا تأشير لتقرّرهما بنفسك.
+                                                    </div>
+                                                    <div className="max-h-44 overflow-y-auto space-y-2 pl-1">
                                                     {analysis.updated.map((upd, uIdx) => (
-                                                        <div key={uIdx} className="border-b border-dashed border-indigo-100 pb-2 last:border-b-0 last:pb-0">
-                                                            <div className="font-bold text-indigo-900 mb-1">👤 {upd.name} (رقم: {upd.jobNumber})</div>
-                                                            <div className="grid grid-cols-1 gap-1 text-[11px] pr-2">
-                                                                {upd.changes.map((ch, cIdx) => (
-                                                                    <div key={cIdx} className="flex justify-between flex-wrap gap-1">
-                                                                        <span className="text-gray-600">• حقل {ch.fieldNameAr}:</span>
-                                                                        <span className="font-semibold">
-                                                                            <span className="line-through text-rose-500 bg-rose-50 px-1 rounded">{ch.oldVal}</span>
-                                                                            <span className="mx-1">←</span>
-                                                                            <span className="text-emerald-700 bg-emerald-50 px-1 rounded">{ch.newVal}</span>
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
+                                                        <div key={upd.jobNumber || uIdx} className="border-b border-dashed border-indigo-100 pb-2 last:border-b-0 last:pb-0">
+                                                            {/* ثابت أثناء التمرير: بلا ذلك تُؤشِّر حقلاً وقد غاب اسم صاحبه عن الشاشة */}
+                                                            <div className="flex justify-between items-center gap-2 mb-1 sticky top-0 bg-white py-1 z-10">
+                                                                <span className="font-bold text-indigo-900">👤 {upd.name} (رقم: {upd.jobNumber})</span>
+                                                                <span className="flex items-center gap-1 flex-shrink-0">
+                                                                    <button type="button" onClick={() => setMergeScope(upd.jobNumber, true)}
+                                                                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100">الكل</button>
+                                                                    <button type="button" onClick={() => setMergeScope(upd.jobNumber, false)}
+                                                                        className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200">لا شيء</button>
+                                                                </span>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 gap-1 text-[11px] pr-1">
+                                                                {upd.changes.map((ch, cIdx) => {
+                                                                    const picked = !!mergeSelection[mergeKeyOf(upd.jobNumber, ch.field)];
+                                                                    return (
+                                                                        <label key={ch.field || cIdx}
+                                                                            className={`flex justify-between flex-wrap gap-1 items-center cursor-pointer rounded px-1 py-0.5 ${picked ? 'bg-indigo-50/60' : ''}`}>
+                                                                            <span className="flex items-center gap-1.5 text-gray-600">
+                                                                                <input type="checkbox" checked={picked}
+                                                                                    onChange={() => toggleMergeField(upd.jobNumber, ch.field)}
+                                                                                    className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
+                                                                                <span>حقل {ch.fieldNameAr}:</span>
+                                                                                {ch.cosmeticOnly
+                                                                                    ? <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1 rounded" title="نفس النص بصيغة كتابة مختلفة (مسافة أو همزة أو تاء مربوطة)">إملائي</span>
+                                                                                    : !ch.wasEmpty && <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1 rounded">تعارض</span>}
+                                                                            </span>
+                                                                            {/* الشطب يظهر فقط على ما سيُستبدَل فعلاً — غير المؤشَّر باقٍ كما هو */}
+                                                                            <span className="font-semibold">
+                                                                                <span className={picked ? 'line-through text-rose-500 bg-rose-50 px-1 rounded' : 'text-slate-700 bg-slate-100 px-1 rounded'}>{ch.oldVal}</span>
+                                                                                <span className="mx-1">{picked ? '←' : '⇠'}</span>
+                                                                                <span className={picked ? 'text-emerald-700 bg-emerald-50 px-1 rounded' : 'text-slate-400 bg-slate-50 px-1 rounded line-through'}>{ch.newVal}</span>
+                                                                            </span>
+                                                                        </label>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     ))}
+                                                    </div>
+                                                    <div className="border-t pt-1.5 text-[11px] font-black text-indigo-900">
+                                                        سيُطبَّق {mergeSelectedCount} حقلاً من أصل {mergeTotalChanges}
+                                                        {mergeSelectedCount === 0 && <span className="text-slate-500 font-bold"> — لن يتغيّر أي حقل حالي</span>}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
 
                                         {/* الخيار الأول: الدمج الذكي */}
-                                        <button 
-                                            onClick={() => handleSmartMerge(incomingStaff)}
-                                            className="w-full text-right p-4 rounded-2xl border-2 border-indigo-100 hover:border-indigo-500 hover:bg-indigo-50/30 transition group flex gap-4 items-start"
+                                        {(() => {
+                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0;
+                                            return (
+                                        <button
+                                            disabled={nothingToDo}
+                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection)}
+                                            className={`w-full text-right p-4 rounded-2xl border-2 transition group flex gap-4 items-start ${
+                                                nothingToDo
+                                                    ? 'border-slate-100 opacity-50 cursor-not-allowed'
+                                                    : 'border-indigo-100 hover:border-indigo-500 hover:bg-indigo-50/30'
+                                            }`}
                                         >
                                             <div className="text-2xl p-2.5 bg-indigo-50 rounded-xl group-hover:bg-indigo-100 transition">🔄</div>
                                             <div>
-                                                <h4 className="font-bold text-indigo-900 text-sm">مزامنة ودمج ذكي (موصى به وبشكل آمن)</h4>
+                                                <h4 className="font-bold text-indigo-900 text-sm">تطبيق ما اخترته (موصى به)</h4>
                                                 <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
-                                                    يقوم بدمج الحقول المليئة فقط من الملف الجديد مع الاحتفاظ بأي حقول أخرى معبأة مسبقاً (مثل الوحدات والقياسات) وإضافة الموظفين الجدد.
+                                                    {nothingToDo
+                                                        ? 'لم تختر شيئاً بعد — أشِّر ما تريد نقله من الملف أعلاه.'
+                                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس.`}
                                                 </p>
                                             </div>
                                         </button>
+                                            );
+                                        })()}
 
                                         {/* الخيار الثاني: الاستبدال الكامل */}
                                         <button 
