@@ -976,6 +976,7 @@
                 return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
             });
             const [periodUnitFilter, setPeriodUnitFilter] = useState('all');
+            const [periodWorkTypeFilter, setPeriodWorkTypeFilter] = useState('all');
             const [periodSearchQuery, setPeriodSearchQuery] = useState('');
             const [expandedEmpPeriod, setExpandedEmpPeriod] = useState(null);
 
@@ -3596,6 +3597,7 @@
 
                 let filteredStaff = staff.filter(s => {
                     if (periodUnitFilter !== 'all' && s.unit !== periodUnitFilter) return false;
+                    if (periodWorkTypeFilter !== 'all' && s.workType !== periodWorkTypeFilter) return false;
                     if (periodSearchQuery.trim()) {
                         const normQ = normalizeArabicForSearch(periodSearchQuery);
                         const normName = normalizeArabicForSearch(s.name || '');
@@ -3713,7 +3715,7 @@
                         totalDaysCount: datesList.length
                     }
                 };
-            }, [staff, periodStartDate, periodEndDate, periodUnitFilter, periodSearchQuery, dailyStatusOverrides, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
+            }, [staff, periodStartDate, periodEndDate, periodUnitFilter, periodWorkTypeFilter, periodSearchQuery, dailyStatusOverrides, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
 
             const exportPeriodReportExcel = () => {
                 try {
@@ -3740,7 +3742,12 @@
 
                     setPreviewData(exportData);
                     setVisiblePreviewColumns(['الرقم الوظيفي', 'الوحدة', 'طبيعة العمل', 'الدوام الاعتيادي (يوم)', 'الدوام الإضافي (يوم)', 'الإجازات (يوم)', 'الغياب (يوم)']);
-                    setPreviewTitle(`موقف الحضور الموحد للشعبة للفترة من ${periodStartDate} إلى ${periodEndDate}`);
+                    // الفلاتر تُذكَر في العنوان: تقريران بعنوان واحد ومحتوى مختلف التباس خطر في مستند رسمي
+                    const scopeParts = [];
+                    if (periodUnitFilter !== 'all') scopeParts.push(periodUnitFilter);
+                    if (periodWorkTypeFilter !== 'all') scopeParts.push(periodWorkTypeFilter === 'صباحي' ? 'الملاك الصباحي' : 'الملاك المناوب');
+                    const scopeLabel = scopeParts.length ? scopeParts.join(' — ') : 'كامل الشعبة';
+                    setPreviewTitle(`موقف الحضور (${scopeLabel}) للفترة من ${periodStartDate} إلى ${periodEndDate}`);
                     setShowPreview(true);
                 } catch (e) {
                     alert('❌ خطأ في تصدير موقف الفترة: ' + e.message);
@@ -9401,7 +9408,7 @@
                                                     </div>
 
                                                     {/* فلتر الوحدة */}
-                                                    <div className="md:col-span-3 space-y-1.5">
+                                                    <div className="md:col-span-2 space-y-1.5">
                                                         <label className="block text-xs font-black text-slate-700">📍 فلترة حسب الوحدة:</label>
                                                         <select
                                                             value={periodUnitFilter}
@@ -9415,8 +9422,22 @@
                                                         </select>
                                                     </div>
 
+                                                    {/* فلتر طبيعة الدوام — أيام الدوام تُحتسب لكل موظف حسب نمطه (صباحي أو دورة مناوبة) */}
+                                                    <div className="md:col-span-2 space-y-1.5">
+                                                        <label className="block text-xs font-black text-slate-700">⏰ طبيعة الدوام:</label>
+                                                        <select
+                                                            value={periodWorkTypeFilter}
+                                                            onChange={(e) => setPeriodWorkTypeFilter(e.target.value)}
+                                                            className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 shadow-sm font-bold text-slate-800 text-xs md:text-sm outline-none cursor-pointer focus:border-indigo-500"
+                                                        >
+                                                            <option value="all">👥 الكل ({staff.length})</option>
+                                                            <option value="صباحي">☀️ الصباحي ({staff.filter(s => s.workType === 'صباحي').length})</option>
+                                                            <option value="مناوب">🔄 المناوبين ({staff.filter(s => s.workType === 'مناوب').length})</option>
+                                                        </select>
+                                                    </div>
+
                                                     {/* حقل البحث */}
-                                                    <div className="md:col-span-3 space-y-1.5">
+                                                    <div className="md:col-span-2 space-y-1.5">
                                                         <label className="block text-xs font-black text-slate-700">🔍 بحث بالاسم/الرقم الوظيفي:</label>
                                                         <div className="relative bg-white border-2 border-slate-300 rounded-xl px-3 py-2 shadow-sm focus-within:border-indigo-500 flex items-center gap-2">
                                                             <span className="text-slate-400 text-sm">🔍</span>
@@ -9456,7 +9477,11 @@
                                                         <div>
                                                             <div className="text-[11px] font-black text-slate-500">👥 الموظفون المشمولون بالتقرير:</div>
                                                             <div className="text-2xl font-black text-slate-900 mt-1">{periodReportData.summary.totalStaff} منتسب</div>
-                                                            <div className="text-[10px] font-bold text-slate-400 mt-0.5">يشمل جميع كادر الشعبة المعتمد بالكامل</div>
+                                                            <div className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                                                {(periodUnitFilter === 'all' && periodWorkTypeFilter === 'all' && !periodSearchQuery.trim())
+                                                                    ? 'يشمل جميع كادر الشعبة المعتمد بالكامل'
+                                                                    : `مُصفّى: ${[periodUnitFilter !== 'all' ? periodUnitFilter : null, periodWorkTypeFilter !== 'all' ? (periodWorkTypeFilter === 'صباحي' ? 'الملاك الصباحي' : 'الملاك المناوب') : null, periodSearchQuery.trim() ? 'بحث بالاسم/الرقم' : null].filter(Boolean).join(' — ')}`}
+                                                            </div>
                                                         </div>
                                                         <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-2xl font-bold flex-shrink-0">
                                                             👥
