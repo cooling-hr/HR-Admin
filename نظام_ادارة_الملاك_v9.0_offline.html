@@ -977,6 +977,7 @@
             });
             const [periodUnitFilter, setPeriodUnitFilter] = useState('all');
             const [periodWorkTypeFilter, setPeriodWorkTypeFilter] = useState('all');
+            const [periodShowMatrix, setPeriodShowMatrix] = useState(false);
             const [periodSearchQuery, setPeriodSearchQuery] = useState('');
             const [expandedEmpPeriod, setExpandedEmpPeriod] = useState(null);
 
@@ -3028,6 +3029,52 @@
                     }
                 };
             }, [staff, periodStartDate, periodEndDate, periodUnitFilter, periodWorkTypeFilter, periodSearchQuery, dailyStatusOverrides, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
+
+            // ترميز خانة اليوم في مصفوفة الموقف: رمز مختصر ولون لكل حالة يومية ممكنة.
+            // الحالات مأخوذة من getEmployeeDailyStatus وأنواع الفترات السبعة والتعديلات اليدوية —
+            // وأي حالة غير متوقَّعة تظهر بأول حرفٍ منها ولونٍ محايد بدل أن تختفي بصمت.
+            const getDayMatrixCell = (status, isFuture) => {
+                if (isFuture) return { code: '·', cls: 'text-slate-300', label: 'يوم لم يحن بعد' };
+                const s = status || '';
+                if (s === 'دوام صباحي' || s === 'حضور فعلي' || s === 'دوام صباحي (12 ساعة)') return { code: 'ص', cls: 'bg-emerald-100 text-emerald-800', label: s };
+                if (s === 'دوام مسائي (12 ساعة)') return { code: 'م', cls: 'bg-teal-100 text-teal-800', label: s };
+                if (s === 'دوام 24 ساعة') return { code: '٢٤', cls: 'bg-emerald-200 text-emerald-900', label: s };
+                if (s === 'ورقة عمل') return { code: 'و', cls: 'bg-blue-100 text-blue-800', label: s };
+                if (s === 'إجازة زمنية') return { code: 'ز', cls: 'bg-cyan-100 text-cyan-800', label: s };
+                if (s.includes('إضافي')) return { code: 'إض', cls: 'bg-violet-100 text-violet-800', label: s };
+                if (s.includes('تعذر')) return { code: 'ت', cls: 'bg-yellow-100 text-yellow-800', label: s };
+                if (s === 'استراحة مناوبة') return { code: 'ر', cls: 'bg-slate-100 text-slate-500', label: s };
+                if (s === 'استراحة نهاية الأسبوع') return { code: 'ع', cls: 'bg-slate-100 text-slate-400', label: s };
+                if (s === 'عطلة رسمية') return { code: 'ر.س', cls: 'bg-slate-200 text-slate-600', label: s };
+                if (s === 'غياب') return { code: 'غ', cls: 'bg-red-100 text-red-800', label: s };
+                if (s === 'في دورة') return { code: 'د', cls: 'bg-indigo-100 text-indigo-800', label: s };
+                if (s === 'إيفاد') return { code: 'ف', cls: 'bg-purple-100 text-purple-800', label: s };
+                if (s === 'إجازة أمومة') return { code: 'أم', cls: 'bg-pink-100 text-pink-800', label: s };
+                if (s === 'إجازة بدون راتب') return { code: 'ب', cls: 'bg-orange-100 text-orange-800', label: s };
+                if (s === 'إجازة طويلة') return { code: 'ط', cls: 'bg-orange-100 text-orange-900', label: s };
+                if (s.includes('إجازة')) return { code: 'إ', cls: 'bg-amber-100 text-amber-800', label: s };
+                return { code: (s.trim()[0] || '؟'), cls: 'bg-slate-100 text-slate-500', label: s || 'غير محدد' };
+            };
+
+            const DAY_MATRIX_LEGEND = [
+                { code: 'ص', label: 'دوام صباحي', cls: 'bg-emerald-100 text-emerald-800' },
+                { code: 'م', label: 'دوام مسائي', cls: 'bg-teal-100 text-teal-800' },
+                { code: '٢٤', label: 'دوام 24 ساعة', cls: 'bg-emerald-200 text-emerald-900' },
+                { code: 'إض', label: 'دوام إضافي', cls: 'bg-violet-100 text-violet-800' },
+                { code: 'و', label: 'ورقة عمل', cls: 'bg-blue-100 text-blue-800' },
+                { code: 'ز', label: 'إجازة زمنية', cls: 'bg-cyan-100 text-cyan-800' },
+                { code: 'ت', label: 'تعذر حضور', cls: 'bg-yellow-100 text-yellow-800' },
+                { code: 'ر', label: 'استراحة مناوبة', cls: 'bg-slate-100 text-slate-500' },
+                { code: 'ع', label: 'عطلة أسبوعية', cls: 'bg-slate-100 text-slate-400' },
+                { code: 'ر.س', label: 'عطلة رسمية', cls: 'bg-slate-200 text-slate-600' },
+                { code: 'إ', label: 'إجازة اعتيادية', cls: 'bg-amber-100 text-amber-800' },
+                { code: 'ب', label: 'بدون راتب', cls: 'bg-orange-100 text-orange-800' },
+                { code: 'ط', label: 'إجازة طويلة', cls: 'bg-orange-100 text-orange-900' },
+                { code: 'أم', label: 'إجازة أمومة', cls: 'bg-pink-100 text-pink-800' },
+                { code: 'د', label: 'في دورة', cls: 'bg-indigo-100 text-indigo-800' },
+                { code: 'ف', label: 'إيفاد', cls: 'bg-purple-100 text-purple-800' },
+                { code: 'غ', label: 'غياب', cls: 'bg-red-100 text-red-800' }
+            ];
 
             const exportPeriodReportExcel = () => {
                 try {
@@ -8432,11 +8479,85 @@
                                                     <span>📋</span>
                                                     <span>سجل حضور وإجازات المنتسبين للفترة من ({periodStartDate}) إلى ({periodEndDate})</span>
                                                 </h3>
-                                                <span className="bg-indigo-100 text-indigo-800 font-extrabold px-3 py-1 rounded-full text-xs">
-                                                    {periodReportData.employees.length} منتسب
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    {/* مبدّل العرض: إجمالي لكل موظف، أو مصفوفة يوماً بيوم للمجموعة كلها */}
+                                                    <div className="flex bg-white border border-slate-300 rounded-xl overflow-hidden shadow-sm no-print">
+                                                        <button
+                                                            onClick={() => setPeriodShowMatrix(false)}
+                                                            className={`px-3 py-1.5 text-[11px] font-black transition cursor-pointer ${!periodShowMatrix ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                                                        >
+                                                            📊 إجمالي
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setPeriodShowMatrix(true)}
+                                                            className={`px-3 py-1.5 text-[11px] font-black transition cursor-pointer ${periodShowMatrix ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                                                        >
+                                                            📅 مصفوفة الأيام
+                                                        </button>
+                                                    </div>
+                                                    <span className="bg-indigo-100 text-indigo-800 font-extrabold px-3 py-1 rounded-full text-xs">
+                                                        {periodReportData.employees.length} منتسب
+                                                    </span>
+                                                </div>
                                             </div>
 
+                                            {periodShowMatrix ? (
+                                                /* مصفوفة الأيام: صف لكل موظف، عمود لكل يوم — كشف الحضور بشكله الرسمي المعتاد */
+                                                <div>
+                                                    <div className="px-4 py-2.5 bg-white border-b border-slate-200 flex flex-wrap gap-x-3 gap-y-1.5 items-center">
+                                                        <span className="text-[11px] font-black text-slate-500">مفتاح الرموز:</span>
+                                                        {DAY_MATRIX_LEGEND.map(l => (
+                                                            <span key={l.code} className="flex items-center gap-1">
+                                                                <span className={`inline-flex items-center justify-center w-6 h-5 rounded font-black text-[10px] ${l.cls}`}>{l.code}</span>
+                                                                <span className="text-[10px] font-bold text-slate-500">{l.label}</span>
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                    <div className="overflow-x-auto w-full">
+                                                        <table className="w-full text-right border-collapse text-xs">
+                                                            <thead>
+                                                                <tr className="bg-slate-100 text-slate-800 border-b border-slate-200 font-black">
+                                                                    <th className="px-2 py-2 text-center w-8 sticky right-0 bg-slate-100 z-10">ت</th>
+                                                                    <th className="px-3 py-2 text-right sticky right-8 bg-slate-100 z-10 min-w-[150px]">الاسم الكامل</th>
+                                                                    {periodReportData.datesList.map(d => {
+                                                                        const dayNum = d.split('-')[2];
+                                                                        return (
+                                                                            <th key={d} className="px-1 py-2 text-center min-w-[34px] border-r border-slate-200" title={`${d} — ${getArabicDayName(d)}`}>
+                                                                                <div className="font-mono font-black text-[11px] text-slate-700">{dayNum}</div>
+                                                                                <div className="text-[9px] font-bold text-slate-400">{getArabicDayName(d).slice(0, 3)}</div>
+                                                                            </th>
+                                                                        );
+                                                                    })}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {periodReportData.employees.map((item, idx) => (
+                                                                    <tr key={item.employee.id || idx} className="border-b border-slate-100 hover:bg-indigo-50/30">
+                                                                        <td className="px-2 py-1.5 text-center font-mono text-slate-400 text-[11px] sticky right-0 bg-white z-10">{idx + 1}</td>
+                                                                        <td className="px-3 py-1.5 text-right font-bold text-slate-800 text-[11px] sticky right-8 bg-white z-10 whitespace-nowrap">
+                                                                            {item.employee.name}
+                                                                            <span className="block text-[9px] font-mono font-normal text-slate-400">{item.employee.jobNumber}</span>
+                                                                        </td>
+                                                                        {item.dailyLog.map(dayItem => {
+                                                                            const cell = getDayMatrixCell(dayItem.status, dayItem.isFuture);
+                                                                            return (
+                                                                                <td key={dayItem.dateStr} className="px-0.5 py-1.5 text-center border-r border-slate-100" title={`${dayItem.dateStr} — ${dayItem.dayName}: ${cell.label}`}>
+                                                                                    <span className={`inline-flex items-center justify-center w-7 h-6 rounded font-black text-[10px] ${cell.cls}`}>
+                                                                                        {cell.code}
+                                                                                    </span>
+                                                                                </td>
+                                                                            );
+                                                                        })}
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    {periodReportData.employees.length === 0 && (
+                                                        <div className="p-8 text-center text-slate-400 font-bold text-sm">لا يوجد منتسبون ضمن الفلاتر المحددة</div>
+                                                    )}
+                                                </div>
+                                            ) : (
                                             <div className="overflow-x-auto w-full">
                                                 <table className="w-full text-right border-collapse text-xs md:text-sm">
                                                     <thead>
@@ -8551,6 +8672,7 @@
                                                     </tbody>
                                                 </table>
                                             </div>
+                                            )}
                                         </div>
                                     </div>
                                 ) : (
