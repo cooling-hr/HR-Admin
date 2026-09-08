@@ -8333,7 +8333,7 @@
                                                             onChange={(e) => setPeriodUnitFilter(e.target.value)}
                                                             className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 shadow-sm font-bold text-slate-800 text-xs md:text-sm outline-none cursor-pointer focus:border-indigo-500"
                                                         >
-                                                            <option value="all">🏢 جميع الوحدات ({staff.length} موظف)</option>
+                                                            <option value="all">🏢 جميع الوحدات</option>
                                                             {['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'].map(u => (
                                                                 <option key={u} value={u}>📍 {u}</option>
                                                             ))}
@@ -8348,9 +8348,9 @@
                                                             onChange={(e) => setPeriodWorkTypeFilter(e.target.value)}
                                                             className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 shadow-sm font-bold text-slate-800 text-xs md:text-sm outline-none cursor-pointer focus:border-indigo-500"
                                                         >
-                                                            <option value="all">👥 الكل ({staff.length})</option>
-                                                            <option value="صباحي">☀️ الصباحي ({staff.filter(s => s.workType === 'صباحي').length})</option>
-                                                            <option value="مناوب">🔄 المناوبين ({staff.filter(s => s.workType === 'مناوب').length})</option>
+                                                            <option value="all">👥 الكل</option>
+                                                            <option value="صباحي">☀️ الصباحي</option>
+                                                            <option value="مناوب">🔄 المناوبين</option>
                                                         </select>
                                                     </div>
 
