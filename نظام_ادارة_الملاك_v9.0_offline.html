@@ -361,6 +361,38 @@
             }
         }
         
+        /* طباعة مصفوفة الأيام: أفقية إلزاماً — ثلاثون عموداً لا تسع في صفحة عمودية */
+        @media print {
+            body.printing-matrix { background: white !important; }
+            /* visibility لا display: القالب مُدرَج داخل غلاف التطبيق نفسه، فإخفاء الغلاف
+               بـdisplay:none يُخفيه معه مهما فعلنا. أما visibility فتتوارث ويمكن نقضها
+               على الفرع المطلوب وحده — وهي الطريقة الوحيدة التي تعمل مع هذه البنية. */
+            body.printing-matrix #root > * { visibility: hidden !important; }
+            body.printing-matrix .matrix-print-only,
+            body.printing-matrix .matrix-print-only * { visibility: visible !important; }
+            body.printing-matrix .matrix-print-only {
+                display: block !important;
+                position: absolute !important;
+                top: 0 !important; right: 0 !important; left: 0 !important;
+                background: white !important;
+                color: black !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            body.printing-matrix .matrix-print-only table { width: 100% !important; border-collapse: collapse !important; }
+            body.printing-matrix .matrix-print-only th,
+            body.printing-matrix .matrix-print-only td {
+                border: 1px solid #94a3b8 !important;
+                padding: 2px 1px !important;
+                text-align: center !important;
+                /* الألوان تُطبع كما هي: الرمز وحده يكفي أبيض وأسود، لكن اللون يسرّع القراءة */
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            body.printing-matrix .matrix-print-only tr { page-break-inside: avoid !important; }
+        }
+
         /* تنسيق طباعة بطاقة الموظف A4 */
         @media print {
             body.printing-profile #root > *:not(.profile-print-only) {
@@ -3472,6 +3504,25 @@
                 setShowMergeModal(false);
                 setIncomingStaff([]);
                 alert(`⚠️ تم استبدال قاعدة البيانات بالكامل بنجاح. إجمالي الموظفين الحاليين: ${incoming.length} موظف.`);
+            };
+
+            // طباعة مصفوفة الأيام: القالب المخصص أدناه يحلّ محلّ الشاشة أثناء الطباعة فقط.
+            // اتجاه الصفحة يُحقَن ديناميكياً لأن التطبيق يفرض A4 عمودية عالمياً في @page،
+            // و@page لا يمكن ربطه بصنف على body — فالحقن والإزالة هما الطريق الموثوق الوحيد.
+            const printDayMatrix = () => {
+                const styleEl = document.createElement('style');
+                styleEl.id = 'matrixLandscapeStyle';
+                styleEl.textContent = '@media print { @page { size: A4 landscape; margin: 8mm; } }';
+                document.head.appendChild(styleEl);
+                document.body.classList.add('printing-matrix');
+                setTimeout(() => {
+                    window.print();
+                    setTimeout(() => {
+                        document.body.classList.remove('printing-matrix');
+                        const el = document.getElementById('matrixLandscapeStyle');
+                        if (el) el.remove();
+                    }, 1000);
+                }, 250);
             };
 
             const printProfileCard = (emp) => {
@@ -8495,6 +8546,21 @@
                                                             📅 مصفوفة الأيام
                                                         </button>
                                                     </div>
+                                                    {/* الطباعة هنا لا في زر التصدير العام: ذاك يُخرج مستند الإجماليات، وهذا يُخرج المصفوفة */}
+                                                    {periodShowMatrix && (
+                                                        <button
+                                                            onClick={printDayMatrix}
+                                                            disabled={periodReportData.employees.length === 0}
+                                                            className={`px-3 py-1.5 rounded-xl text-[11px] font-black shadow-sm transition no-print flex items-center gap-1 ${
+                                                                periodReportData.employees.length === 0
+                                                                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95'
+                                                            }`}
+                                                            title="طباعة المصفوفة بمفتاح الرموز على ورق أفقي"
+                                                        >
+                                                            🖨️ طباعة المصفوفة
+                                                        </button>
+                                                    )}
                                                     <span className="bg-indigo-100 text-indigo-800 font-extrabold px-3 py-1 rounded-full text-xs">
                                                         {periodReportData.employees.length} منتسب
                                                     </span>
@@ -9854,6 +9920,69 @@
                             </div>
                         </div>
                     )}
+
+                    {/* قالب طباعة مصفوفة الأيام — يظهر أثناء الطباعة فقط (body.printing-matrix) */}
+                    <div className="matrix-print-only hidden bg-white text-black" style={{ direction: 'rtl' }}>
+                        <div style={{ textAlign: 'center', marginBottom: '4mm' }}>
+                            <div style={{ fontWeight: 900, fontSize: '13pt' }}>شركة نفط البصرة — هيأة الصيانة الهندسية — قسم التكييف والتبريد</div>
+                            <div style={{ fontWeight: 700, fontSize: '10pt' }}>شعبة تبريد المركز ومحطة عزل نهر بن عمر</div>
+                            <div style={{ fontWeight: 900, fontSize: '11pt', marginTop: '2mm' }}>
+                                موقف الحضور اليومي — {(() => {
+                                    const parts = [];
+                                    if (periodUnitFilter !== 'all') parts.push(periodUnitFilter);
+                                    if (periodWorkTypeFilter !== 'all') parts.push(periodWorkTypeFilter === 'صباحي' ? 'الملاك الصباحي' : 'الملاك المناوب');
+                                    return parts.length ? parts.join(' — ') : 'كامل الشعبة';
+                                })()}
+                            </div>
+                            <div style={{ fontSize: '9pt', fontWeight: 700 }}>
+                                للفترة من {periodStartDate} إلى {periodEndDate} — عدد المنتسبين: {periodReportData.employees.length}
+                            </div>
+                        </div>
+
+                        {/* مفتاح الرموز يُطبع مع الجدول: كشف بلا مفتاح غير مقروء لمن يستلمه */}
+                        <div style={{ marginBottom: '3mm', fontSize: '7pt', display: 'flex', flexWrap: 'wrap', gap: '2mm', justifyContent: 'center' }}>
+                            {DAY_MATRIX_LEGEND.map(l => (
+                                <span key={l.code} style={{ whiteSpace: 'nowrap' }}>
+                                    <strong style={{ border: '1px solid #64748b', padding: '0 3px', borderRadius: '2px' }}>{l.code}</strong>
+                                    <span style={{ marginRight: '1mm' }}>{l.label}</span>
+                                </span>
+                            ))}
+                        </div>
+
+                        <table style={{ fontSize: '7pt' }}>
+                            <thead>
+                                <tr style={{ background: '#e2e8f0' }}>
+                                    <th style={{ width: '7mm' }}>ت</th>
+                                    <th style={{ textAlign: 'right', minWidth: '45mm' }}>الاسم الكامل</th>
+                                    <th style={{ width: '14mm' }}>الرقم</th>
+                                    {periodReportData.datesList.map(d => (
+                                        <th key={d}>
+                                            <div style={{ fontWeight: 900 }}>{d.split('-')[2]}</div>
+                                            <div style={{ fontSize: '5.5pt' }}>{getArabicDayName(d).slice(0, 3)}</div>
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {periodReportData.employees.map((item, idx) => (
+                                    <tr key={item.employee.id || idx}>
+                                        <td>{idx + 1}</td>
+                                        <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{item.employee.name}</td>
+                                        <td style={{ fontFamily: 'monospace' }}>{item.employee.jobNumber}</td>
+                                        {item.dailyLog.map(dayItem => {
+                                            const cell = getDayMatrixCell(dayItem.status, dayItem.isFuture);
+                                            return <td key={dayItem.dateStr} className={cell.cls} style={{ fontWeight: 900 }}>{cell.code}</td>;
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        <div style={{ marginTop: '6mm', display: 'flex', justifyContent: 'space-between', fontSize: '8pt', fontWeight: 700 }}>
+                            <span>تاريخ الطباعة: {localDateStr()}</span>
+                            <span>مسؤول شعبة تبريد المركز ومحطة عزل نهر بن عمر</span>
+                        </div>
+                    </div>
 
                     {/* قالب الطباعة لبطاقة الموظف التعريفية الفردية A4 */}
                     {profileToPrint && (
