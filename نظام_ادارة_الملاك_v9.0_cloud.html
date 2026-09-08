@@ -6027,14 +6027,24 @@
 
                 const existing = periodsOf(emp).filter(p => p && p.from);
                 const newEnd = to || '9999-12-31';
-                const conflict = existing.find(p => {
+                const conflicts = existing.filter(p => {
                     const pEnd = p.to || '9999-12-31';
                     return from <= pEnd && p.from <= newEnd;
                 });
-                if (conflict) {
-                    alert('⛔ تتداخل هذه الفترة مع فترة موجودة: «' + conflict.type + '» (' + conflict.from + ' → ' + (conflict.to || 'مستمرة') + ').' + String.fromCharCode(10,10) + 'عدّل التواريخ أو استخدم نافذة تعديل الموظف.');
-                    return;
+                // التداخل لم يعد طريقاً مسدوداً: محرّر الفترات لم يعد موجوداً في نافذة الموظف،
+                // فرفض الحفظ بلا بديل يعني فترة خاطئة لا سبيل لتصحيحها من الواجهة إطلاقاً.
+                // نعرض الاستبدال صراحةً بدل ذلك.
+                if (conflicts.length > 0) {
+                    const list = conflicts.map(p => '«' + p.type + '» (' + p.from + ' → ' + (p.to || 'مستمرة') + ')').join('، ');
+                    const ok = confirm(
+                        '⚠️ تتداخل هذه الفترة مع: ' + list + String.fromCharCode(10,10) +
+                        'هل تستبدلها بالفترة الجديدة «' + periodType + '» (' + from + ' → ' + (to || 'مستمرة') + ')؟' + String.fromCharCode(10,10) +
+                        'موافق = تُحذف الفترة المتداخلة وتحلّ الجديدة محلها.' + String.fromCharCode(10) +
+                        'إلغاء = لا يُحفظ شيء وتبقى الفترة الحالية كما هي.'
+                    );
+                    if (!ok) return;
                 }
+                const keptPeriods = periodsOf(emp).filter(p => !conflicts.some(c => c.id === p.id));
 
                 // موظف بحالة قديمة بلا فترات: إضافة أول فترة له تُسقِط الرجوع الضمني إلى emp.status
                 // (getActivePeriod يتوقف عن استخدامه بمجرد وجود أي فترة) — فتُرحَّل الحالة القديمة
@@ -6043,12 +6053,57 @@
                     ? [{ id: 'per_legacy_' + Date.now(), type: emp.status, from: '1900-01-01', to: localDateStr(new Date(from).getTime() - 86400000), note: 'ترحيل تلقائي من الحالة القديمة' }]
                     : [];
                 const newPeriod = { id: 'per_' + Date.now(), type: periodType, from, to, note: '' };
-                const updatedPeriods = [...legacySeed, ...periodsOf(emp), newPeriod];
+                const updatedPeriods = [...legacySeed, ...keptPeriods, newPeriod];
+
+                // التعديلات اليومية تسبق الفترات في getEmployeeDailyStatus، فيوم مُثبَّت يدوياً
+                // داخل الفترة يبقى ظاهراً بحالته القديمة ويبدو أن الفترة «لم تُطبَّق». نسأل صراحةً
+                // بدل أن نترك المستخدم يظن أن حفظه فشل — وهذا ما حدث فعلاً مع إجازة أماني.
+                const rangeEnd = to || '9999-12-31';
+                const daysInside = Object.keys(dailyStatusOverrides || {}).filter(d =>
+                    d >= from && d <= rangeEnd && dailyStatusOverrides[d] && dailyStatusOverrides[d][emp.id]
+                );
+                let clearedOverrides = null;
+                if (daysInside.length > 0) {
+                    const sample = daysInside.slice(0, 3).map(d => d + ' («' + dailyStatusOverrides[d][emp.id] + '»)').join('، ');
+                    const replace = confirm(
+                        'ℹ️ داخل هذه الفترة يوجد ' + daysInside.length + ' يوماً مثبَّتاً يدوياً من شاشة الموقف اليومي:' + String.fromCharCode(10) +
+                        sample + (daysInside.length > 3 ? ' وغيرها' : '') + String.fromCharCode(10,10) +
+                        'الأيام المثبَّتة يدوياً تسبق الفترة، فتبقى على حالها ولن تظهر الفترة فيها.' + String.fromCharCode(10,10) +
+                        'موافق = تُحذف تلك الأيام وتحكم الفترة كل أيامها.' + String.fromCharCode(10) +
+                        'إلغاء = تُحفظ الفترة وتبقى تلك الأيام كما ثُبِّتت.'
+                    );
+                    if (replace) {
+                        clearedOverrides = { ...dailyStatusOverrides };
+                        daysInside.forEach(d => {
+                            const day = { ...clearedOverrides[d] };
+                            delete day[emp.id];
+                            if (Object.keys(day).length === 0) delete clearedOverrides[d];
+                            else clearedOverrides[d] = day;
+                        });
+                        setDailyStatusOverrides(clearedOverrides);
+                        safeStorage.setItem('dailyStatusOverrides', JSON.stringify(clearedOverrides));
+                    }
+                }
+
                 const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: updatedPeriods, status: periodType } : s);
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
-                pushDataToCloud();
-                logAuditEvent('add_period:' + periodType + ':' + (emp.jobNumber || emp.id), currentUserName);
+                pushDataToCloud(clearedOverrides ? {
+                    staffData: updated,
+                    systemUsersList: systemUsers,
+                    officialHolidaysList: officialHolidays,
+                    hourlyLeaveRecords: hourlyLeaveRecords,
+                    overtimeHoursRecords: overtimeHoursRecords,
+                    dailyStatusOverrides: clearedOverrides,
+                    shiftAnchorDate: anchorDate,
+                    threeShiftAnchorSquad: threeShiftAnchorSquad,
+                    twoShiftAnchorSquad: twoShiftAnchorSquad,
+                    dataEntryOperator: dataEntryOperator,
+                    overtimeSelectedIds: overtimeIds,
+                    lastCloudUpdate: new Date().toISOString(),
+                    pendingDeletionRequest: pendingDeletionRequest
+                } : null);
+                logAuditEvent((conflicts.length > 0 ? 'replace_period:' : 'add_period:') + periodType + ':' + (emp.jobNumber || emp.id), currentUserName);
                 setQuickPeriod(null);
             };
 
