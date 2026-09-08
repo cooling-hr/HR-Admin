@@ -3007,7 +3007,7 @@
 
                         // احتساب أيام الحضور والإحصائيات فقط للأيام المنقضية واليوم الحالي
                         if (isPastOrToday) {
-                            if (status === 'دوام صباحي' || status === 'حضور فعلي' || status === 'دوام صباحي (12 ساعة)' || status === 'دوام مسائي (12 ساعة)' || status === 'دوام 24 ساعة' || status === 'إجازة زمنية' || status === 'ورقة عمل') {
+                            if (status === 'دوام صباحي' || status === 'حضور فعلي' || status === 'دوام صباحي (12 ساعة)' || status === 'دوام مسائي (12 ساعة)' || status === 'دوام 24 ساعة' || status === 'إجازة زمنية' || status === 'ورقة عمل' || status === 'مكلف بواجب') {
                                 regularDuty++;
                             } else if (status === 'دوام إضافي' || status.includes('إضافي')) {
                                 overtimeDuty++;
@@ -3072,6 +3072,7 @@
                 if (s === 'دوام مسائي (12 ساعة)') return { code: 'م', cls: 'bg-teal-100 text-teal-800', label: s };
                 if (s === 'دوام 24 ساعة') return { code: '٢٤', cls: 'bg-emerald-200 text-emerald-900', label: s };
                 if (s === 'ورقة عمل') return { code: 'و', cls: 'bg-blue-100 text-blue-800', label: s };
+                if (s === 'مكلف بواجب') return { code: 'ك', cls: 'bg-sky-100 text-sky-800', label: s };
                 if (s === 'إجازة زمنية') return { code: 'ز', cls: 'bg-cyan-100 text-cyan-800', label: s };
                 if (s.includes('إضافي')) return { code: 'إض', cls: 'bg-violet-100 text-violet-800', label: s };
                 if (s.includes('تعذر')) return { code: 'ت', cls: 'bg-yellow-100 text-yellow-800', label: s };
@@ -3094,6 +3095,7 @@
                 { code: '٢٤', label: 'دوام 24 ساعة', cls: 'bg-emerald-200 text-emerald-900' },
                 { code: 'إض', label: 'دوام إضافي', cls: 'bg-violet-100 text-violet-800' },
                 { code: 'و', label: 'ورقة عمل', cls: 'bg-blue-100 text-blue-800' },
+                { code: 'ك', label: 'مكلف بواجب', cls: 'bg-sky-100 text-sky-800' },
                 { code: 'ز', label: 'إجازة زمنية', cls: 'bg-cyan-100 text-cyan-800' },
                 { code: 'ت', label: 'تعذر حضور', cls: 'bg-yellow-100 text-yellow-800' },
                 { code: 'ر', label: 'استراحة مناوبة', cls: 'bg-slate-100 text-slate-500' },
@@ -8296,6 +8298,7 @@
                                                                         else if (status.includes('استراحة')) statusBadgeColor = 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
                                                                         else if (status.includes('إجازة') || status.includes('مرضية')) statusBadgeColor = 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100';
                                                                         else if (status === 'ورقة عمل') statusBadgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 font-bold';
+                                                                        else if (status === 'مكلف بواجب') statusBadgeColor = 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100 font-bold';
                                                                         else if (status.includes('تعذر') || status.includes('توقف موقع')) statusBadgeColor = 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 font-bold';
                                                                         else if (status.includes('دورة')) statusBadgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100';
                                                                         else if (status === 'غياب') statusBadgeColor = 'bg-red-600 text-white border-red-600 hover:bg-red-700';
@@ -8344,6 +8347,7 @@
                                                                                         <option value="إيفاد داخل العراق" className="bg-white text-purple-700 font-bold">🇮🇶 إيفاد داخل العراق</option>
                                                                                         <option value="إيفاد خارج العراق" className="bg-white text-indigo-900 font-bold">🌐 إيفاد خارج العراق</option>
                                                                                         <option value="ورقة عمل" className="bg-white text-emerald-700 font-bold">📝 ورقة عمل</option>
+                                                                                        <option value="مكلف بواجب" className="bg-white text-sky-700 font-bold">🛠️ مكلف بواجب</option>
                                                                                         <option value="تعذر حضور" className="bg-white text-amber-800 font-bold">🚧 تعذر حضور</option>
                                                                                         <option value="استراحة ذوي الاحتياجات الخاصة" className="bg-white text-teal-800 font-bold">♿ استراحة ذوي الاحتياجات الخاصة</option>
                                                                                         <option value="غياب" className="bg-white text-red-700 font-bold">❌ غياب</option>
@@ -11090,69 +11094,10 @@
                                             />
                                         </div>
                                         
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 mb-2">الحالة</label>
-                                            <select value={editingEmployee.status}
-                                                onChange={(e) => updateEditField('status', e.target.value)}
-                                                className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none">
-                                                <option value="نشط">نشط</option>
-                                                <option value="في دورة">في دورة</option>
-                                                <option value="إجازة طويلة">إجازة طويلة</option>
-                                                <option value="إجازة أمومة">إجازة أمومة</option>
-                                            </select>
-                                        </div>
-                                    <div className="md:col-span-2 space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="text-sm font-black text-slate-800">📅 فترات الحالة المؤرَّخة</span>
-                                            <button type="button" onClick={addPeriodToEditing} className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black transition cursor-pointer">
-                                                ➕ إضافة فترة
-                                            </button>
-                                        </div>
-                                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                                            تُدخل الفترة مرة واحدة فتتولّى بقية الأيام. اترك حقل «إلى» فارغاً لفترة مفتوحة النهاية تستمر حتى تُنهيها — وهذا شكل الغياب.
-                                        </p>
-                                        {periodsOf(editingEmployee).length === 0 ? (
-                                            <div className="text-center text-slate-400 text-xs font-bold py-3">لا توجد فترات مسجّلة.</div>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {periodsOf(editingEmployee).map((p, idx) => (
-                                                    <div key={p.id || idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center bg-white border border-slate-200 rounded-lg p-2">
-                                                        <select
-                                                            value={p.type || ''}
-                                                            onChange={(e) => updateEditingPeriod(idx, 'type', e.target.value)}
-                                                            className="md:col-span-3 border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:border-indigo-600"
-                                                        >
-                                                            {PERIOD_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                                        </select>
-                                                        <input
-                                                            type="date"
-                                                            value={p.from || ''}
-                                                            onChange={(e) => updateEditingPeriod(idx, 'from', e.target.value)}
-                                                            title="من"
-                                                            className="md:col-span-3 border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-mono outline-none focus:border-indigo-600"
-                                                        />
-                                                        <input
-                                                            type="date"
-                                                            value={p.to || ''}
-                                                            onChange={(e) => updateEditingPeriod(idx, 'to', e.target.value)}
-                                                            title="إلى — اتركه فارغاً لفترة مفتوحة"
-                                                            className="md:col-span-3 border border-slate-300 rounded-lg px-2 py-1.5 text-xs font-mono outline-none focus:border-indigo-600"
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            value={p.note || ''}
-                                                            onChange={(e) => updateEditingPeriod(idx, 'note', e.target.value)}
-                                                            placeholder="ملاحظة"
-                                                            className="md:col-span-2 border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-indigo-600"
-                                                        />
-                                                        <button type="button" onClick={() => removeEditingPeriod(idx)} title="حذف الفترة" className="md:col-span-1 px-2 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-xs font-black transition cursor-pointer">
-                                                            🗑️
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
+                                    {/* حُذف من الاستمارة بقرار صريح: حقل «الحالة» القديم ومحرّر «الفترات المؤرَّخة».
+                                        الموقف يُدخَل حصراً من شاشة الموقف اليومي والنافذة السريعة، فلا يبقى مدخلان
+                                        متنافسان لنفس المعلومة. الحقلان باقيان في البيانات ولم يُحذف أيٌّ منهما — emp.status
+                                        تقرؤه عشرات المواضع، و statusPeriods هي مصدر الموقف المعتمد. */}
 
                                     <div className="md:col-span-2">
                                         <label className="flex items-center gap-2 p-3 bg-cyan-50 border border-cyan-200 rounded-xl cursor-pointer">
