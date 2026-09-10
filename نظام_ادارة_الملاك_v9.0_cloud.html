@@ -4174,7 +4174,97 @@
                 address: 'عنوان السكن'
             };
 
-            const analyzeMerge = (incoming, currentStaff) => {
+            // ===== الفترات المؤرخة في الدمج =====
+            // الفترات لا تُقارَن كحقل: كل فترة سجلّ بمعرّف، وموظفة لا يختلف أي حقل لها قد تختلف فترتها
+            // (هكذا غابت «إجازة بدون راتب» عن نافذة المزامنة ولم تنتقل حتى بعد «تحديد الكل»).
+            // قاعدة صاحب النظام: الفترة المؤرخة لا تضيع بالدمج. ما في الملف وحده يُعرض منبَّهاً عليه، وما لدى
+            // الجهاز وحده يبقى منبَّهاً عليه — فغيابها عن نسخةٍ قد يعني موقفاً قديماً لم يُدخَل فيها بعد —
+            // وكل اختلاف يُعرض ليُختار ما يُنفَّذ وما يُلغى.
+            // الافتراض مبني على الخطر كالحقول: ما لا يمسّ شيئاً لديك كسبٌ فيُؤشَّر؛ وما يمسّ فترة أو حالة
+            // غير مؤرخة أو يوماً مثبَّتاً لديك، أو يغيّر فترة لديك، يبقى بلا تأشير.
+            const periodEndOf = (p) => (p && p.to) ? p.to : '9999-12-31';
+            // تداخل تواريخ صارم: النهاية الفارغة مفتوحة، والفترتان المتتاليتان لا تتداخلان
+            const periodsOverlap = (a, b) => a.from <= periodEndOf(b) && b.from <= periodEndOf(a);
+            // هوية الفترة: معرّفها، أو نوعها وتواريخها إن كانت قديمة بلا معرّف — فلا تتطابق فترتان لمجرد غياب معرّفيهما
+            const periodIdentityOf = (p) => p.id || ('~' + [p.type, p.from, p.to || ''].join('|'));
+            const periodMergeKeyOf = (jobNumber, p) => `${jobNumber}::${periodIdentityOf(p)}`;
+            const samePeriodDates = (a, b) => a.type === b.type && a.from === b.from && (a.to || '') === (b.to || '');
+            const samePeriodExtras = (a, b) => (a.note || '') === (b.note || '') && !!a.confirmedReturn === !!b.confirmedReturn;
+            // نطاق الفترة بالكلمات، والتواريخ معزولة الاتجاه: التاريخ بعد نصّ عربي يُعرض مقلوباً (23-08-2026)
+            // والسهم بين تاريخين يشير بصرياً إلى البداية، فيُقرأ النطاق معكوساً
+            const periodRangeJsx = (p) => (
+                <React.Fragment>«{p.type}» من <bdi dir="ltr">{p.from}</bdi> {p.to ? <React.Fragment>إلى <bdi dir="ltr">{p.to}</bdi></React.Fragment> : '(مستمرة)'}</React.Fragment>
+            );
+            // عدد الأيام المثبَّتة بصيغته العربية بعد «امسح»: يوماً واحداً، يومين، 3–10 أيام، 11 فأكثر يوماً
+            const arabicManualDaysCount = (n) => n === 1 ? 'يوماً واحداً مثبَّتاً'
+                : n === 2 ? 'يومين مثبَّتين'
+                : (n >= 3 && n <= 10) ? `${n} أيام مثبَّتة`
+                : `${n} يوماً مثبَّتاً`;
+            const analyzeMergePeriods = (inc, existing, jobNumber, overrides) => {
+                const valid = (p) => p && p.type && p.from;
+                // نسخة مكرّرة حرفياً داخل الملف نفسه تُعرض وتُطبَّق مرة واحدة
+                const seenInFile = {};
+                const incList = (Array.isArray(inc.statusPeriods) ? inc.statusPeriods : []).filter(valid).filter(p => {
+                    const fingerprint = JSON.stringify([periodIdentityOf(p), p.type, p.from, p.to || '', p.note || '', !!p.confirmedReturn]);
+                    if (seenInFile[fingerprint]) return false;
+                    seenInFile[fingerprint] = true;
+                    return true;
+                });
+                const locList = periodsOf(existing).filter(valid);
+                // حالة قديمة بلا فترات تغطي كل التواريخ: أول فترة تُضاف تُسقط الرجوع إليها في getActivePeriod
+                const legacy = (periodsOf(existing).length === 0 && existing.status && existing.status !== 'نشط') ? existing.status : null;
+                // أيام مثبَّتة يدوياً لهذا الموظف داخل الفترة بقيمة غير نوعها: التثبيت اليومي يسبق الفترة في العرض
+                const contradictingDays = (p) => Object.keys(overrides || {})
+                    .filter(d => d >= p.from && d <= periodEndOf(p) && overrides[d] && overrides[d][existing.id] && overrides[d][existing.id] !== p.type)
+                    .sort()
+                    .map(d => ({ date: d, value: overrides[d][existing.id] }));
+                // مفتاح فريد لكل سطر: ملف مشوَّه قد يحمل معرّفاً واحداً لفترتين مختلفتين
+                const uniqueKeyMaker = () => {
+                    const used = {};
+                    return (p) => {
+                        const k = periodMergeKeyOf(jobNumber, p);
+                        used[k] = (used[k] || 0) + 1;
+                        return used[k] === 1 ? k : `${k}#${used[k]}`;
+                    };
+                };
+                const itemKeyOf = uniqueKeyMaker();
+                const items = [];
+                incList.forEach(ip => {
+                    // النظير المحلي: المعرّف نفسه، أو النوع والتواريخ نفسها بمعرّف آخر (الفترة نفسها أُدخلت في الجهازين)
+                    const twin = (ip.id && locList.find(lp => lp.id === ip.id)) || locList.find(lp => samePeriodDates(lp, ip)) || null;
+                    if (twin && samePeriodDates(twin, ip) && samePeriodExtras(twin, ip)) return;
+                    const base = { key: itemKeyOf(ip), jobNumber, name: existing.name, empId: existing.id,
+                                   incoming: ip, local: null, overlaps: [], legacy: null, days: [], gainOnly: false };
+                    if (twin) {
+                        // النوع والتواريخ نفسها، والفرق ملاحظة أو تأكيد مباشرة كان فارغاً لديك ⇒ كسب لا تعارض
+                        const gainOnly = samePeriodDates(twin, ip)
+                            && (!(twin.note || '') || (twin.note || '') === (ip.note || ''))
+                            && (!twin.confirmedReturn || !!ip.confirmedReturn);
+                        // تواريخ جديدة قد تمسّ فترات أخرى لديك: تُعرض مع الفترة وتُستبدل إن اختيرت، كأي فترة واردة
+                        const overlaps = gainOnly ? [] : locList.filter(lp => lp !== twin && periodsOverlap(lp, ip));
+                        items.push({ ...base, kind: 'changed', local: twin, gainOnly, overlaps, days: gainOnly ? [] : contradictingDays(ip) });
+                        return;
+                    }
+                    const overlaps = locList.filter(lp => periodsOverlap(lp, ip));
+                    const days = contradictingDays(ip);
+                    const kind = overlaps.length > 0 ? 'overlap' : legacy ? 'legacy' : days.length > 0 ? 'days' : 'new';
+                    items.push({ ...base, kind, overlaps, legacy, days });
+                });
+                // فترات الجهاز غير الموجودة في الملف تبقى ويُنبَّه إليها. ما يُعرض منها مع فترة واردة (نظيراً أو تداخلاً) لا يُكرَّر هنا
+                // مجموعة لا كائن: معرّف مثل «constructor» يطابق خاصية موروثة في الكائن فيُخفي فترة من التنبيه
+                const shownWithItems = new Set();
+                items.forEach(it => {
+                    if (it.local) shownWithItems.add(periodIdentityOf(it.local));
+                    it.overlaps.forEach(p => shownWithItems.add(periodIdentityOf(p)));
+                });
+                const localKeyOf = uniqueKeyMaker();
+                const localOnly = locList
+                    .filter(lp => !shownWithItems.has(periodIdentityOf(lp)) && !incList.some(ip => (lp.id && ip.id === lp.id) || samePeriodDates(ip, lp)))
+                    .map(lp => ({ key: localKeyOf(lp), jobNumber, name: existing.name, period: lp }));
+                return { items, localOnly };
+            };
+
+            const analyzeMerge = (incoming, currentStaff, overrides = {}) => {
                 const currentMap = {};
                 currentStaff.forEach(s => {
                     const key = String(s.jobNumber || '').trim();
@@ -4183,6 +4273,8 @@
 
                 const added = [];
                 const updated = [];
+                const periodItems = [];
+                const localOnlyPeriods = [];
                 const fieldsToCompare = Object.keys(FIELD_NAMES_AR);
 
                 incoming.forEach(inc => {
@@ -4217,6 +4309,11 @@
                             }
                         });
 
+                        // الفترات المؤرخة تُقارَن سجلاً سجلاً بمعرّفها، لا كحقل
+                        const periodDiff = analyzeMergePeriods(inc, existing, key, overrides);
+                        periodDiff.items.forEach(it => periodItems.push(it));
+                        periodDiff.localOnly.forEach(lo => localOnlyPeriods.push(lo));
+
                         if (employeeChanges.length > 0) {
                             updated.push({
                                 name: existing.name,
@@ -4229,7 +4326,7 @@
                     }
                 });
 
-                return { added, updated, totalIncoming: incoming.length };
+                return { added, updated, periods: periodItems, localOnlyPeriods, totalIncoming: incoming.length };
             };
 
                         const commitBundleMetadata = (bundle) => {
@@ -4275,8 +4372,8 @@
             // فتح النافذة والضغط (وصول مزامنة سحابية مثلاً)، فالاشتقاق الآن يضمن مطابقة الفروقات
             // للبيانات الحيّة. والمفاتيح (رقم، حقل) تبقى صالحة، وأي فرق جديد لم يره المستخدم
             // لا مفتاح له في selection فلا يُطبَّق — الاتجاه الآمن.
-            const handleSmartMerge = (incoming, selection = null, addSelection = null) => {
-                const analysis = analyzeMerge(incoming, staff);
+            const handleSmartMerge = (incoming, selection = null, addSelection = null, periodSelection = null, clearDaysSelection = null) => {
+                const analysis = analyzeMerge(incoming, staff, dailyStatusOverrides);
                 const isPicked = (jobNumber, field) =>
                     selection === null ? true : !!selection[`${jobNumber}::${field}`];
                 const isAddPicked = (jobNumber) =>
@@ -4309,6 +4406,53 @@
                     if (touched) existing.lastModified = new Date().toISOString();
                 });
 
+                // 3. الفترات المؤرخة — المؤشَّرة وحدها. الحالة (status) لا تُلمس هنا: لها سطرها في الحقول أعلاه،
+                //    وعرض الموقف يقرأ الفترات قبلها. والتحليل مبني على البيانات الحيّة لحظة الضغط، فمفتاح فترة
+                //    لم يرها المستخدم لا يطابق شيئاً في الاختيار فلا تُطبَّق — الاتجاه الآمن.
+                const isPeriodPicked = (key) => !!(periodSelection && periodSelection[key]);
+                let appliedPeriodCount = 0;
+                let clearedOverrides = null;
+                analysis.periods.forEach(item => {
+                    if (!isPeriodPicked(item.key)) return;
+                    const existing = currentMap[item.jobNumber];
+                    if (!existing) return;
+                    const current = periodsOf(existing);
+                    const ip = { ...item.incoming };
+                    // اختيار فترة الملف يستبدل المتداخلة معها كاملةً — اصطلاح saveQuickPeriod نفسه، والمستبدَل ظاهر مشطوباً
+                    // في النافذة قبل الضغط. المطابقة بالهوية لا بالمعرّف وحده: فترة قديمة بلا معرّف لا تجرّ غيرها معها
+                    const replaced = item.overlaps.map(periodIdentityOf);
+                    const kept = current.filter(p => !replaced.includes(periodIdentityOf(p)));
+                    let nextPeriods;
+                    if (item.kind === 'changed') {
+                        // تحلّ محلّ نظيرها المحلي وتحتفظ بمعرّفه، فلا يتغيّر ما يشير إلى الفترة لديك
+                        const twinIdentity = periodIdentityOf(item.local);
+                        const replacement = { ...ip, id: item.local.id || ip.id };
+                        nextPeriods = kept.some(p => periodIdentityOf(p) === twinIdentity)
+                            ? kept.map(p => periodIdentityOf(p) === twinIdentity ? replacement : p)
+                            : [...kept, replacement];
+                    } else {
+                        // وكذلك: حالة قديمة بلا فترات تُرحَّل صراحةً حتى اليوم السابق للفترة، فلا تُفقَد صمتاً
+                        const legacySeed = (item.legacy && current.length === 0 && item.legacy !== ip.type)
+                            ? [{ id: 'per_legacy_' + Date.now() + '_' + item.jobNumber, type: item.legacy, from: '1900-01-01', to: localDateStr(new Date(ip.from).getTime() - 86400000), note: 'ترحيل تلقائي من الحالة القديمة' }]
+                            : [];
+                        nextPeriods = [...legacySeed, ...kept, ip];
+                    }
+                    existing.statusPeriods = nextPeriods;
+                    existing.lastModified = new Date().toISOString();
+                    appliedPeriodCount++;
+                    // الأيام المثبَّتة المخالفة داخل الفترة: التثبيت اليومي يسبق الفترة، فبلا مسحها لا تظهر الفترة فيها
+                    if (item.days.length > 0 && clearDaysSelection && clearDaysSelection[item.key]) {
+                        if (!clearedOverrides) clearedOverrides = { ...dailyStatusOverrides };
+                        item.days.forEach(({ date }) => {
+                            if (!clearedOverrides[date]) return;
+                            const day = { ...clearedOverrides[date] };
+                            delete day[item.empId];
+                            if (Object.keys(day).length === 0) delete clearedOverrides[date];
+                            else clearedOverrides[date] = day;
+                        });
+                    }
+                });
+
                 // دمج القائمتين مع بقية الموظفين الذين لم يتغيروا
                 const mergedList = [];
                 staff.forEach(s => {
@@ -4326,6 +4470,10 @@
                 // الدمج لا يستبدل بيانات الحضور المحلية دفعة واحدة: كان هنا استدعاءٌ يطبّق حزمة الملف كلها
                 // (المواقف اليومية والإجازات الزمنية والإضافي والعطل ومرجع المناوبات) مهما اختار المستخدم.
                 // الاستبدال الكامل وحده يطبّق الحزمة كلها.
+                if (clearedOverrides) {
+                    setDailyStatusOverrides(clearedOverrides);
+                    safeStorage.setItem('dailyStatusOverrides', JSON.stringify(clearedOverrides));
+                }
                 const sorted = sortByUnit(mergedList);
                 setStaff(sorted);
                 safeStorage.setItem('staffData', JSON.stringify(sorted));
@@ -4338,7 +4486,7 @@
                 const touchedEmployees = analysis.updated.filter(
                     upd => upd.changes.some(ch => isPicked(upd.jobNumber, ch.field))
                 ).length;
-                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}`);
+                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}\n• الفترات المؤرخة المطبَّقة: ${appliedPeriodCount}`);
             };
 
             const handleFullOverwrite = (incoming) => {
@@ -4571,19 +4719,22 @@
             const mergeKeyOf = (jobNumber, field) => `${jobNumber}::${field}`;
             const mergeAnalysis = useMemo(() => {
                 if (!showMergeModal || !Array.isArray(incomingStaff) || incomingStaff.length === 0) return null;
-                return analyzeMerge(incomingStaff, staff);
-            }, [showMergeModal, incomingStaff, staff]);
+                return analyzeMerge(incomingStaff, staff, dailyStatusOverrides);
+            }, [showMergeModal, incomingStaff, staff, dailyStatusOverrides]);
 
             // الحقول المؤشَّرة للتطبيق، والموظفون الجدد المؤشَّرون للإضافة (كلٌّ على حدة:
             // ملف زميل قديم قد يحمل من حُذف عمداً، أو من أُضيف عنده بالخطأ)
             const [mergeSelection, setMergeSelection] = useState({});
             const [mergeAddSelection, setMergeAddSelection] = useState({});
+            // الفترات المؤرخة المؤشَّرة للتطبيق، ومسح الأيام المثبَّتة المخالفة داخل كل فترة — مفتاحهما مفتاح الفترة
+            const [mergePeriodSelection, setMergePeriodSelection] = useState({});
+            const [mergeClearDaysSelection, setMergeClearDaysSelection] = useState({});
 
             // الافتراض مبني على الخطر لا على المساواة: ما كان حقله الحالي فارغاً كسبٌ خالص
             // فيُؤشَّر تلقائياً، وما له قيمة حالية — تعارضاً كان أو فرقاً إملائياً — يحتاج قرار
             // المستخدم فيبقى بلا تأشير. افتراض قابل للتجاوز في كل سطر، لا قاعدة تمنع.
             React.useEffect(() => {
-                if (!mergeAnalysis) { setMergeSelection({}); setMergeAddSelection({}); return; }
+                if (!mergeAnalysis) { setMergeSelection({}); setMergeAddSelection({}); setMergePeriodSelection({}); setMergeClearDaysSelection({}); return; }
                 const initial = {};
                 mergeAnalysis.updated.forEach(upd => {
                     upd.changes.forEach(ch => { initial[mergeKeyOf(upd.jobNumber, ch.field)] = ch.wasEmpty; });
@@ -4593,6 +4744,17 @@
                 const adds = {};
                 mergeAnalysis.added.forEach(emp => { adds[String(emp.jobNumber || '').trim()] = true; });
                 setMergeAddSelection(adds);
+                // الفترة: الجديدة التي لا تمسّ شيئاً لديك، والكسب (ملاحظة أو تأكيد مباشرة كان فارغاً لديك) ⇒ مؤشَّرة؛
+                // ما يتداخل مع فترة أو حالة غير مؤرخة، أو يخالف يوماً مثبَّتاً، أو يغيّر فترة لديك ⇒ بلا تأشير.
+                // مسح الأيام المخالفة مؤشَّر افتراضاً: لا أثر له ما لم تُؤشَّر فترته، وبدونه لا تظهر الفترة في تلك الأيام.
+                const periodPicks = {};
+                const clearPicks = {};
+                mergeAnalysis.periods.forEach(item => {
+                    periodPicks[item.key] = item.kind === 'new' || item.gainOnly;
+                    if (item.days.length > 0) clearPicks[item.key] = true;
+                });
+                setMergePeriodSelection(periodPicks);
+                setMergeClearDaysSelection(clearPicks);
             }, [mergeAnalysis]);
 
             const toggleMergeAdd = (jobNumber) =>
@@ -4615,6 +4777,25 @@
             const mergeTotalChanges = useMemo(
                 () => mergeAnalysis ? mergeAnalysis.updated.reduce((n, u) => n + u.changes.length, 0) : 0,
                 [mergeAnalysis]
+            );
+            const toggleMergePeriod = (key) =>
+                setMergePeriodSelection(prev => ({ ...prev, [key]: !prev[key] }));
+            const setMergePeriodScope = (value) => {
+                if (!mergeAnalysis) return;
+                const next = {};
+                mergeAnalysis.periods.forEach(item => { next[item.key] = value; });
+                setMergePeriodSelection(next);
+            };
+            const toggleMergeClearDays = (key) =>
+                setMergeClearDaysSelection(prev => ({ ...prev, [key]: !prev[key] }));
+            const mergePeriodCount = useMemo(
+                () => Object.values(mergePeriodSelection).filter(Boolean).length,
+                [mergePeriodSelection]
+            );
+            // تعارضات لم يؤشّرها المستخدم: تُذكر في العدّاد صراحةً، فلا تُفوَّت فترة ينتظر نقلها لأنها بدأت بلا تأشير
+            const mergePendingPeriodWarnings = useMemo(
+                () => mergeAnalysis ? mergeAnalysis.periods.filter(item => !(item.kind === 'new' || item.gainOnly) && !mergePeriodSelection[item.key]).length : 0,
+                [mergeAnalysis, mergePeriodSelection]
             );
 
             // إلغاء الدمج دون تطبيق شيء: من ✕ في رأس النافذة، ومن «إلغاء العملية» في ذيلها، ومن Esc.
@@ -11337,6 +11518,12 @@
                                                 <span>✏️ عدد الموظفين الذين سيتم تحديث حقولهم:</span>
                                                 <span className="text-amber-700">{analysis.updated.length} موظف</span>
                                             </div>
+                                            {analysis.periods.length > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span>📅 فترات مؤرخة مختلفة بين الملف وجهازك:</span>
+                                                    <span className="text-amber-700">{analysis.periods.length} فترة</span>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between">
                                                 <span>🔒 إجمالي الموظفين في الملف المرفوع:</span>
                                                 <span>{incomingStaff.length} موظف</span>
@@ -11438,15 +11625,104 @@
                                                     </div>
                                                 </div>
                                             )}
+                                            {analysis.periods.length > 0 && (
+                                                <div className="mt-3 bg-white bg-opacity-80 p-3 rounded-xl border border-indigo-100 font-normal space-y-2 text-right">
+                                                    <div className="flex justify-between items-center flex-wrap gap-1.5 border-b pb-1.5">
+                                                        <span className="font-black text-indigo-950">📅 الفترات المؤرخة المختلفة:</span>
+                                                        <span className="flex items-center gap-1.5">
+                                                            <button type="button" onClick={() => setMergePeriodScope(true)}
+                                                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100">كل الفترات</button>
+                                                            <button type="button" onClick={() => setMergePeriodScope(false)}
+                                                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">لا فترة</button>
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                                                        الدمج لا يحذف فترة مؤرخة لم تختر استبدالها. المؤشَّر تلقائياً: ما لا يمسّ شيئاً لديك. <span className="text-amber-700">الشارة البرتقالية تنبيه</span>: الفترة تمسّ فترة أو حالة أو أياماً مثبَّتة لديك، فلا تُطبَّق ما لم تؤشّرها — واختيار فترة الملف يستبدل ما يظهر مشطوباً.
+                                                    </div>
+                                                    {/* بلا سقف تمرير داخلي: جسم النافذة يُمرَّر أصلاً، والتمرير المتداخل يحبس العجلة داخل صندوق صغير */}
+                                                    <div className="space-y-1.5 pl-1 text-[11px]">
+                                                        {analysis.periods.map(item => {
+                                                            const picked = !!mergePeriodSelection[item.key];
+                                                            const ip = item.incoming;
+                                                            const badge = item.kind === 'new' ? 'فترة جديدة'
+                                                                : item.kind === 'changed' ? (item.gainOnly ? 'إضافة إلى فترة لديك' : 'فترة لديك بتفاصيل مختلفة')
+                                                                : item.kind === 'overlap' ? (item.overlaps.some(p => p.type === ip.type) ? 'قد تكون مسجَّلة مرتين' : 'تتداخل مع فترة لديك')
+                                                                : item.kind === 'legacy' ? 'فوق حالة غير مؤرخة لديك'
+                                                                : 'تخالف أياماً مثبَّتة لديك';
+                                                            const calm = item.kind === 'new' || item.gainOnly;
+                                                            const replacedClass = picked ? 'line-through text-rose-500 bg-rose-50 px-1 rounded' : 'text-slate-700 bg-slate-100 px-1 rounded';
+                                                            return (
+                                                                <div key={item.key} className="border-b border-dashed border-indigo-100 pb-1.5 last:border-b-0 last:pb-0">
+                                                                    <label data-period-key={item.key}
+                                                                        className={`flex justify-between flex-wrap gap-1 items-center cursor-pointer rounded px-1 py-0.5 ${picked ? 'bg-indigo-50/60' : ''}`}>
+                                                                        <span className="flex items-center flex-wrap gap-1.5 text-gray-600">
+                                                                            <input type="checkbox" checked={picked}
+                                                                                onChange={() => toggleMergePeriod(item.key)}
+                                                                                className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
+                                                                            <span className="font-bold text-indigo-900">👤 {item.name} ({item.jobNumber})</span>
+                                                                            <span className={`text-[9px] font-bold px-1 rounded ${calm ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'}`}>{badge}</span>
+                                                                        </span>
+                                                                        <span className={`font-semibold px-1 rounded ${picked ? 'text-emerald-700 bg-emerald-50' : 'text-slate-700 bg-slate-100'}`}>
+                                                                            {periodRangeJsx(ip)}{ip.note ? ` — ${ip.note}` : ''}
+                                                                        </span>
+                                                                    </label>
+                                                                    {(item.local || item.overlaps.length > 0 || item.legacy) && (
+                                                                        <div className="pr-6 text-[10px] text-slate-500 space-y-0.5">
+                                                                            {item.local && !item.gainOnly && (
+                                                                                <div>لديك: <span className={replacedClass}>{periodRangeJsx(item.local)}{item.local.note ? ` — ${item.local.note}` : ''}</span></div>
+                                                                            )}
+                                                                            {item.overlaps.map(p => (
+                                                                                <div key={periodIdentityOf(p)}>لديك: <span className={replacedClass}>{periodRangeJsx(p)}{p.note ? ` — ${p.note}` : ''}</span></div>
+                                                                            ))}
+                                                                            {item.legacy && (
+                                                                                <div>لديك حالة غير مؤرخة: <span className="text-slate-700 bg-slate-100 px-1 rounded">«{item.legacy}»</span>
+                                                                                    {picked && <span> — {item.legacy !== ip.type ? <React.Fragment>تبقى حتى <bdi dir="ltr">{localDateStr(new Date(ip.from).getTime() - 86400000)}</bdi> ثم تحكم فترة الملف</React.Fragment> : 'تُحصر في تواريخ هذه الفترة'}</span>}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                    {item.days.length > 0 && (
+                                                                        <label data-clear-days-key={item.key}
+                                                                            className={`flex items-start gap-1.5 pr-6 mt-0.5 text-[10px] transition-opacity ${picked ? 'text-slate-600 cursor-pointer' : 'text-slate-600 opacity-50'}`}>
+                                                                            <input type="checkbox" checked={!!mergeClearDaysSelection[item.key]} disabled={!picked}
+                                                                                onChange={() => toggleMergeClearDays(item.key)}
+                                                                                className="w-3 h-3 mt-0.5 accent-indigo-600" />
+                                                                            <span>امسح {arabicManualDaysCount(item.days.length)} لديك داخل الفترة ({item.days.slice(0, 3).map((d, di) => <React.Fragment key={d.date}>{di > 0 ? '، ' : ''}<bdi dir="ltr">{d.date}</bdi> «{d.value}»</React.Fragment>)}{item.days.length > 3 ? ' وغيرها' : ''}) — بدونه تبقى تلك الأيام على حالها ولا تظهر الفترة فيها</span>
+                                                                        </label>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="border-t pt-1.5 text-[11px] font-black text-indigo-900">
+                                                        المؤشَّر للتطبيق: {mergePeriodCount} من {analysis.periods.length}
+                                                        {mergePeriodCount === 0 && <span className="text-slate-500 font-bold"> — لن تتغيّر أي فترة لديك</span>}
+                                                        {mergePendingPeriodWarnings > 0 && <span className="text-amber-700 font-bold"> — {mergePendingPeriodWarnings} عليها تنبيه وغير مؤشَّرة، فلن تُطبَّق ما لم تؤشّرها</span>}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {analysis.localOnlyPeriods.length > 0 && (
+                                                <div className="mt-3 bg-white bg-opacity-80 p-3 rounded-xl border border-indigo-100 font-normal space-y-1 text-right text-[11px]">
+                                                    <div className="font-black text-indigo-950 border-b pb-1.5">📌 تنبيه: فترات مؤرخة لديك غير موجودة في الملف — تبقى كما هي:</div>
+                                                    <div className="max-h-28 overflow-y-auto space-y-0.5">
+                                                        {analysis.localOnlyPeriods.map(lo => (
+                                                            <div key={lo.key} data-local-only-key={lo.key} className="text-slate-600">
+                                                                👤 {lo.name} ({lo.jobNumber}): {periodRangeJsx(lo.period)}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* الخيار الأول: الدمج الذكي */}
                                         {(() => {
-                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0;
+                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0;
                                             return (
                                         <button
                                             disabled={nothingToDo}
-                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection)}
+                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection, mergePeriodSelection, mergeClearDaysSelection)}
                                             className={`w-full text-right p-4 rounded-2xl border-2 transition group flex gap-4 items-start ${
                                                 nothingToDo
                                                     ? 'border-slate-100 opacity-50 cursor-not-allowed'
@@ -11459,7 +11735,7 @@
                                                 <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
                                                     {nothingToDo
                                                         ? 'لم تختر شيئاً بعد — أشِّر ما تريد نقله من الملف أعلاه.'
-                                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس.`}
+                                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}${mergePeriodCount > 0 ? ` ويطبّق ${mergePeriodCount} فترة مؤرخة` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس.`}
                                                 </p>
                                             </div>
                                         </button>
