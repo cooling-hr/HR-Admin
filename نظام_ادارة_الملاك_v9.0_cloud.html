@@ -4323,7 +4323,9 @@
                     mergedList.push(emp);
                 });
 
-                commitBundleMetadata(incomingBundle);
+                // الدمج لا يستبدل بيانات الحضور المحلية دفعة واحدة: كان هنا استدعاءٌ يطبّق حزمة الملف كلها
+                // (المواقف اليومية والإجازات الزمنية والإضافي والعطل ومرجع المناوبات) مهما اختار المستخدم.
+                // الاستبدال الكامل وحده يطبّق الحزمة كلها.
                 const sorted = sortByUnit(mergedList);
                 setStaff(sorted);
                 safeStorage.setItem('staffData', JSON.stringify(sorted));
@@ -4331,6 +4333,7 @@
                 setShowWelcome(false);
                 setShowMergeModal(false);
                 setIncomingStaff([]);
+                setIncomingBundle(null);
                 
                 const touchedEmployees = analysis.updated.filter(
                     upd => upd.changes.some(ch => isPicked(upd.jobNumber, ch.field))
@@ -4345,6 +4348,7 @@
                 setShowWelcome(false);
                 setShowMergeModal(false);
                 setIncomingStaff([]);
+                setIncomingBundle(null);
                 alert(`⚠️ تم استبدال قاعدة البيانات بالكامل بنجاح. إجمالي الموظفين الحاليين: ${incoming.length} موظف.`);
             };
 
@@ -4619,6 +4623,7 @@
             const cancelMerge = () => {
                 setShowMergeModal(false);
                 setIncomingStaff([]);
+                setIncomingBundle(null);
             };
             // المستمع يُسجَّل حين تنفتح النافذة ويُزال حين تُغلق، فلا يلتقط Esc في غيرها.
             // (مستمع Esc العام لمنتقي التاريخ لا يوقف انتشار الحدث، فيتعايشان.)
@@ -5201,6 +5206,9 @@
             
             const loadFile = (e) => {
                 const file = e.target.files[0];
+                // تصفير الحقل بعد التقاط الملف: المتصفح لا يُطلق حدث الاختيار لملف مطابق لقيمة الحقل الحالية،
+                // فمن ألغى نافذة المزامنة ثم أعاد اختيار ملفه نفسه لم يكن يحدث له شيء. كائن الملف يبقى صالحاً.
+                e.target.value = '';
                 if (!file) return;
                 
                 // تحديد نوع الملف
@@ -5224,41 +5232,14 @@
                                 incomingList = data;
                             } else if (data && (Array.isArray(data.staff) || Array.isArray(data.staffData))) {
                                 incomingList = data.staff || data.staffData;
-                                if (data.officialHolidaysList && Array.isArray(data.officialHolidaysList)) {
-                                    setOfficialHolidays(data.officialHolidaysList);
-                                    safeStorage.setItem('officialHolidaysList', JSON.stringify(data.officialHolidaysList));
-                                }
-                                if (data.hourlyLeaveRecords) {
-                                    setHourlyLeaveRecords(data.hourlyLeaveRecords);
-                                    safeStorage.setItem('hourlyLeaveRecords', JSON.stringify(data.hourlyLeaveRecords));
-                                }
-                                if (data.overtimeHoursRecords) {
-                                    setOvertimeHoursRecords(data.overtimeHoursRecords);
-                                    safeStorage.setItem('overtimeHoursRecords', JSON.stringify(data.overtimeHoursRecords));
-                                }
-                                if (data.dailyStatusOverrides) {
-                                    setDailyStatusOverrides(data.dailyStatusOverrides);
-                                    safeStorage.setItem('dailyStatusOverrides', JSON.stringify(data.dailyStatusOverrides));
-                                }
-                                if (data.shiftAnchorDate) {
-                                    setAnchorDate(data.shiftAnchorDate);
-                                    safeStorage.setItem('shiftAnchorDate', data.shiftAnchorDate);
-                                }
-                                if (data.threeShiftAnchorSquad) {
-                                    setThreeShiftAnchorSquad(data.threeShiftAnchorSquad);
-                                    safeStorage.setItem('threeShiftAnchorSquad', data.threeShiftAnchorSquad);
-                                }
-                                if (data.twoShiftAnchorSquad) {
-                                    setTwoShiftAnchorSquad(data.twoShiftAnchorSquad);
-                                    safeStorage.setItem('twoShiftAnchorSquad', data.twoShiftAnchorSquad);
-                                }
-                                if (data.dataEntryOperator) {
-                                    setDataEntryOperator(data.dataEntryOperator);
-                                    safeStorage.setItem('dataEntryOperator', data.dataEntryOperator);
-                                }
                             } else {
                                 throw new Error('تنسيق ملف النسخة الاحتياطية غير مدعوم');
                             }
+                            // لا يُطبَّق شيء من الملف لحظة اختياره: تُحفظ حزمته كما هي وتنفتح نافذة المزامنة.
+                            // كان هذا الفرع يستبدل هنا — قبل أي نقرة — المواقفَ اليومية والإجازات الزمنية والإضافي
+                            // والعطل ومرجع المناوبات ومُدخل البيانات، والإلغاء لا يُرجع منها شيئاً.
+                            // الحزمة لا يطبّقها كاملةً إلا «الاستبدال الكامل»؛ وكل إغلاق للنافذة يُسقطها.
+                            setIncomingBundle(Array.isArray(data) ? null : data);
                             setIncomingStaff(incomingList);
                             setShowMergeModal(true);
                         } catch (err) {
@@ -5543,6 +5524,8 @@
                         });
                         
                         // تمرير البيانات لواجهة المزامنة والدمج الذكي
+                        // ملف Excel لا يحمل بيانات حضور: لا حزمة يطبّقها «الاستبدال الكامل»
+                        setIncomingBundle(null);
                         setIncomingStaff(loadedStaff);
                         setShowMergeModal(true);
                     } catch (error) {
@@ -11561,12 +11544,15 @@
                                                 let incomingList = [];
                                                 if (Array.isArray(data)) {
                                                     incomingList = data;
-                                                } else if (data && Array.isArray(data.staff)) {
-                                                    incomingList = data.staff;
+                                                } else if (data && (Array.isArray(data.staff) || Array.isArray(data.staffData))) {
+                                                    incomingList = data.staff || data.staffData;
                                                 } else {
                                                     throw new Error('تنسيق البيانات غير صحيح');
                                                 }
                                                 
+                                                // اللصق كالملف: تُحفظ الحزمة ولا يُطبَّق منها شيء قبل الاختيار. كان اللصق يُسقطها كلياً،
+                                                // فيخرج «الاستبدال الكامل» منه ناقصاً: موظفون بلا مواقفهم اليومية ولا إجازاتهم الزمنية.
+                                                setIncomingBundle(Array.isArray(data) ? null : data);
                                                 setIncomingStaff(incomingList);
                                                 setShowMergeModal(true);
                                                 setShowPasteModal(false);
