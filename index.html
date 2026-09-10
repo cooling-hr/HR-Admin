@@ -393,6 +393,37 @@
             body.printing-matrix .matrix-print-only tr { page-break-inside: avoid !important; }
         }
 
+        /* طباعة بطاقة المنتسب من نافذة المعاينة (زرّ «طباعة بطاقة المنتسب A4»).
+           النافذة مرسومة عبر ReactDOM.createPortal مباشرة تحت body، خارج #root —
+           فيُخفى كل ما سواها من أبناء body بـdisplay:none، وتبقى البطاقة وحدها على الورق.
+
+           تاريخ ما قبله يستحق الذكر، لأن الحلّين السابقين يبدوان معقولين:
+           1) كانت النافذة داخل main، وقاعدة الطباعة العامة تُخفي main بـdisplay:none،
+              ولا يلغي حفيدٌ display:none على سلفه ⇒ صفحة بيضاء (مقيس: شاشة 1400×900، ورق 0×0).
+           2) عزلٌ بـvisibility كطباعة المصفوفة أظهرها، لكن المحتوى المخفي بقي شاغلاً مساحته
+              فأخرج ورقة ثانية بيضاء. وإلغاء ارتفاع الغلاف أسقطها، غير أنه اعتمد على شرط خفيّ
+              (ألّا يكون بين الغلاف والبطاقة سلفٌ مُموضَع أو محوَّل) يكسره تعديل قادم بصمت.
+              نبّهت إليه مراجعة Codex، فحلّ الـportal محلّ الحلّين من الجذر. */
+        @media print {
+            /* كل أبناء body المباشرين لا #root وحدها: ما تُلحقه شيفرات أخرى بـbody (منتقي
+               التاريخ مثلاً) كان سيُطبع مع البطاقة — نبّهت إليه مراجعة Codex. والبطاقة ابن
+               مباشر لـbody (portal)، وقاعدتها أدناه أعلى تحديداً (0,2,1 مقابل 0,1,1) فتبقى. */
+            body.printing-card > * { display: none !important; }
+            body.printing-card .card-print-root {
+                display: block !important;
+                position: static !important;
+                background: white !important;
+                backdrop-filter: none !important;
+                padding: 0 !important;
+            }
+            /* النافذة على الشاشة محدودة الارتفاع وقابلة للتمرير؛ على الورق تُفرَد كاملة */
+            body.printing-card .card-print-root,
+            body.printing-card .card-print-root * {
+                overflow: visible !important;
+                max-height: none !important;
+            }
+        }
+
         /* تنسيق طباعة بطاقة الموظف A4 */
         @media print {
             body.printing-profile #root > *:not(.profile-print-only) {
@@ -2820,6 +2851,11 @@
             }, [unifiedResultsRaw, staff]);
             const [editingEmployee, setEditingEmployee] = useState(null);
             const [selectedEmployeeCard, setSelectedEmployeeCard] = useState(null);
+            // صنف عزل طباعة البطاقة لا يبقى بعد إغلاقها: لو بقي (متصفح لم يُطلق afterprint)
+            // لطبّق عزله على أي طباعة تالية — المصفوفة مثلاً — فأخرجها بيضاء.
+            React.useEffect(() => {
+                if (!selectedEmployeeCard) document.body.classList.remove('printing-card');
+            }, [selectedEmployeeCard]);
             
             // دالة تنسيق رقم الهاتف النقال لتسهيل القراءة (مثل: 0420 329 0770)
             const formatMobileNumber = (phoneStr) => {
@@ -4310,6 +4346,32 @@
                         if (el) el.remove();
                     }, 1000);
                 }, 250);
+            };
+
+            // طباعة بطاقة المنتسب من نافذة المعاينة. الصنف على body يفعّل عزل طباعتها
+            // (body.printing-card في CSS)، والنافذة نفسها مرسومة خارج #root عبر portal.
+            //
+            // لا مؤقّت لنزع الصنف، عمداً: الصنف لا أثر له إلا تحت @media print، فبقاؤه على
+            // الشاشة غير ضارّ؛ أما نزعه بمؤقّت فيسابق الطباعة في المتصفحات التي لا تحجب عند
+            // window.print (سفاري على الهاتف) فتعود المعاينة بيضاء — نبّهت إليه مراجعة Codex.
+            // يُنزع عند afterprint، وعند إغلاق النافذة (التأثير بجوار selectedEmployeeCard)
+            // احتياطاً لمتصفح لا يُطلقه، فلا يبقى الصنف ليُفسد طباعة تالية.
+            // ملاحظة: printProfileCard أدناه لا يستدعيها شيء في الملف، ولا صلة لها بهذا الزرّ.
+            const printEmployeeCard = () => {
+                // البطاقة التي نُقر زرّها بعينها، لا «أيّ بطاقة مفتوحة» عند حلول التأجيل:
+                // لو أُغلقت وفُتحت أخرى خلاله، لطبع الاستعلامُ العام البطاقةَ الجديدة بنداءٍ قديم.
+                const cardEl = document.querySelector('.card-print-root');
+                const onAfterPrint = () => document.body.classList.remove('printing-card');
+                document.body.classList.add('printing-card');
+                window.addEventListener('afterprint', onAfterPrint, { once: true });
+                // تأجيل قصير يضمن أن يرى محرّك الطباعة الصنف مطبَّقاً. وإن انفصلت البطاقة عن
+                // الصفحة خلاله (أُغلقت) تُلغى الطباعة ويُزال مستمعها، فلا يبقى مستمع يتيم.
+                // (البندان نبّهت إليهما مراجعة Codex في جولتيها الثانية والثالثة.)
+                setTimeout(() => {
+                    if (cardEl && cardEl.isConnected) { window.print(); return; }
+                    window.removeEventListener('afterprint', onAfterPrint);
+                    document.body.classList.remove('printing-card');
+                }, 50);
             };
 
             const printProfileCard = (emp) => {
@@ -7596,8 +7658,10 @@
                                 
             
             {/* نافذة معاينة وبطاقة ملف المنتسب الفاخرة قبل الطباعة مع خيارات التخصيص والإخفاء والإظهار التلقائي التنسيق */}
-            {selectedEmployeeCard && (
-                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 print:p-0 print:bg-white print:static">
+            {/* عبر portal تحت body لا داخل main: قاعدة الطباعة العامة تُخفي main، ولا يلغي
+                حفيدٌ display:none على سلفه — فكانت البطاقة تُطبع بيضاء. انظر body.printing-card. */}
+            {selectedEmployeeCard && ReactDOM.createPortal((
+                <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 print:p-0 print:bg-white print:static card-print-root">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-fadeInUp print:shadow-none print:border-none print:max-w-none print:w-full print:max-h-none">
                         {/* Header */}
                         <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 p-5 sm:p-6 text-white relative flex justify-between items-start flex-shrink-0 print:bg-none print:text-slate-900 print:border-b-2 print:border-slate-800 print:p-4">
@@ -7787,7 +7851,7 @@
                                         إغلاق
                                     </button>
                                     <button
-                                        onClick={() => window.print()}
+                                        onClick={printEmployeeCard}
                                         className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold rounded-xl text-xs shadow-lg transition flex items-center gap-2"
                                     >
                                         <span>🖨️</span>
@@ -7798,7 +7862,7 @@
                         </div>
                     </div>
                 </div>
-            )}
+            ), document.body)}
 
             {/* نافذة تسجيل الدخول للنظام بالتعرف التلقائي الذكي على كلمة المرور */}
             {showLoginModal && (
