@@ -926,6 +926,25 @@
             // لا إلى «الكل» دائماً، وهو ما يتوقّعه من يعمل على «المناوبين» طوال اليوم
             const [sectionMemory, setSectionMemory] = useState({});
             const [showUserMenu, setShowUserMenu] = useState(false);
+            // ارتفاع الشريط الملتصق الحيّ في متغيّر CSS على <html> (--nav-h). يتغيّر بين سطر وسطرين
+            // (صفّ شرائح الملاك أو شاشات الدوام) ويلتفّ على الشاشات الضيّقة، فكل ما يلتصق تحته أو
+            // يقفز مراعياً له يقرؤه من هنا لا من رقم ثابت. رقمان ثابتان (68px للوحة الوحدات و150px
+            // للقفز إلى وحدة) دفنا 37px من اللوحة و20px من عنوان الوحدة حين صار الشريط سطرين — مقيس.
+            const navHeightObserverRef = React.useRef(null);
+            const observeNavHeight = React.useCallback((el) => {
+                if (navHeightObserverRef.current) {
+                    navHeightObserverRef.current.disconnect();
+                    navHeightObserverRef.current = null;
+                }
+                if (!el) return;
+                const publish = () => document.documentElement.style.setProperty(
+                    '--nav-h', Math.round(el.getBoundingClientRect().height) + 'px');
+                publish();
+                if (typeof ResizeObserver !== 'undefined') {
+                    navHeightObserverRef.current = new ResizeObserver(publish);
+                    navHeightObserverRef.current.observe(el);
+                }
+            }, []);
 
             const [selectedUnit, setSelectedUnit] = useState(null);
             const [selectedSafetyIds, setSelectedSafetyIds] = useState([]);
@@ -7452,7 +7471,7 @@
                             setView(target);
                         };
                         return (
-                    <nav className="bg-white/85 backdrop-blur-md border-b border-slate-100 sticky top-0 z-30 px-4 py-3 shadow-sm transition-all duration-300">
+                    <nav ref={observeNavHeight} className="bg-white/85 backdrop-blur-md border-b border-slate-100 sticky top-0 z-30 px-4 py-3 shadow-sm transition-all duration-300">
                         {/* flex-wrap لا overflow-x مع scrollbar-none: الشريط المخفيّ تمريره
                             كان يُخفي أواخر التبويبات بلا أي دليل عليها. الالتفاف لا يُخفي شيئاً أبداً. */}
                         {/* لا role="tablist": نمط التبويبات يقتضي aria-controls وتنقّلاً بالأسهم
@@ -7506,6 +7525,52 @@
                                             }`}
                                         >
                                             {x.l}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        {/* ============================================================= */}
+                        {/* شاشات «الدوام والموقف» الثلاث — داخل الشريط الملتصق نفسه، في   */}
+                        {/* مكان شرائح «الملاك» تماماً، فتبقى ظاهرة مع التمرير مثلها.      */}
+                        {/*                                                               */}
+                        {/* كانت داخل main فتمرّ مع الصفحة وتختفي: تقرير الفترة بثلاثين     */}
+                        {/* موظفاً طوله 2479px، فمن في آخر الجدول يصعد أولاً ليبدّل الشاشة. */}
+                        {/* ولم تُثبَّت تحت الشريط بمسافة ثابتة: ارتفاعه يتغيّر حين يلتفّ    */}
+                        {/* إلى سطرين (62px ⇒ 107px عند 820px). داخله لا مسافة تُحسب أصلاً. */}
+                        {/*                                                               */}
+                        {/* القاعدة باقية: ما يُدخَل إليه ويُخرَج منه وجهةٌ مكانها الشريط؛  */}
+                        {/* وما يبدّل شكل العرض وحده يبقى مفتاحاً داخل شاشته — ولهذا تبقى   */}
+                        {/* «مصفوفة الأيام» مفتاحاً داخل تقرير الفترة لا وجهة رابعة.        */}
+                        {/* ============================================================= */}
+                        {activeSection && activeSection.id === 'attendance' && (
+                            <div className="max-w-7xl mx-auto flex flex-wrap gap-1.5 pr-1 mt-2 pt-2 border-t border-slate-100"
+                                 aria-label="شاشات الدوام والموقف">
+                                {[
+                                    // الاسم كاملاً عمداً: هذه الشاشة مكان سلّة العمل الإضافي، ومن يبحث عن
+                                    // الكشف الشهري يبحث عنه باسمه. قُصِّر مرة لأنه كان يلتفّ داخل صندوق ضيّق،
+                                    // ثم أُزيل الصندوق — والتلميح وحده لا يظهر على الهاتف واللوح.
+                                    { v: 'roster', icon: '👥', l: 'ملاك الوحدات والعمل الإضافي',
+                                      t: 'ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد للشعبة' },
+                                    { v: 'dailyStatus', icon: '📋', l: 'الموقف اليومي',
+                                      t: 'موقف وحضور اليوم' },
+                                    { v: 'periodReport', icon: '📊', l: 'تقرير الفترة',
+                                      t: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' }
+                                ].map(sub => {
+                                    const on = unitsSubView === sub.v;
+                                    return (
+                                        <button
+                                            key={sub.v}
+                                            onClick={() => setUnitsSubView(sub.v)}
+                                            aria-pressed={on ? 'true' : 'false'}
+                                            title={sub.t}
+                                            className={`px-3 py-1 rounded-full text-[11px] md:text-xs font-bold whitespace-nowrap border transition cursor-pointer ${
+                                                on
+                                                    ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
+                                                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                                            }`}
+                                        >
+                                            {sub.icon} {sub.l}
                                         </button>
                                     );
                                 })}
@@ -9405,44 +9470,8 @@
 
 ) : view === 'units' ? (
                             <div className="space-y-5 animate-fadeIn">
-                                {/* ============================================================= */}
-                                {/* شاشات القسم الثلاث — وجهات نظيرة بلغة الشرائح نفسها في الأعلى. */}
-                                {/*                                                               */}
-                                {/* كانت اثنتين فقط، و«تقرير الفترة» يُدخَل إليه من زرّ داخل      */}
-                                {/* الموقف اليومي ويُخرَج بزرّ عودة في ترويسته. فكان الشريط يعرض   */}
-                                {/* خيارين مطفأين معاً وأنت في الثالث — أي يقول «أنت في لا مكان». */}
-                                {/*                                                               */}
-                                {/* القاعدة: ما يُدخَل إليه ويُخرَج منه وجهةٌ مكانها الشريط؛ وما   */}
-                                {/* يبدّل شكل العرض وحده يبقى مفتاحاً داخل شاشته — ولهذا تبقى     */}
-                                {/* «مصفوفة الأيام» مفتاحاً داخل تقرير الفترة لا وجهة رابعة.      */}
-                                {/* ============================================================= */}
-                                <div className="flex flex-wrap gap-1.5 no-print" aria-label="شاشات الدوام والموقف">
-                                    {[
-                                        { v: 'roster', icon: '👥', l: 'ملاك الوحدات',
-                                          t: 'ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد للشعبة' },
-                                        { v: 'dailyStatus', icon: '📋', l: 'الموقف اليومي',
-                                          t: 'موقف وحضور اليوم' },
-                                        { v: 'periodReport', icon: '📊', l: 'تقرير الفترة',
-                                          t: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' }
-                                    ].map(sub => {
-                                        const on = unitsSubView === sub.v;
-                                        return (
-                                            <button
-                                                key={sub.v}
-                                                onClick={() => setUnitsSubView(sub.v)}
-                                                aria-pressed={on ? 'true' : 'false'}
-                                                title={sub.t}
-                                                className={`px-3 py-1 rounded-full text-[11px] md:text-xs font-bold whitespace-nowrap border transition cursor-pointer ${
-                                                    on
-                                                        ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
-                                                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                                                }`}
-                                            >
-                                                {sub.icon} {sub.l}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                {/* شاشات القسم الثلاث انتقلت إلى الشريط الملتصق أعلى الصفحة، في صفّ تحت
+                                    الأقسام، فتبقى ظاهرة مع التمرير — انظر «شاشات الدوام والموقف» داخل <nav>. */}
 
                                 {unitsSubView === 'dailyStatus' ? (
                                     <div className="space-y-5 animate-fadeIn">
@@ -9670,8 +9699,10 @@
                                             </div>
                                         </div>
 
-                                        {/* شريط أزرار الفلترة الكحلي والذهبي المجمد أسفل شريط التنقل الرئيسي تماماً (Sticky Header top-[68px]) */}
-                                        <div className="sticky top-[68px] z-20 bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border-2 border-slate-700 space-y-2 no-print my-4 transition-all">
+                                        {/* شريط أزرار الفلترة الكحلي والذهبي المجمد أسفل شريط التنقل الرئيسي تماماً.
+                                            موضعه من ارتفاع الشريط الحيّ (--nav-h) + 6px، لا من top-[68px] الثابتة:
+                                            حين صار الشريط سطرين في هذا القسم دفن ذلك الرقم 37px من اللوحة خلفه (مقيس). */}
+                                        <div id="dailyUnitPickerBar" className="sticky z-20 bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border-2 border-slate-700 space-y-2 no-print my-4 transition-all" style={{ top: 'calc(var(--nav-h, 62px) + 6px)' }}>
                                             <div className="flex justify-between items-center px-1">
                                                 <span className="text-xs md:text-sm font-black text-amber-400 flex items-center gap-1.5">
                                                     <span>📍</span>
@@ -9710,8 +9741,14 @@
                                                                         window.scrollTo({ top: 340, behavior: 'smooth' });
                                                                         return;
                                                                     }
-                                                                    // 150 بكسل تعويضاً عن الشريطين المثبّتين أعلى الصفحة (التنقل + شريط الوحدات)
-                                                                    const target = section.getBoundingClientRect().top + window.scrollY - 150;
+                                                                    // الإزاحة تُقاس لحظة النقر: الشريط الملتصق + لوحة الوحدات + فراغ. كانت 150 ثابتة،
+                                                                    // واللوحة وحدها تنتهي عند 170 (68 + ارتفاعها 102) — فكان عنوان الوحدة يُدفن 20px
+                                                                    // حتى قبل أن يصير الشريط سطرين (مقيس).
+                                                                    const navEl = document.querySelector('nav');
+                                                                    const pickerEl = document.getElementById('dailyUnitPickerBar');
+                                                                    const offset = (navEl ? navEl.getBoundingClientRect().height : 62)
+                                                                                 + (pickerEl ? pickerEl.getBoundingClientRect().height : 102) + 18;
+                                                                    const target = section.getBoundingClientRect().top + window.scrollY - offset;
                                                                     window.scrollTo({ top: target > 0 ? target : 0, behavior: 'smooth' });
                                                                 }, 60);
                                                             }}
