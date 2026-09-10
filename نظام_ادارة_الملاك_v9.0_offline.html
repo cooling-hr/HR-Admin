@@ -3503,8 +3503,9 @@
             const samePeriodExtras = (a, b) => (a.note || '') === (b.note || '') && !!a.confirmedReturn === !!b.confirmedReturn;
             // نطاق الفترة بالكلمات، والتواريخ معزولة الاتجاه: التاريخ بعد نصّ عربي يُعرض مقلوباً (23-08-2026)
             // والسهم بين تاريخين يشير بصرياً إلى البداية، فيُقرأ النطاق معكوساً
+            // ويبقى التاريخ في سطر واحد: المتصفح قد يكسره عند الشرطة («2026-» في آخر السطر و«09-03» في أوله)
             const periodRangeJsx = (p) => (
-                <React.Fragment>«{p.type}» من <bdi dir="ltr">{p.from}</bdi> {p.to ? <React.Fragment>إلى <bdi dir="ltr">{p.to}</bdi></React.Fragment> : '(مستمرة)'}</React.Fragment>
+                <React.Fragment>«{p.type}» من <bdi dir="ltr" className="whitespace-nowrap">{p.from}</bdi> {p.to ? <React.Fragment>إلى <bdi dir="ltr" className="whitespace-nowrap">{p.to}</bdi></React.Fragment> : '(مستمرة)'}</React.Fragment>
             );
             // عدد الأيام المثبَّتة بصيغته العربية بعد «امسح»: يوماً واحداً، يومين، 3–10 أيام، 11 فأكثر يوماً
             const arabicManualDaysCount = (n) => n === 1 ? 'يوماً واحداً مثبَّتاً'
@@ -3575,11 +3576,132 @@
                 return { items, localOnly };
             };
 
+            // ===== المواقف اليومية والساعات الزمنية والإضافي والعطل والإعدادات في الدمج =====
+            // حاجة صاحب النظام: تبقى الفترات المؤرخة كلها، ويُجلب من الملف تحديث المواقف حتى اليوم.
+            // سطر لكل موظف في كل يوم يجمع الموقف وساعاته الزمنية والإضافي: الساعات الزمنية لا تُحتسب إلا مع موقف «إجازة زمنية».
+            // المطابقة بالرقم الوظيفي: المعرّفات الداخلية قد تختلف بين الجهازين، وقيمة لموظف لا يطابقه أحد تُتجاهل.
+            // الافتراض: ما في الملف وليس لديك مؤشَّر؛ ما لديك بقيمة أخرى بلا تأشير؛ ويوم تغطيه فترة مؤرخة لديك بنوع آخر
+            // بلا تأشير مع تنبيه — فالموقف اليومي يتقدّم على الفترة في العرض. العطل تُضاف ولا تُحذف، والإعدادات العامة
+            // بلا تأشير. لا يُحذف شيء لديك. المعرّفات والتواريخ القادمة من الملف لا تُستعمل مفاتيح في كائن عادي.
+            const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+            const ownKey = (obj, k) => !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, k);
+            const ATTENDANCE_PARTS = [['status', 'dailyStatusOverrides'], ['hourly', 'hourlyLeaveRecords'], ['overtime', 'overtimeHoursRecords']];
+            // قيمة صالحة: الموقف نصّ غير فارغ؛ والساعات عدد موجب لا يتجاوز 24 — ملف مشوَّه لا يُكتب في بيانات الحضور
+            const isValidAttendanceValue = (part, value) => part === 'status'
+                ? (typeof value === 'string' && value.trim() !== '' && value.length <= 60)
+                : ((typeof value === 'number' || (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value.trim()))) && Number(value) > 0 && Number(value) <= 24);
+            const analyzeMergeAttendance = (bundle, incomingList, currentStaff, local) => {
+                const result = { items: [], holidays: [], settings: [], orphans: 0, ambiguous: 0, invalid: 0, forNewEmployees: 0 };
+                if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return result;
+                // موظفو الحزمة نفسها أولاً: مفاتيح قيمها معرّفاتهم
+                const staffList = Array.isArray(bundle.staff) ? bundle.staff : Array.isArray(bundle.staffData) ? bundle.staffData : incomingList;
+                const jobByIncomingId = new Map();
+                (Array.isArray(staffList) ? staffList : []).forEach(e => {
+                    if (e && e.id !== undefined && e.id !== null) jobByIncomingId.set(String(e.id), String(e.jobNumber || '').trim());
+                });
+                // رقم وظيفي مكرر لدى الجهاز: لا يُعرف لمن تذهب القيمة، فلا تُعرض ولا تُطبَّق
+                const localByJob = new Map();
+                const ambiguousJobs = new Set();
+                currentStaff.forEach(e => {
+                    const k = String(e.jobNumber || '').trim();
+                    if (!k) return;
+                    if (localByJob.has(k)) ambiguousJobs.add(k); else localByJob.set(k, e);
+                });
+                const byKey = new Map();
+                ATTENDANCE_PARTS.forEach(([part, bundleKey]) => {
+                    const records = bundle[bundleKey];
+                    if (!records || typeof records !== 'object' || Array.isArray(records)) return;
+                    Object.keys(records).forEach(date => {
+                        const row = records[date];
+                        if (!ISO_DAY.test(date) || !row || typeof row !== 'object' || Array.isArray(row)) return;
+                        Object.keys(row).forEach(incomingId => {
+                            const value = row[incomingId];
+                            if (value === undefined || value === null || value === '') return;
+                            if (!isValidAttendanceValue(part, value)) { result.invalid++; return; }
+                            const job = jobByIncomingId.get(incomingId);
+                            if (!job) { result.orphans++; return; }
+                            if (ambiguousJobs.has(job)) { result.ambiguous++; return; }
+                            const emp = localByJob.get(job);
+                            // موظف في الملف ليس لديك: قيمه تأتي معه إن اختير إضافته
+                            if (!emp) { result.forNewEmployees++; return; }
+                            const key = `${date}::${job}`;
+                            if (!byKey.has(key)) byKey.set(key, { key, date, jobNumber: job, empId: emp.id, name: emp.name, emp, incoming: {}, local: {} });
+                            byKey.get(key).incoming[part] = value;
+                        });
+                    });
+                });
+                const localRecords = { status: local.overrides, hourly: local.hourly, overtime: local.overtime };
+                byKey.forEach(item => {
+                    let differs = false;
+                    let allSame = true;
+                    Object.keys(item.incoming).forEach(part => {
+                        const recs = localRecords[part];
+                        const lv = ownKey(recs, item.date) && ownKey(recs[item.date], item.empId) ? recs[item.date][item.empId] : undefined;
+                        if (lv === undefined || lv === null || lv === '') { allSame = false; return; }
+                        item.local[part] = lv;
+                        if (String(lv) !== String(item.incoming[part])) { differs = true; allSame = false; }
+                    });
+                    if (allSame) return;
+                    // الموقف اليومي وحده يُخفي الفترة في العرض؛ الساعات وحدها لا، فتتبع قاعدتي «ليس لديك» و«قيمة أخرى»
+                    const period = getActivePeriod(item.emp, item.date);
+                    const againstPeriod = !!period && item.incoming.status !== undefined && item.incoming.status !== period.type;
+                    item.period = againstPeriod ? period : null;
+                    item.kind = againstPeriod ? 'period' : differs ? 'different' : 'new';
+                    result.items.push(item);
+                });
+                result.items.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+                const localHolidays = new Set(Array.isArray(local.holidays) ? local.holidays : []);
+                const seenHolidays = new Set();
+                (Array.isArray(bundle.officialHolidaysList) ? bundle.officialHolidaysList : []).forEach(d => {
+                    if (typeof d !== 'string' || !ISO_DAY.test(d) || localHolidays.has(d) || seenHolidays.has(d)) return;
+                    seenHolidays.add(d);
+                    result.holidays.push({ key: `holiday::${d}`, date: d });
+                });
+                result.holidays.sort((a, b) => a.date < b.date ? -1 : 1);
+                const localAnchor = { shiftAnchorDate: local.anchorDate || '', threeShiftAnchorSquad: local.threeShiftAnchorSquad || '', twoShiftAnchorSquad: local.twoShiftAnchorSquad || '' };
+                const anchorValues = {};
+                Object.keys(localAnchor).forEach(k => {
+                    if (typeof bundle[k] === 'string' && bundle[k] && bundle[k] !== localAnchor[k]) anchorValues[k] = bundle[k];
+                });
+                if (Object.keys(anchorValues).length > 0) {
+                    result.settings.push({ key: 'setting::anchor', kind: 'anchor', local: localAnchor, incoming: { ...localAnchor, ...anchorValues }, values: anchorValues });
+                }
+                if (typeof bundle.dataEntryOperator === 'string' && bundle.dataEntryOperator && bundle.dataEntryOperator !== (local.dataEntryOperator || '')) {
+                    result.settings.push({ key: 'setting::operator', kind: 'operator', local: local.dataEntryOperator || '', incoming: bundle.dataEntryOperator,
+                                           values: { dataEntryOperator: bundle.dataEntryOperator } });
+                }
+                return result;
+            };
+            // عدد الساعات بصيغته العربية: ساعة واحدة، ساعتان، 3–10 ساعات، 11 فأكثر ساعة
+            const arabicHoursCount = (value) => {
+                const n = Number(value);
+                return n === 1 ? 'ساعة واحدة' : n === 2 ? 'ساعتان' : (n >= 3 && n <= 10) ? `${n} ساعات` : `${n} ساعة`;
+            };
+            // قيمة سطر المواقف: الموقف وساعاته بين قوسين — «إجازة زمنية» (3 ساعات)؛ والساعات وحدها تُسمّى بنوعها
+            const attendanceValueJsx = (parts) => {
+                const hours = [];
+                if (parts.hourly !== undefined) hours.push({ label: 'زمنية', value: parts.hourly });
+                if (parts.overtime !== undefined) hours.push({ label: 'إضافي', value: parts.overtime });
+                const hoursText = hours.length === 1 && parts.status !== undefined
+                    ? arabicHoursCount(hours[0].value)
+                    : hours.map(h => `${h.label}: ${arabicHoursCount(h.value)}`).join('، ');
+                return (
+                    <React.Fragment>
+                        {parts.status !== undefined ? <span>«{parts.status}»</span> : <span>ساعات</span>}
+                        {hours.length > 0 && <span> ({hoursText})</span>}
+                    </React.Fragment>
+                );
+            };
+
             const analyzeMerge = (incoming, currentStaff, overrides = {}) => {
-                const currentMap = {};
+                // رقم وظيفي يحمله أكثر من موظف لديك: لا يُعرف أيّهم المقصود، فلا يُقارَن ولا يُعدّ جديداً — تُنبّه إليه النافذة.
+                // والفهرس بلا نموذج أولي: رقم مثل «constructor» لا يطابق خاصية موروثة
+                const currentMap = Object.create(null);
+                const ambiguousJobs = new Set();
                 currentStaff.forEach(s => {
                     const key = String(s.jobNumber || '').trim();
-                    if (key) currentMap[key] = s;
+                    if (!key) return;
+                    if (key in currentMap) ambiguousJobs.add(key); else currentMap[key] = s;
                 });
 
                 const added = [];
@@ -3592,6 +3714,7 @@
                     const key = String(inc.jobNumber || '').trim();
                     if (!key) return;
 
+                    if (ambiguousJobs.has(key)) return;
                     const existing = currentMap[key];
                     if (!existing) {
                         added.push(inc);
@@ -3637,7 +3760,7 @@
                     }
                 });
 
-                return { added, updated, periods: periodItems, localOnlyPeriods, totalIncoming: incoming.length };
+                return { added, updated, periods: periodItems, localOnlyPeriods, ambiguousJobs: Array.from(ambiguousJobs), totalIncoming: incoming.length };
             };
 
                         const commitBundleMetadata = (bundle) => {
@@ -3683,23 +3806,42 @@
             // فتح النافذة والضغط، فالاشتقاق الآن يضمن مطابقة الفروقات للبيانات الحيّة. والمفاتيح
             // (رقم، حقل) تبقى صالحة، وأي فرق جديد لم يره المستخدم لا مفتاح له في selection
             // فلا يُطبَّق — الاتجاه الآمن.
-            const handleSmartMerge = (incoming, selection = null, addSelection = null, periodSelection = null, clearDaysSelection = null) => {
+            const handleSmartMerge = (incoming, selection = null, addSelection = null, periodSelection = null, clearDaysSelection = null, attendanceSelection = null) => {
                 const analysis = analyzeMerge(incoming, staff, dailyStatusOverrides);
                 const isPicked = (jobNumber, field) =>
                     selection === null ? true : !!selection[`${jobNumber}::${field}`];
                 const isAddPicked = (jobNumber) =>
                     addSelection === null ? true : !!addSelection[String(jobNumber || '').trim()];
 
-                const currentMap = {};
+                // رقم وظيفي يحمله أكثر من موظف لديك: كان كلٌّ منهم يُستبدل بنسخة آخرهم عند بناء القائمة — فيضيع أحدهم ويتكرر
+                // الآخر. المكرر يُخرج من الفهرس، فلا يُحدَّث ويبقى كل موظف كما هو؛ والتحليل لا يعرض له فروقاً أصلاً
+                const currentMap = Object.create(null);
+                const duplicateJobs = new Set();
                 staff.forEach(s => {
                     const key = String(s.jobNumber || '').trim();
-                    if (key) currentMap[key] = { ...s };
+                    if (!key) return;
+                    if (key in currentMap) duplicateJobs.add(key); else currentMap[key] = { ...s };
                 });
+                duplicateJobs.forEach(key => { delete currentMap[key]; });
 
-                // 1. الموظفون الجدد تماماً — المؤشَّرون منهم وحدهم
-                const newEmployees = analysis.added
-                    .filter(inc => isAddPicked(inc.jobNumber))
-                    .map(inc => ({ ...inc, lastModified: new Date().toISOString() }));
+                // 1. الموظفون الجدد تماماً — المؤشَّرون منهم وحدهم. المعرّف مفتاح المواقف والساعات، ومعرّف موظف جديد قد يطابق
+                //    معرّف موظف لديك (رقمه الوظيفي صُحِّح في جهاز آخر مثلاً): فيُعطى معرّفاً جديداً، فلا يتشارك موظفان بياناتهما.
+                const pickedAdds = analysis.added.filter(inc => isAddPicked(inc.jobNumber));
+                const takenIds = new Set(staff.map(s => String(s.id)));
+                const bundleIdUses = new Map();
+                pickedAdds.forEach(inc => {
+                    const b = inc.id === undefined || inc.id === null ? '' : String(inc.id);
+                    if (b) bundleIdUses.set(b, (bundleIdUses.get(b) || 0) + 1);
+                });
+                const bundleIdOfNew = new Map();
+                const newEmployees = pickedAdds.map(inc => {
+                    const bundleId = inc.id === undefined || inc.id === null ? '' : String(inc.id);
+                    let id = bundleId && !takenIds.has(bundleId) ? inc.id : null;
+                    while (id === null || takenIds.has(String(id))) id = 'emp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+                    takenIds.add(String(id));
+                    bundleIdOfNew.set(String(id), bundleId);
+                    return { ...inc, id, lastModified: new Date().toISOString() };
+                });
 
                 // 2. تحديث الموظفين الحاليين — الحقول المؤشَّرة وحدها.
                 //    lastModified لا يُلمس إن لم يُطبَّق شيء على الموظف، وإلا بدا معدَّلاً بلا تعديل.
@@ -3781,10 +3923,81 @@
                 // الدمج لا يستبدل بيانات الحضور المحلية دفعة واحدة: كان هنا استدعاءٌ يطبّق حزمة الملف كلها
                 // (المواقف اليومية والإجازات الزمنية والإضافي والعطل ومرجع المناوبات) مهما اختار المستخدم.
                 // الاستبدال الكامل وحده يطبّق الحزمة كلها.
-                if (clearedOverrides) {
-                    setDailyStatusOverrides(clearedOverrides);
-                    safeStorage.setItem('dailyStatusOverrides', JSON.stringify(clearedOverrides));
+                // 4. المواقف اليومية والساعات الزمنية والإضافي والعطل والإعدادات — المؤشَّرة وحدها، ولا يُحذف شيء لديك.
+                //    تُطبَّق بعد مسح أيام الفترات: موقف وارد اختير صراحةً ليوم مُسح يُكتب فوقه.
+                const attendance = analyzeMergeAttendance(incomingBundle, incoming, staff, {
+                    overrides: dailyStatusOverrides, hourly: hourlyLeaveRecords, overtime: overtimeHoursRecords, holidays: officialHolidays,
+                    anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator
+                });
+                const isAttendancePicked = (key) => !!(attendanceSelection && attendanceSelection[key]);
+                let nextOverrides = clearedOverrides;
+                let nextHourly = null;
+                let nextOvertime = null;
+                let nextHolidays = null;
+                let appliedAttendanceCount = 0;
+                const writeDay = (records, date, empId, value) => {
+                    records[date] = { ...(ownKey(records, date) ? records[date] : {}), [empId]: value };
+                };
+                attendance.items.forEach(item => {
+                    if (!isAttendancePicked(item.key)) return;
+                    if (item.incoming.status !== undefined) {
+                        if (!nextOverrides) nextOverrides = { ...dailyStatusOverrides };
+                        writeDay(nextOverrides, item.date, item.empId, item.incoming.status);
+                    }
+                    if (item.incoming.hourly !== undefined) {
+                        if (!nextHourly) nextHourly = { ...hourlyLeaveRecords };
+                        writeDay(nextHourly, item.date, item.empId, item.incoming.hourly);
+                    }
+                    if (item.incoming.overtime !== undefined) {
+                        if (!nextOvertime) nextOvertime = { ...overtimeHoursRecords };
+                        writeDay(nextOvertime, item.date, item.empId, item.incoming.overtime);
+                    }
+                    appliedAttendanceCount++;
+                });
+                // موظفون جدد اختير إضافتهم: قيمهم في الملف تأتي معهم — لا شيء لديهم يُستبدل. تُقرأ بمعرّف الموظف في الملف
+                // وتُكتب بمعرّفه لديك (جديد إن طابق معرّفه موظفاً لديك)؛ ومعرّف مكرر بين الجدد لا تُنقل قيمه لأيٍّ منهم.
+                newEmployees.forEach(emp => {
+                    const bundleId = bundleIdOfNew.get(String(emp.id)) || '';
+                    if (!bundleId || (bundleIdUses.get(bundleId) || 0) > 1) return;
+                    ATTENDANCE_PARTS.forEach(([part, bundleKey]) => {
+                        const records = incomingBundle ? incomingBundle[bundleKey] : null;
+                        if (!records || typeof records !== 'object' || Array.isArray(records)) return;
+                        Object.keys(records).forEach(date => {
+                            const row = records[date];
+                            if (!ISO_DAY.test(date) || !row || typeof row !== 'object' || Array.isArray(row) || !ownKey(row, bundleId)) return;
+                            const value = row[bundleId];
+                            if (!isValidAttendanceValue(part, value)) return;
+                            if (part === 'status') {
+                                if (!nextOverrides) nextOverrides = { ...dailyStatusOverrides };
+                                writeDay(nextOverrides, date, emp.id, value);
+                            } else if (part === 'hourly') {
+                                if (!nextHourly) nextHourly = { ...hourlyLeaveRecords };
+                                writeDay(nextHourly, date, emp.id, value);
+                            } else {
+                                if (!nextOvertime) nextOvertime = { ...overtimeHoursRecords };
+                                writeDay(nextOvertime, date, emp.id, value);
+                            }
+                            appliedAttendanceCount++;
+                        });
+                    });
+                });
+                const pickedHolidays = attendance.holidays.filter(h => isAttendancePicked(h.key)).map(h => h.date);
+                if (pickedHolidays.length > 0) {
+                    nextHolidays = Array.from(new Set([...(officialHolidays || []), ...pickedHolidays])).sort();
+                    appliedAttendanceCount += pickedHolidays.length;
                 }
+                // كل ما تغيّر من بيانات الحضور يُحفظ مرة واحدة: مسح أيام الفترات، ثم المواقف والساعات والعطل المختارة
+                commitBundleMetadata({
+                    dailyStatusOverrides: nextOverrides || undefined,
+                    hourlyLeaveRecords: nextHourly || undefined,
+                    overtimeHoursRecords: nextOvertime || undefined,
+                    officialHolidaysList: nextHolidays || undefined
+                });
+                attendance.settings.forEach(s => {
+                    if (!isAttendancePicked(s.key)) return;
+                    commitBundleMetadata(s.values);
+                    appliedAttendanceCount++;
+                });
                 const sorted = sortByUnit(mergedList);
                 setStaff(sorted);
                 safeStorage.setItem('staffData', JSON.stringify(sorted));
@@ -3797,7 +4010,7 @@
                 const touchedEmployees = analysis.updated.filter(
                     upd => upd.changes.some(ch => isPicked(upd.jobNumber, ch.field))
                 ).length;
-                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}\n• الفترات المؤرخة المطبَّقة: ${appliedPeriodCount}`);
+                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}\n• الفترات المؤرخة المطبَّقة: ${appliedPeriodCount}\n• المواقف والعطل والإعدادات المطبَّقة: ${appliedAttendanceCount}`);
             };
 
             const handleFullOverwrite = (incoming) => {
@@ -4107,6 +4320,47 @@
             const mergePendingPeriodWarnings = useMemo(
                 () => mergeAnalysis ? mergeAnalysis.periods.filter(item => !(item.kind === 'new' || item.gainOnly) && !mergePeriodSelection[item.key]).length : 0,
                 [mergeAnalysis, mergePeriodSelection]
+            );
+            // المواقف والعطل والإعدادات من حزمة الملف — تُحلَّل على البيانات الحيّة كالحقول والفترات
+            const mergeAttendance = useMemo(() => {
+                if (!showMergeModal || !incomingBundle) return null;
+                return analyzeMergeAttendance(incomingBundle, incomingStaff, staff, {
+                    overrides: dailyStatusOverrides, hourly: hourlyLeaveRecords, overtime: overtimeHoursRecords, holidays: officialHolidays,
+                    anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator
+                });
+            }, [showMergeModal, incomingBundle, incomingStaff, staff, dailyStatusOverrides, hourlyLeaveRecords, overtimeHoursRecords,
+                officialHolidays, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator]);
+            const [mergeAttendanceSelection, setMergeAttendanceSelection] = useState({});
+            // ما ليس لديك مؤشَّر، والعطل الجديدة مؤشَّرة؛ ما يخالف قيمة أو فترة لديك، والإعدادات العامة، بلا تأشير
+            React.useEffect(() => {
+                if (!mergeAttendance) { setMergeAttendanceSelection({}); return; }
+                const picks = {};
+                mergeAttendance.items.forEach(item => { picks[item.key] = item.kind === 'new'; });
+                mergeAttendance.holidays.forEach(h => { picks[h.key] = true; });
+                mergeAttendance.settings.forEach(s => { picks[s.key] = false; });
+                setMergeAttendanceSelection(picks);
+            }, [mergeAttendance]);
+            const toggleMergeAttendance = (key) =>
+                setMergeAttendanceSelection(prev => ({ ...prev, [key]: !prev[key] }));
+            const setMergeAttendanceScope = (scope, value) => {
+                if (!mergeAttendance) return;
+                setMergeAttendanceSelection(prev => {
+                    const next = { ...prev };
+                    if (scope === 'all') {
+                        [...mergeAttendance.items, ...mergeAttendance.holidays, ...mergeAttendance.settings].forEach(x => { next[x.key] = value; });
+                    } else {
+                        mergeAttendance.items.forEach(item => { if (item.date === scope) next[item.key] = value; });
+                    }
+                    return next;
+                });
+            };
+            const mergeAttendanceCount = useMemo(
+                () => Object.values(mergeAttendanceSelection).filter(Boolean).length,
+                [mergeAttendanceSelection]
+            );
+            const mergeAttendancePending = useMemo(
+                () => mergeAttendance ? mergeAttendance.items.filter(item => item.kind !== 'new' && !mergeAttendanceSelection[item.key]).length : 0,
+                [mergeAttendance, mergeAttendanceSelection]
             );
 
             // إلغاء الدمج دون تطبيق شيء: من ✕ في رأس النافذة، ومن «إلغاء العملية» في ذيلها، ومن Esc.
@@ -10429,6 +10683,18 @@
                                                     <span className="text-amber-700">{analysis.periods.length} فترة</span>
                                                 </div>
                                             )}
+                                            {mergeAttendance && mergeAttendance.items.length > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span>📋 مواقف يومية وساعات مختلفة بين الملف وجهازك:</span>
+                                                    <span className="text-amber-700">{mergeAttendance.items.length} موقف</span>
+                                                </div>
+                                            )}
+                                            {analysis.ambiguousJobs && analysis.ambiguousJobs.length > 0 && (
+                                                <div className="flex justify-between gap-2">
+                                                    <span>⚠️ أرقام وظيفية مكررة لديك لم تُقارَن (صحّحها ثم أعد المزامنة):</span>
+                                                    <span className="text-amber-700">{analysis.ambiguousJobs.join('، ')}</span>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between">
                                                 <span>🔒 إجمالي الموظفين في الملف المرفوع:</span>
                                                 <span>{incomingStaff.length} موظف</span>
@@ -10511,11 +10777,31 @@
                                                                                     ? <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1 rounded" title="نفس النص بصيغة كتابة مختلفة (مسافة أو همزة أو تاء مربوطة)">إملائي</span>
                                                                                     : !ch.wasEmpty && <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1 rounded">تعارض</span>}
                                                                             </span>
-                                                                            {/* الشطب يظهر فقط على ما سيُستبدَل فعلاً — غير المؤشَّر باقٍ كما هو */}
-                                                                            <span className="font-semibold">
-                                                                                <span className={picked ? 'line-through text-rose-500 bg-rose-50 px-1 rounded' : 'text-slate-700 bg-slate-100 px-1 rounded'}>{ch.oldVal}</span>
-                                                                                <span className="mx-1">{picked ? '←' : '⇠'}</span>
-                                                                                <span className={picked ? 'text-emerald-700 bg-emerald-50 px-1 rounded' : 'text-slate-400 bg-slate-50 px-1 rounded line-through'}>{ch.newVal}</span>
+                                                                            {/* الكلمات تقول ما سيحدث، لا الشطب وحده: قُرئ الشطب الرمادي على قيمة الملف «تأشيراً»، وسُئل عن الأحمر «أهو الإلغاء؟» */}
+                                                                            <span className="font-semibold flex flex-wrap items-center gap-1">
+                                                                                {picked ? (
+                                                                                    ch.wasEmpty ? (
+                                                                                        <React.Fragment>
+                                                                                            <span className="text-[10px] font-bold text-emerald-700">يُضاف:</span>
+                                                                                            <span className="text-emerald-700 bg-emerald-50 px-1 rounded">{ch.newVal}</span>
+                                                                                        </React.Fragment>
+                                                                                    ) : (
+                                                                                        <React.Fragment>
+                                                                                            <span className="text-[10px] font-bold text-rose-700">يُستبدل:</span>
+                                                                                            <span className="line-through text-rose-500 bg-rose-50 px-1 rounded">{ch.oldVal}</span>
+                                                                                            <span className="mx-0.5">←</span>
+                                                                                            <span className="text-[10px] font-bold text-emerald-700">يُطبَّق:</span>
+                                                                                            <span className="text-emerald-700 bg-emerald-50 px-1 rounded">{ch.newVal}</span>
+                                                                                        </React.Fragment>
+                                                                                    )
+                                                                                ) : (
+                                                                                    <React.Fragment>
+                                                                                        <span className="text-[10px] font-bold text-slate-600">يبقى:</span>
+                                                                                        <span className="text-slate-700 bg-slate-100 px-1 rounded">{ch.oldVal}</span>
+                                                                                        <span className="text-[10px] font-bold text-slate-400 mr-1">— في الملف (لن يُطبَّق):</span>
+                                                                                        <span className="text-slate-500 bg-slate-50 px-1 rounded">{ch.newVal}</span>
+                                                                                    </React.Fragment>
+                                                                                )}
                                                                             </span>
                                                                         </label>
                                                                     );
@@ -10542,7 +10828,7 @@
                                                         </span>
                                                     </div>
                                                     <div className="text-[10px] font-bold text-slate-500 leading-relaxed">
-                                                        الدمج لا يحذف فترة مؤرخة لم تختر استبدالها. المؤشَّر تلقائياً: ما لا يمسّ شيئاً لديك. <span className="text-amber-700">الشارة البرتقالية تنبيه</span>: الفترة تمسّ فترة أو حالة أو أياماً مثبَّتة لديك، فلا تُطبَّق ما لم تؤشّرها — واختيار فترة الملف يستبدل ما يظهر مشطوباً.
+                                                        الدمج لا يحذف فترة مؤرخة لم تختر استبدالها. المؤشَّر تلقائياً: ما لا يمسّ شيئاً لديك. <span className="text-amber-700">الشارة البرتقالية تنبيه</span>: الفترة تمسّ فترة أو حالة أو أياماً مثبَّتة لديك، فلا تُطبَّق ما لم تؤشّرها — واختيار فترة الملف يحذف من جهازك ما يظهر تحتها «سيُحذف».
                                                     </div>
                                                     {/* بلا سقف تمرير داخلي: جسم النافذة يُمرَّر أصلاً، والتمرير المتداخل يحبس العجلة داخل صندوق صغير */}
                                                     <div className="space-y-1.5 pl-1 text-[11px]">
@@ -10574,14 +10860,14 @@
                                                                     {(item.local || item.overlaps.length > 0 || item.legacy) && (
                                                                         <div className="pr-6 text-[10px] text-slate-500 space-y-0.5">
                                                                             {item.local && !item.gainOnly && (
-                                                                                <div>لديك: <span className={replacedClass}>{periodRangeJsx(item.local)}{item.local.note ? ` — ${item.local.note}` : ''}</span></div>
+                                                                                <div>{picked ? <span className="font-bold text-rose-700">سيُحذف من جهازك:</span> : 'لديك (يبقى):'} <span className={replacedClass}>{periodRangeJsx(item.local)}{item.local.note ? ` — ${item.local.note}` : ''}</span></div>
                                                                             )}
                                                                             {item.overlaps.map(p => (
-                                                                                <div key={periodIdentityOf(p)}>لديك: <span className={replacedClass}>{periodRangeJsx(p)}{p.note ? ` — ${p.note}` : ''}</span></div>
+                                                                                <div key={periodIdentityOf(p)}>{picked ? <span className="font-bold text-rose-700">سيُحذف من جهازك:</span> : 'لديك (يبقى):'} <span className={replacedClass}>{periodRangeJsx(p)}{p.note ? ` — ${p.note}` : ''}</span></div>
                                                                             ))}
                                                                             {item.legacy && (
                                                                                 <div>لديك حالة غير مؤرخة: <span className="text-slate-700 bg-slate-100 px-1 rounded">«{item.legacy}»</span>
-                                                                                    {picked && <span> — {item.legacy !== ip.type ? <React.Fragment>تبقى حتى <bdi dir="ltr">{localDateStr(new Date(ip.from).getTime() - 86400000)}</bdi> ثم تحكم فترة الملف</React.Fragment> : 'تُحصر في تواريخ هذه الفترة'}</span>}
+                                                                                    {picked && <span> — {item.legacy !== ip.type ? <React.Fragment>تبقى حتى <bdi dir="ltr" className="whitespace-nowrap">{localDateStr(new Date(ip.from).getTime() - 86400000)}</bdi> ثم تحكم فترة الملف</React.Fragment> : 'تُحصر في تواريخ هذه الفترة'}</span>}
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -10592,7 +10878,7 @@
                                                                             <input type="checkbox" checked={!!mergeClearDaysSelection[item.key]} disabled={!picked}
                                                                                 onChange={() => toggleMergeClearDays(item.key)}
                                                                                 className="w-3 h-3 mt-0.5 accent-indigo-600" />
-                                                                            <span>امسح {arabicManualDaysCount(item.days.length)} لديك داخل الفترة ({item.days.slice(0, 3).map((d, di) => <React.Fragment key={d.date}>{di > 0 ? '، ' : ''}<bdi dir="ltr">{d.date}</bdi> «{d.value}»</React.Fragment>)}{item.days.length > 3 ? ' وغيرها' : ''}) — بدونه تبقى تلك الأيام على حالها ولا تظهر الفترة فيها</span>
+                                                                            <span>امسح {arabicManualDaysCount(item.days.length)} لديك داخل الفترة (<span className={picked && mergeClearDaysSelection[item.key] ? 'line-through text-rose-500' : ''}>{item.days.slice(0, 3).map((d, di) => <React.Fragment key={d.date}>{di > 0 ? '، ' : ''}<bdi dir="ltr" className="whitespace-nowrap">{d.date}</bdi> «{d.value}»</React.Fragment>)}{item.days.length > 3 ? ' وغيرها' : ''}</span>){picked && mergeClearDaysSelection[item.key] ? <span className="font-bold text-rose-700"> — ستُمسح عند التطبيق</span> : ' — بدونه تبقى تلك الأيام على حالها ولا تظهر الفترة فيها'}</span>
                                                                         </label>
                                                                     )}
                                                                 </div>
@@ -10619,15 +10905,131 @@
                                                     </div>
                                                 </div>
                                             )}
+                                            {mergeAttendance && (mergeAttendance.items.length + mergeAttendance.holidays.length + mergeAttendance.settings.length) > 0 && (
+                                                <div className="mt-3 bg-white bg-opacity-80 p-3 rounded-xl border border-indigo-100 font-normal space-y-2 text-right">
+                                                    <div className="flex justify-between items-center flex-wrap gap-1.5 border-b pb-1.5">
+                                                        <span className="font-black text-indigo-950">📋 المواقف اليومية والساعات الزمنية والإضافي:</span>
+                                                        <span className="flex items-center gap-1.5">
+                                                            <button type="button" onClick={() => setMergeAttendanceScope('all', true)}
+                                                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100">كل المواقف</button>
+                                                            <button type="button" onClick={() => setMergeAttendanceScope('all', false)}
+                                                                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">لا موقف</button>
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                                                        المؤشَّر تلقائياً: ما في الملف وليس لديك (تحديثات الزملاء). <span className="text-amber-700">الشارة البرتقالية تنبيه</span>: لديك قيمة أخرى أو فترة مؤرخة تغطي اليوم — فيبقى ما لديك ما لم تؤشّره. لا يُحذف شيء من جهازك.
+                                                    </div>
+                                                    {(mergeAttendance.forNewEmployees + mergeAttendance.orphans + mergeAttendance.ambiguous + mergeAttendance.invalid) > 0 && (
+                                                        <div className="text-[10px] text-slate-400 leading-relaxed">
+                                                            {mergeAttendance.forNewEmployees > 0 && <span>قيم لموظفين جدد في الملف (عددها {mergeAttendance.forNewEmployees}) تأتي معهم إن أضفتهم. </span>}
+                                                            {(mergeAttendance.orphans + mergeAttendance.ambiguous + mergeAttendance.invalid) > 0 && <span>وتُجاهَل قيم عددها {mergeAttendance.orphans + mergeAttendance.ambiguous + mergeAttendance.invalid}: لموظف لا يطابقه أحد، أو لرقم وظيفي مكرر لديك، أو لقيمة غير صالحة.</span>}
+                                                        </div>
+                                                    )}
+                                                    {Array.from(new Set(mergeAttendance.items.map(item => item.date))).map(date => {
+                                                        // أسطر التنبيه أولاً في كل يوم: لا تضيع بين سطور جديدة كثيرة مؤشَّرة (الترتيب ثابت داخل كل فئة)
+                                                        const dayItems = mergeAttendance.items.filter(item => item.date === date)
+                                                            .sort((a, b) => (a.kind === 'new' ? 1 : 0) - (b.kind === 'new' ? 1 : 0));
+                                                        return (
+                                                            <div key={date} data-attendance-day={date} className="border-b border-dashed border-indigo-100 pb-1.5 last:border-b-0 last:pb-0">
+                                                                <div className="flex justify-between items-center gap-2 mb-1">
+                                                                    <span className="font-bold text-indigo-900 text-[11px]">🗓️ <bdi dir="ltr" className="whitespace-nowrap">{date}</bdi> ({dayItems.length})</span>
+                                                                    <span className="flex items-center gap-1 flex-shrink-0">
+                                                                        <button type="button" onClick={() => setMergeAttendanceScope(date, true)}
+                                                                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100">الكل</button>
+                                                                        <button type="button" onClick={() => setMergeAttendanceScope(date, false)}
+                                                                            className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 hover:bg-slate-200">لا شيء</button>
+                                                                    </span>
+                                                                </div>
+                                                                <div className="space-y-0.5 text-[11px]">
+                                                                    {dayItems.map(item => {
+                                                                        const picked = !!mergeAttendanceSelection[item.key];
+                                                                        const hasLocal = Object.keys(item.local).length > 0;
+                                                                        return (
+                                                                            <label key={item.key} data-attendance-key={item.key}
+                                                                                className={`flex justify-between flex-wrap gap-1 items-center cursor-pointer rounded px-1 py-0.5 ${picked ? 'bg-indigo-50/60' : ''}`}>
+                                                                                <span className="flex items-center flex-wrap gap-1.5 text-gray-600">
+                                                                                    <input type="checkbox" checked={picked} onChange={() => toggleMergeAttendance(item.key)}
+                                                                                        className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
+                                                                                    <span className="font-bold text-indigo-900">👤 {item.name} ({item.jobNumber})</span>
+                                                                                    {item.kind === 'period' && <span className="text-[9px] font-bold px-1 rounded text-amber-700 bg-amber-50">يخالف فترة مؤرخة لديك: «{item.period.type}»</span>}
+                                                                                    {item.kind === 'different' && <span className="text-[9px] font-bold px-1 rounded text-amber-700 bg-amber-50">لديك قيمة أخرى</span>}
+                                                                                </span>
+                                                                                <span className="font-semibold flex flex-wrap items-center gap-1">
+                                                                                    <span className={`text-[10px] font-bold ${picked ? 'text-emerald-700' : 'text-slate-400'}`}>{picked ? 'يُطبَّق:' : 'في الملف (لن يُطبَّق):'}</span>
+                                                                                    <span className={picked ? 'text-emerald-700 bg-emerald-50 px-1 rounded' : 'text-slate-700 bg-slate-100 px-1 rounded'}>{attendanceValueJsx(item.incoming)}</span>
+                                                                                    {hasLocal && (
+                                                                                        <React.Fragment>
+                                                                                            <span className={`text-[10px] font-bold mr-1 ${picked ? 'text-rose-700' : 'text-slate-600'}`}>{picked ? '— يُستبدل:' : '— يبقى:'}</span>
+                                                                                            <span className={picked ? 'line-through text-rose-500 bg-rose-50 px-1 rounded' : 'text-slate-700 bg-slate-100 px-1 rounded'}>{attendanceValueJsx(item.local)}</span>
+                                                                                        </React.Fragment>
+                                                                                    )}
+                                                                                    {!hasLocal && item.kind === 'period' && (
+                                                                                        <span className={`text-[10px] font-bold mr-1 ${picked ? 'text-rose-700' : 'text-slate-600'}`}>{picked ? '— يتقدّم على الفترة في هذا اليوم' : `— تبقى الفترة: «${item.period.type}»`}</span>
+                                                                                    )}
+                                                                                </span>
+                                                                            </label>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {mergeAttendance.holidays.length > 0 && (
+                                                        <div className="border-t pt-1.5 space-y-0.5 text-[11px]">
+                                                            <div className="font-bold text-indigo-900">🏖️ عطل رسمية في الملف ليست لديك — تُضاف ولا يُحذف شيء:</div>
+                                                            {mergeAttendance.holidays.map(h => (
+                                                                <label key={h.key} data-setting-key={h.key}
+                                                                    className={`inline-flex items-center gap-1.5 cursor-pointer rounded px-1 py-0.5 ml-2 ${mergeAttendanceSelection[h.key] ? 'bg-indigo-50/60' : ''}`}>
+                                                                    <input type="checkbox" checked={!!mergeAttendanceSelection[h.key]} onChange={() => toggleMergeAttendance(h.key)}
+                                                                        className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
+                                                                    <bdi dir="ltr" className="whitespace-nowrap">{h.date}</bdi>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {mergeAttendance.settings.length > 0 && (
+                                                        <div className="border-t pt-1.5 space-y-0.5 text-[11px]">
+                                                            <div className="font-bold text-indigo-900">⚙️ إعدادات عامة مختلفة — تمسّ حساب كل الجهاز، فلا تُطبَّق ما لم تؤشّرها:</div>
+                                                            {mergeAttendance.settings.map(s => {
+                                                                const picked = !!mergeAttendanceSelection[s.key];
+                                                                const anchorText = (a) => (
+                                                                    <React.Fragment>تاريخ المرجع <bdi dir="ltr" className="whitespace-nowrap">{a.shiftAnchorDate || '—'}</bdi>، الثلاثية {a.threeShiftAnchorSquad || '—'}، الثنائية {a.twoShiftAnchorSquad || '—'}</React.Fragment>
+                                                                );
+                                                                return (
+                                                                    <label key={s.key} data-setting-key={s.key}
+                                                                        className={`flex justify-between flex-wrap gap-1 items-center cursor-pointer rounded px-1 py-0.5 ${picked ? 'bg-indigo-50/60' : ''}`}>
+                                                                        <span className="flex items-center gap-1.5 text-gray-600">
+                                                                            <input type="checkbox" checked={picked} onChange={() => toggleMergeAttendance(s.key)}
+                                                                                className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
+                                                                            <span className="font-bold text-indigo-900">{s.kind === 'anchor' ? 'مرجع المناوبات' : 'اسم مُدخل البيانات'}</span>
+                                                                            <span className="text-[9px] font-bold px-1 rounded text-amber-700 bg-amber-50">يمسّ كل الجهاز</span>
+                                                                        </span>
+                                                                        <span className="font-semibold flex flex-wrap items-center gap-1">
+                                                                            <span className={`text-[10px] font-bold ${picked ? 'text-rose-700' : 'text-slate-600'}`}>{picked ? 'يُستبدل:' : 'يبقى:'}</span>
+                                                                            <span className={picked ? 'line-through text-rose-500 bg-rose-50 px-1 rounded' : 'text-slate-700 bg-slate-100 px-1 rounded'}>{s.kind === 'anchor' ? anchorText(s.local) : (s.local || '—')}</span>
+                                                                            <span className={`text-[10px] font-bold mr-1 ${picked ? 'text-emerald-700' : 'text-slate-400'}`}>{picked ? '— يُطبَّق:' : '— في الملف (لن يُطبَّق):'}</span>
+                                                                            <span className={picked ? 'text-emerald-700 bg-emerald-50 px-1 rounded' : 'text-slate-700 bg-slate-100 px-1 rounded'}>{s.kind === 'anchor' ? anchorText(s.incoming) : s.incoming}</span>
+                                                                        </span>
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    <div className="border-t pt-1.5 text-[11px] font-black text-indigo-900">
+                                                        المؤشَّر للتطبيق: {mergeAttendanceCount} من {mergeAttendance.items.length + mergeAttendance.holidays.length + mergeAttendance.settings.length}
+                                                        {mergeAttendancePending > 0 && <span className="text-amber-700 font-bold"> — {mergeAttendancePending} عليها تنبيه وغير مؤشَّرة، فلن تُطبَّق ما لم تؤشّرها</span>}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* الخيار الأول: تطبيق ما اختاره المستخدم */}
                                         {(() => {
-                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0;
+                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0 && mergeAttendanceCount === 0;
                                             return (
                                         <button
                                             disabled={nothingToDo}
-                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection, mergePeriodSelection, mergeClearDaysSelection)}
+                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection, mergePeriodSelection, mergeClearDaysSelection, mergeAttendanceSelection)}
                                             className={`w-full text-right p-4 rounded-2xl border-2 transition group flex gap-4 items-start ${
                                                 nothingToDo
                                                     ? 'border-slate-100 opacity-50 cursor-not-allowed'
@@ -10640,7 +11042,7 @@
                                                 <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
                                                     {nothingToDo
                                                         ? 'لم تختر شيئاً بعد — أشِّر ما تريد نقله من الملف أعلاه.'
-                                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}${mergePeriodCount > 0 ? ` ويطبّق ${mergePeriodCount} فترة مؤرخة` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس.`}
+                                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}${mergePeriodCount > 0 ? ` ويطبّق ${mergePeriodCount} فترة مؤرخة` : ''}${mergeAttendanceCount > 0 ? ` ومن المواقف والعطل والإعدادات ${mergeAttendanceCount}` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس.`}
                                                 </p>
                                             </div>
                                         </button>
