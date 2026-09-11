@@ -1007,6 +1007,41 @@
             React.useEffect(() => {
                 safeStorage.setItem('overtimeHoursRecords', JSON.stringify(overtimeHoursRecords));
             }, [overtimeHoursRecords]);
+            // ===== سجلّ المحذوفات (tombstones) =====
+            // ما يحذفه المستخدم من جهازه يُسجَّل: الفترة المؤرخة بهويتها، والموقف اليومي بـ«تاريخ::رقم وظيفي» (المعرّفات
+            // الداخلية تختلف بين الأجهزة). يُحفظ ويُصدَّر مع النسخة الاحتياطية، وفي الدمج لا يُؤشَّر المحذوف إن عاد في ملف
+            // أقدم ويُنبَّه إليه. بدونه يعود يوم حُذف عمداً مؤشَّراً، فإن طُبِّق ورُفعت القاعدة صار متطابقاً في كل النسخ ولا يُعرض أبداً.
+            const [mergeTombstones, setMergeTombstones] = useState(() => {
+                try {
+                    const saved = JSON.parse(safeStorage.getItem('mergeTombstones') || 'null');
+                    if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+                        return { periods: saved.periods || {}, dailyStatus: saved.dailyStatus || {} };
+                    }
+                } catch (e) {}
+                return { periods: {}, dailyStatus: {} };
+            });
+            React.useEffect(() => {
+                safeStorage.setItem('mergeTombstones', JSON.stringify(mergeTombstones));
+            }, [mergeTombstones]);
+            const tombstoneKeyOfDay = (date, jobNumber) => {
+                const job = String(jobNumber || '').trim();
+                return job && date ? `${date}::${job}` : '';
+            };
+            // إضافة تذاكر وإزالتها دفعة واحدة — تُستدعى من معالجات الأحداث وحدها، لا أثناء الرسم
+            const updateTombstones = ({ addPeriods = [], addDays = [], removePeriods = [], removeDays = [] }) => {
+                const clean = (list) => list.filter(Boolean);
+                const ap = clean(addPeriods), ad = clean(addDays), rp = clean(removePeriods), rd = clean(removeDays);
+                if (ap.length + ad.length + rp.length + rd.length === 0) return;
+                const at = new Date().toISOString();
+                setMergeTombstones(prev => {
+                    const next = { periods: { ...(prev.periods || {}) }, dailyStatus: { ...(prev.dailyStatus || {}) } };
+                    ap.forEach(k => { next.periods[k] = { at }; });
+                    ad.forEach(k => { next.dailyStatus[k] = { at }; });
+                    rp.forEach(k => { delete next.periods[k]; });
+                    rd.forEach(k => { delete next.dailyStatus[k]; });
+                    return next;
+                });
+            };
 
             const toggleOfficialHolidayDate = (dateStr) => {
                 setOfficialHolidays(prev => {
@@ -3462,6 +3497,11 @@
 
                 // إلغاء وسحب التعديل فوراً والعودة إلى الافتراضي الأصلي
                 const revertToDefault = () => {
+                    // الحذف يُسجَّل إن كان لليوم ما يُحذف فعلاً: موقف، أو ساعات زمنية، أو إضافي (مراجعة Codex)
+                    const hasOwnDay = (rec) => !!rec && Object.prototype.hasOwnProperty.call(rec, dateStr) && !!rec[dateStr] && Object.prototype.hasOwnProperty.call(rec[dateStr], empId);
+                    if (emp && (hasOwnDay(dailyStatusOverrides) || hasOwnDay(hourlyLeaveRecords) || hasOwnDay(overtimeHoursRecords))) {
+                        updateTombstones({ addDays: [tombstoneKeyOfDay(dateStr, emp.jobNumber)] });
+                    }
                     setEmployeeHourlyLeave(empId, dateStr, 0);
                     setEmployeeOvertimeHours(empId, dateStr, 0);
                     setDailyStatusOverrides(prev => {
@@ -3543,6 +3583,8 @@
                     } catch(e) {}
                 }
 
+                // إدخال موقف لليوم يُزيل تذكرة حذفه
+                if (emp) updateTombstones({ removeDays: [tombstoneKeyOfDay(dateStr, emp.jobNumber)] });
                 let nextOverrides;
                 setDailyStatusOverrides(prev => {
                     const next = { ...prev };
@@ -3603,6 +3645,15 @@
                     return;
                 }
 
+                // ما يُحذف من مواقف الوحدة يُسجَّل: الافتراضي لكل من له موقف، وتعذر الحضور المُزال عن المناوبين؛ وما يُسلَّط يُزيل تذكرته
+                const dayBeforeBulk = dailyStatusOverrides[dailyReportDate] || {};
+                const removedByBulk = targetStaff.filter(emp => dayBeforeBulk[emp.id] && (isDefault
+                    || (isExcuse && emp.workType !== 'صباحي' && String(dayBeforeBulk[emp.id]).includes('تعذر'))));
+                const setByBulk = isExcuse ? targetStaff.filter(emp => emp.workType === 'صباحي') : [];
+                updateTombstones({
+                    addDays: removedByBulk.map(emp => tombstoneKeyOfDay(dailyReportDate, emp.jobNumber)),
+                    removeDays: setByBulk.map(emp => tombstoneKeyOfDay(dailyReportDate, emp.jobNumber))
+                });
                 let updatedOverrides = {};
                 setDailyStatusOverrides(prev => {
                     const next = { ...prev };
@@ -4201,7 +4252,7 @@
                 : n === 2 ? 'يومين مثبَّتين'
                 : (n >= 3 && n <= 10) ? `${n} أيام مثبَّتة`
                 : `${n} يوماً مثبَّتاً`;
-            const analyzeMergePeriods = (inc, existing, jobNumber, overrides) => {
+            const analyzeMergePeriods = (inc, existing, jobNumber, overrides, deletedPeriods = null) => {
                 const valid = (p) => p && p.type && p.from;
                 // نسخة مكرّرة حرفياً داخل الملف نفسه تُعرض وتُطبَّق مرة واحدة
                 const seenInFile = {};
@@ -4249,7 +4300,7 @@
                     const overlaps = locList.filter(lp => periodsOverlap(lp, ip));
                     const days = contradictingDays(ip);
                     const kind = overlaps.length > 0 ? 'overlap' : legacy ? 'legacy' : days.length > 0 ? 'days' : 'new';
-                    items.push({ ...base, kind, overlaps, legacy, days });
+                    items.push({ ...base, kind, overlaps, legacy, days, deletedLocally: !!deletedPeriods && Object.prototype.hasOwnProperty.call(deletedPeriods, periodIdentityOf(ip)) });
                 });
                 // فترات الجهاز غير الموجودة في الملف تبقى ويُنبَّه إليها. ما يُعرض منها مع فترة واردة (نظيراً أو تداخلاً) لا يُكرَّر هنا
                 // مجموعة لا كائن: معرّف مثل «constructor» يطابق خاصية موروثة في الكائن فيُخفي فترة من التنبيه
@@ -4336,6 +4387,9 @@
                     const againstPeriod = !!period && item.incoming.status !== undefined && item.incoming.status !== period.type;
                     item.period = againstPeriod ? period : null;
                     item.kind = againstPeriod ? 'period' : differs ? 'different' : 'new';
+                    // يوم حذفه المستخدم من جهازه وعاد في الملف: لا يُؤشَّر، ويُنبَّه إليه
+                    item.deletedLocally = !!local.tombstones && Object.prototype.hasOwnProperty.call(local.tombstones, `${item.date}::${item.jobNumber}`)
+                        && Object.keys(item.incoming).some(part => item.local[part] === undefined);
                     result.items.push(item);
                 });
                 result.items.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
@@ -4382,7 +4436,7 @@
                 );
             };
 
-            const analyzeMerge = (incoming, currentStaff, overrides = {}) => {
+            const analyzeMerge = (incoming, currentStaff, overrides = {}, tombstones = null) => {
                 // رقم وظيفي يحمله أكثر من موظف لديك: لا يُعرف أيّهم المقصود، فلا يُقارَن ولا يُعدّ جديداً — تُنبّه إليه النافذة.
                 // والفهرس بلا نموذج أولي: رقم مثل «constructor» لا يطابق خاصية موروثة
                 const currentMap = Object.create(null);
@@ -4433,7 +4487,7 @@
                         });
 
                         // الفترات المؤرخة تُقارَن سجلاً سجلاً بمعرّفها، لا كحقل
-                        const periodDiff = analyzeMergePeriods(inc, existing, key, overrides);
+                        const periodDiff = analyzeMergePeriods(inc, existing, key, overrides, tombstones && tombstones.periods);
                         periodDiff.items.forEach(it => periodItems.push(it));
                         periodDiff.localOnly.forEach(lo => localOnlyPeriods.push(lo));
 
@@ -4454,6 +4508,15 @@
 
                         const commitBundleMetadata = (bundle) => {
                 if (!bundle || typeof bundle !== 'object') return;
+                // سجلّ المحذوفات في الملف يُضاف إلى سجلّ الجهاز (اتحاداً): الاستبدال الكامل يستعيد ذاكرة الحذف ولا يمحو ذاكرة الجهاز
+                if (bundle.mergeTombstones && typeof bundle.mergeTombstones === 'object' && !Array.isArray(bundle.mergeTombstones)) {
+                    const incomingTombs = bundle.mergeTombstones;
+                    const plain = (x) => (x && typeof x === 'object' && !Array.isArray(x)) ? x : {};
+                    setMergeTombstones(prev => ({
+                        periods: { ...(prev.periods || {}), ...plain(incomingTombs.periods) },
+                        dailyStatus: { ...(prev.dailyStatus || {}), ...plain(incomingTombs.dailyStatus) }
+                    }));
+                }
                 if (bundle.officialHolidaysList && Array.isArray(bundle.officialHolidaysList)) {
                     setOfficialHolidays(bundle.officialHolidaysList);
                     safeStorage.setItem('officialHolidaysList', JSON.stringify(bundle.officialHolidaysList));
@@ -4496,7 +4559,7 @@
             // للبيانات الحيّة. والمفاتيح (رقم، حقل) تبقى صالحة، وأي فرق جديد لم يره المستخدم
             // لا مفتاح له في selection فلا يُطبَّق — الاتجاه الآمن.
             const handleSmartMerge = (incoming, selection = null, addSelection = null, periodSelection = null, clearDaysSelection = null, attendanceSelection = null) => {
-                const analysis = analyzeMerge(incoming, staff, dailyStatusOverrides);
+                const analysis = analyzeMerge(incoming, staff, dailyStatusOverrides, mergeTombstones);
                 const isPicked = (jobNumber, field) =>
                     selection === null ? true : !!selection[`${jobNumber}::${field}`];
                 const isAddPicked = (jobNumber) =>
@@ -4612,11 +4675,19 @@
                 // الدمج لا يستبدل بيانات الحضور المحلية دفعة واحدة: كان هنا استدعاءٌ يطبّق حزمة الملف كلها
                 // (المواقف اليومية والإجازات الزمنية والإضافي والعطل ومرجع المناوبات) مهما اختار المستخدم.
                 // الاستبدال الكامل وحده يطبّق الحزمة كلها.
+                // ما يحذفه الدمج من الجهاز (فترات مستبدَلة، أيام ممسوحة) يُسجَّل؛ وفترة الملف المختارة صراحةً لا تبقى لها تذكرة
+                const appliedPeriodItems = analysis.periods.filter(item => isPeriodPicked(item.key) && currentMap[item.jobNumber]);
+                updateTombstones({
+                    addPeriods: appliedPeriodItems.reduce((acc, item) => acc.concat(item.overlaps.map(periodIdentityOf)), []),
+                    removePeriods: appliedPeriodItems.map(item => periodIdentityOf(item.incoming)),
+                    addDays: appliedPeriodItems.reduce((acc, item) => acc.concat(
+                        (item.days.length > 0 && clearDaysSelection && clearDaysSelection[item.key]) ? item.days.map(d => tombstoneKeyOfDay(d.date, item.jobNumber)) : []), [])
+                });
                 // 4. المواقف اليومية والساعات الزمنية والإضافي والعطل والإعدادات — المؤشَّرة وحدها، ولا يُحذف شيء لديك.
                 //    تُطبَّق بعد مسح أيام الفترات: موقف وارد اختير صراحةً ليوم مُسح يُكتب فوقه.
                 const attendance = analyzeMergeAttendance(incomingBundle, incoming, staff, {
                     overrides: dailyStatusOverrides, hourly: hourlyLeaveRecords, overtime: overtimeHoursRecords, holidays: officialHolidays,
-                    anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator
+                    anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, tombstones: mergeTombstones.dailyStatus
                 });
                 const isAttendancePicked = (key) => !!(attendanceSelection && attendanceSelection[key]);
                 let nextOverrides = clearedOverrides;
@@ -4643,6 +4714,8 @@
                     }
                     appliedAttendanceCount++;
                 });
+                // ما اختاره المستخدم صراحةً من مواقف الملف يعود ولا تبقى له تذكرة حذف
+                updateTombstones({ removeDays: attendance.items.filter(item => isAttendancePicked(item.key)).map(item => tombstoneKeyOfDay(item.date, item.jobNumber)) });
                 // موظفون جدد اختير إضافتهم: قيمهم في الملف تأتي معهم — لا شيء لديهم يُستبدل. تُقرأ بمعرّف الموظف في الملف
                 // وتُكتب بمعرّفه لديك (جديد إن طابق معرّفه موظفاً لديك)؛ ومعرّف مكرر بين الجدد لا تُنقل قيمه لأيٍّ منهم.
                 newEmployees.forEach(emp => {
@@ -4932,8 +5005,8 @@
             const mergeKeyOf = (jobNumber, field) => `${jobNumber}::${field}`;
             const mergeAnalysis = useMemo(() => {
                 if (!showMergeModal || !Array.isArray(incomingStaff) || incomingStaff.length === 0) return null;
-                return analyzeMerge(incomingStaff, staff, dailyStatusOverrides);
-            }, [showMergeModal, incomingStaff, staff, dailyStatusOverrides]);
+                return analyzeMerge(incomingStaff, staff, dailyStatusOverrides, mergeTombstones);
+            }, [showMergeModal, incomingStaff, staff, dailyStatusOverrides, mergeTombstones]);
 
             // الحقول المؤشَّرة للتطبيق، والموظفون الجدد المؤشَّرون للإضافة (كلٌّ على حدة:
             // ملف زميل قديم قد يحمل من حُذف عمداً، أو من أُضيف عنده بالخطأ)
@@ -4963,7 +5036,7 @@
                 const periodPicks = {};
                 const clearPicks = {};
                 mergeAnalysis.periods.forEach(item => {
-                    periodPicks[item.key] = item.kind === 'new' || item.gainOnly;
+                    periodPicks[item.key] = (item.kind === 'new' || item.gainOnly) && !item.deletedLocally;
                     if (item.days.length > 0) clearPicks[item.key] = true;
                 });
                 setMergePeriodSelection(periodPicks);
@@ -5007,7 +5080,7 @@
             );
             // تعارضات لم يؤشّرها المستخدم: تُذكر في العدّاد صراحةً، فلا تُفوَّت فترة ينتظر نقلها لأنها بدأت بلا تأشير
             const mergePendingPeriodWarnings = useMemo(
-                () => mergeAnalysis ? mergeAnalysis.periods.filter(item => !(item.kind === 'new' || item.gainOnly) && !mergePeriodSelection[item.key]).length : 0,
+                () => mergeAnalysis ? mergeAnalysis.periods.filter(item => (item.deletedLocally || !(item.kind === 'new' || item.gainOnly)) && !mergePeriodSelection[item.key]).length : 0,
                 [mergeAnalysis, mergePeriodSelection]
             );
             // المواقف والعطل والإعدادات من حزمة الملف — تُحلَّل على البيانات الحيّة كالحقول والفترات
@@ -5015,16 +5088,16 @@
                 if (!showMergeModal || !incomingBundle) return null;
                 return analyzeMergeAttendance(incomingBundle, incomingStaff, staff, {
                     overrides: dailyStatusOverrides, hourly: hourlyLeaveRecords, overtime: overtimeHoursRecords, holidays: officialHolidays,
-                    anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator
+                    anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, tombstones: mergeTombstones.dailyStatus
                 });
             }, [showMergeModal, incomingBundle, incomingStaff, staff, dailyStatusOverrides, hourlyLeaveRecords, overtimeHoursRecords,
-                officialHolidays, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator]);
+                officialHolidays, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, mergeTombstones]);
             const [mergeAttendanceSelection, setMergeAttendanceSelection] = useState({});
             // ما ليس لديك مؤشَّر، والعطل الجديدة مؤشَّرة؛ ما يخالف قيمة أو فترة لديك، والإعدادات العامة، بلا تأشير
             React.useEffect(() => {
                 if (!mergeAttendance) { setMergeAttendanceSelection({}); return; }
                 const picks = {};
-                mergeAttendance.items.forEach(item => { picks[item.key] = item.kind === 'new'; });
+                mergeAttendance.items.forEach(item => { picks[item.key] = item.kind === 'new' && !item.deletedLocally; });
                 mergeAttendance.holidays.forEach(h => { picks[h.key] = true; });
                 mergeAttendance.settings.forEach(s => { picks[s.key] = false; });
                 setMergeAttendanceSelection(picks);
@@ -5048,7 +5121,7 @@
                 [mergeAttendanceSelection]
             );
             const mergeAttendancePending = useMemo(
-                () => mergeAttendance ? mergeAttendance.items.filter(item => item.kind !== 'new' && !mergeAttendanceSelection[item.key]).length : 0,
+                () => mergeAttendance ? mergeAttendance.items.filter(item => (item.kind !== 'new' || item.deletedLocally) && !mergeAttendanceSelection[item.key]).length : 0,
                 [mergeAttendance, mergeAttendanceSelection]
             );
 
@@ -6055,7 +6128,8 @@
                         threeShiftAnchorSquad: threeShiftAnchorSquad,
                         twoShiftAnchorSquad: twoShiftAnchorSquad,
                         dataEntryOperator: dataEntryOperator,
-                        overtimeSelectedIds: overtimeIds
+                        overtimeSelectedIds: overtimeIds,
+                        mergeTombstones: mergeTombstones
                     };
                     const dataStr = JSON.stringify(backupData, null, 2);
                     const dataBlob = new Blob([dataStr], {type: 'application/json'});
@@ -6687,6 +6761,8 @@
                     const updatedPeriods = active.from >= today
                         ? periodsOf(emp).filter(p => p.id !== active.id)
                         : periodsOf(emp).map(p => p.id === active.id ? { ...p, to: localDateStr(new Date(today).getTime() - 86400000) } : p);
+                    // فترة حُذفت كلياً (لم تبدأ بعد أو بدأت اليوم) تُسجَّل؛ الفترة التي أُغلقت عند الأمس تبقى بهويتها فلا تذكرة لها
+                    if (active.from >= today) updateTombstones({ addPeriods: [periodIdentityOf(active)] });
                     const updated = staff.map(s => s.id === id ? { ...s, statusPeriods: updatedPeriods, status: 'نشط' } : s);
                     setStaff(updated);
                     safeStorage.setItem('staffData', JSON.stringify(updated));
@@ -6792,6 +6868,13 @@
                     }
                 }
 
+                // الفترات المستبدَلة والأيام الممسوحة تُسجَّل محذوفات
+                updateTombstones({
+                    addPeriods: conflicts.map(p => periodIdentityOf(p)),
+                    addDays: clearedOverrides ? daysInside.map(d => tombstoneKeyOfDay(d, emp.jobNumber)) : [],
+                    // الفترة المحفوظة الآن حيّة: لا تبقى لهويتها تذكرة (تُزال بعد الإضافة فتغلب إن تطابقت الهويتان)
+                    removePeriods: [periodIdentityOf(newPeriod)]
+                });
                 const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: updatedPeriods, status: periodType } : s);
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
@@ -11930,12 +12013,12 @@
                                                         {analysis.periods.map(item => {
                                                             const picked = !!mergePeriodSelection[item.key];
                                                             const ip = item.incoming;
-                                                            const badge = item.kind === 'new' ? 'فترة جديدة'
+                                                            const badge = item.deletedLocally ? 'حذفته من جهازك' : item.kind === 'new' ? 'فترة جديدة'
                                                                 : item.kind === 'changed' ? (item.gainOnly ? 'إضافة إلى فترة لديك' : 'فترة لديك بتفاصيل مختلفة')
                                                                 : item.kind === 'overlap' ? (item.overlaps.some(p => p.type === ip.type) ? 'قد تكون مسجَّلة مرتين' : 'تتداخل مع فترة لديك')
                                                                 : item.kind === 'legacy' ? 'فوق حالة غير مؤرخة لديك'
                                                                 : 'تخالف أياماً مثبَّتة لديك';
-                                                            const calm = item.kind === 'new' || item.gainOnly;
+                                                            const calm = !item.deletedLocally && (item.kind === 'new' || item.gainOnly);
                                                             const replacedClass = picked ? 'line-through text-rose-500 bg-rose-50 px-1 rounded' : 'text-slate-700 bg-slate-100 px-1 rounded';
                                                             return (
                                                                 <div key={item.key} className="border-b border-dashed border-indigo-100 pb-1.5 last:border-b-0 last:pb-0">
@@ -12023,7 +12106,7 @@
                                                     {Array.from(new Set(mergeAttendance.items.map(item => item.date))).map(date => {
                                                         // أسطر التنبيه أولاً في كل يوم: لا تضيع بين سطور جديدة كثيرة مؤشَّرة (الترتيب ثابت داخل كل فئة)
                                                         const dayItems = mergeAttendance.items.filter(item => item.date === date)
-                                                            .sort((a, b) => (a.kind === 'new' ? 1 : 0) - (b.kind === 'new' ? 1 : 0));
+                                                            .sort((a, b) => (a.kind === 'new' && !a.deletedLocally ? 1 : 0) - (b.kind === 'new' && !b.deletedLocally ? 1 : 0));
                                                         return (
                                                             <div key={date} data-attendance-day={date} className="border-b border-dashed border-indigo-100 pb-1.5 last:border-b-0 last:pb-0">
                                                                 <div className="flex justify-between items-center gap-2 mb-1">
@@ -12047,6 +12130,7 @@
                                                                                         className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
                                                                                     <span className="font-bold text-indigo-900">👤 {item.name} ({item.jobNumber})</span>
                                                                                     {item.kind === 'period' && <span className="text-[9px] font-bold px-1 rounded text-amber-700 bg-amber-50">يخالف فترة مؤرخة لديك: «{item.period.type}»</span>}
+                                                                                    {item.deletedLocally && <span className="text-[9px] font-bold px-1 rounded text-amber-700 bg-amber-50">حذفته من جهازك</span>}
                                                                                     {item.kind === 'different' && <span className="text-[9px] font-bold px-1 rounded text-amber-700 bg-amber-50">لديك قيمة أخرى</span>}
                                                                                 </span>
                                                                                 <span className="font-semibold flex flex-wrap items-center gap-1">
