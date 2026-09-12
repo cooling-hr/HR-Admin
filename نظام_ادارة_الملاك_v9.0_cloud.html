@@ -424,23 +424,6 @@
             }
         }
 
-        /* تنسيق طباعة بطاقة الموظف A4 */
-        @media print {
-            body.printing-profile #root > *:not(.profile-print-only) {
-                display: none !important;
-            }
-            body.printing-profile .profile-print-only {
-                display: block !important;
-                background: white !important;
-                color: black !important;
-                width: 100% !important;
-                height: auto !important;
-                position: static !important;
-                margin: 0 !important;
-                padding: 10mm !important;
-            }
-        }
-        
         /* تأثير الظهور التدريجي للإحصاء الإضافي */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-8px); }
@@ -783,6 +766,14 @@
         const normalizeArabicForSearch = (text) => {
             return normalizeArabic(text).replace(/\s+/g, '');
         };
+
+        // توحيد الأرقام العربية-الهندية والفارسية الممتدة إلى لاتينية عند أي مقارنة أو تخزين للرقم
+        // الوظيفي — نفس الرقم بخط أرقام مختلف كان يُعامَل كموظفَين مختلفين في كل مطابقة (دمج، حذف، إكسل)
+        const ARABIC_INDIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+        const EXTENDED_ARABIC_INDIC_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+        const normalizeJobNumber = (v) => String(v || '').trim()
+            .replace(/[٠-٩]/g, (d) => String(ARABIC_INDIC_DIGITS.indexOf(d)))
+            .replace(/[۰-۹]/g, (d) => String(EXTENDED_ARABIC_INDIC_DIGITS.indexOf(d)));
         
         // دالة التخمين الذكي للجنس من الاسم
         const guessGender = (name) => {
@@ -1033,7 +1024,7 @@
                 safeStorage.setItem('mergeTombstones', JSON.stringify(mergeTombstones));
             }, [mergeTombstones]);
             const tombstoneKeyOfDay = (date, jobNumber) => {
-                const job = String(jobNumber || '').trim();
+                const job = normalizeJobNumber(jobNumber);
                 return job && date ? `${date}::${job}` : '';
             };
             // إضافة تذاكر وإزالتها دفعة واحدة — تُستدعى من معالجات الأحداث وحدها، لا أثناء الرسم
@@ -4187,7 +4178,6 @@
             const [incomingBundle, setIncomingBundle] = useState(null);
             const [showPasteModal, setShowPasteModal] = useState(false);
             const [pastedJsonText, setPastedJsonText] = useState('');
-            const [profileToPrint, setProfileToPrint] = useState(null);
 
             const getSafetyStatus = (deliveryDate) => {
                 if (!deliveryDate) return { label: '❌ غير مجهز سابقاً', type: 'due-never', color: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
@@ -4398,13 +4388,13 @@
                 const staffList = Array.isArray(bundle.staff) ? bundle.staff : Array.isArray(bundle.staffData) ? bundle.staffData : incomingList;
                 const jobByIncomingId = new Map();
                 (Array.isArray(staffList) ? staffList : []).forEach(e => {
-                    if (e && e.id !== undefined && e.id !== null) jobByIncomingId.set(String(e.id), String(e.jobNumber || '').trim());
+                    if (e && e.id !== undefined && e.id !== null) jobByIncomingId.set(String(e.id), normalizeJobNumber(e.jobNumber));
                 });
                 // رقم وظيفي مكرر لدى الجهاز: لا يُعرف لمن تذهب القيمة، فلا تُعرض ولا تُطبَّق
                 const localByJob = new Map();
                 const ambiguousJobs = new Set();
                 currentStaff.forEach(e => {
-                    const k = String(e.jobNumber || '').trim();
+                    const k = normalizeJobNumber(e.jobNumber);
                     if (!k) return;
                     if (localByJob.has(k)) ambiguousJobs.add(k); else localByJob.set(k, e);
                 });
@@ -4503,7 +4493,7 @@
                 const currentMap = Object.create(null);
                 const ambiguousJobs = new Set();
                 currentStaff.forEach(s => {
-                    const key = String(s.jobNumber || '').trim();
+                    const key = normalizeJobNumber(s.jobNumber);
                     if (!key) return;
                     if (key in currentMap) ambiguousJobs.add(key); else currentMap[key] = s;
                 });
@@ -4521,7 +4511,7 @@
                 const previouslyDeleted = Object.create(null);
 
                 incoming.forEach(inc => {
-                    const key = String(inc.jobNumber || '').trim();
+                    const key = normalizeJobNumber(inc.jobNumber);
                     if (!key) return;
                     incomingJobs.add(key);
 
@@ -4644,14 +4634,14 @@
                 const isPicked = (jobNumber, field) =>
                     selection === null ? true : !!selection[`${jobNumber}::${field}`];
                 const isAddPicked = (jobNumber) =>
-                    addSelection === null ? true : !!addSelection[String(jobNumber || '').trim()];
+                    addSelection === null ? true : !!addSelection[normalizeJobNumber(jobNumber)];
 
                 // رقم وظيفي يحمله أكثر من موظف لديك: كان كلٌّ منهم يُستبدل بنسخة آخرهم عند بناء القائمة — فيضيع أحدهم ويتكرر
                 // الآخر. المكرر يُخرج من الفهرس، فلا يُحدَّث ويبقى كل موظف كما هو؛ والتحليل لا يعرض له فروقاً أصلاً
                 const currentMap = Object.create(null);
                 const duplicateJobs = new Set();
                 staff.forEach(s => {
-                    const key = String(s.jobNumber || '').trim();
+                    const key = normalizeJobNumber(s.jobNumber);
                     if (!key) return;
                     if (key in currentMap) duplicateJobs.add(key); else currentMap[key] = { ...s };
                 });
@@ -4749,14 +4739,14 @@
                 }
                 // ومن اخترت إعادته بعد أن كنت حذفته: تُمحى شاهدته وإلا بقي موسوماً «محذوف» إلى الأبد
                 const restoredJobs = pickedAdds
-                    .map(inc => String(inc.jobNumber || '').trim())
+                    .map(inc => normalizeJobNumber(inc.jobNumber))
                     .filter(job => job && (analysis.previouslyDeleted || {})[job]);
                 if (restoredJobs.length > 0) updateTombstones({ removeEmployees: restoredJobs });
 
                 // دمج القائمتين مع بقية الموظفين الذين لم يتغيروا
                 const mergedList = [];
                 staff.forEach(s => {
-                    const key = String(s.jobNumber || '').trim();
+                    const key = normalizeJobNumber(s.jobNumber);
                     if (key && deletedJobs.has(key)) return;
                     if (key && currentMap[key]) {
                         mergedList.push(currentMap[key]);
@@ -4968,7 +4958,6 @@
             // window.print (سفاري على الهاتف) فتعود المعاينة بيضاء — نبّهت إليه مراجعة Codex.
             // يُنزع عند afterprint، وعند إغلاق النافذة (التأثير بجوار selectedEmployeeCard)
             // احتياطاً لمتصفح لا يُطلقه، فلا يبقى الصنف ليُفسد طباعة تالية.
-            // ملاحظة: printProfileCard أدناه لا يستدعيها شيء في الملف، ولا صلة لها بهذا الزرّ.
             const printEmployeeCard = () => {
                 // البطاقة التي نُقر زرّها بعينها، لا «أيّ بطاقة مفتوحة» عند حلول التأجيل:
                 // لو أُغلقت وفُتحت أخرى خلاله، لطبع الاستعلامُ العام البطاقةَ الجديدة بنداءٍ قديم.
@@ -4984,18 +4973,6 @@
                     window.removeEventListener('afterprint', onAfterPrint);
                     document.body.classList.remove('printing-card');
                 }, 50);
-            };
-
-            const printProfileCard = (emp) => {
-                setProfileToPrint(emp);
-                document.body.classList.add('printing-profile');
-                setTimeout(() => {
-                    window.print();
-                    setTimeout(() => {
-                        document.body.classList.remove('printing-profile');
-                        setProfileToPrint(null);
-                    }, 1000);
-                }, 250);
             };
 
 
@@ -5186,7 +5163,7 @@
                 // الإضافة كسبٌ لا تعارض فيه، فالافتراض قبولها — والانتقاء متاح
                 const adds = {};
                 mergeAnalysis.added.forEach(emp => {
-                    const job = String(emp.jobNumber || '').trim();
+                    const job = normalizeJobNumber(emp.jobNumber);
                     // من حذفتَه أنت لا يعود مؤشَّراً: عودته الصامتة هي بالضبط ما تمنعه الشاهدة
                     adds[job] = !(mergeAnalysis.previouslyDeleted || {})[job];
                 });
@@ -5214,7 +5191,7 @@
             const setMergeAddScope = (value) => {
                 if (!mergeAnalysis) return;
                 const next = {};
-                mergeAnalysis.added.forEach(emp => { next[String(emp.jobNumber || '').trim()] = value; });
+                mergeAnalysis.added.forEach(emp => { next[normalizeJobNumber(emp.jobNumber)] = value; });
                 setMergeAddSelection(next);
             };
             const mergeAddCount = useMemo(
@@ -6035,8 +6012,8 @@
 
                         const loadedStaff = jsonData.map((row, index) => {
                             // البحث عن الموظف الحالي لمطابقة وحفظ حقوله المخزنة في حال غياب أعمدتها
-                            const empNoString = String(row['الرقم الوظيفي'] || '').split('.')[0].trim();
-                            const existingEmp = staff.find(s => String(s.jobNumber || '').trim() === empNoString);
+                            const empNoString = normalizeJobNumber(String(row['الرقم الوظيفي'] || '').split('.')[0]);
+                            const existingEmp = staff.find(s => normalizeJobNumber(s.jobNumber) === empNoString);
 
                             let status = String(row['الحالة'] || 'نشط').trim();
                             if (status === 'إجازة امومة') status = 'إجازة أمومة';
@@ -6584,7 +6561,7 @@
                 }
 
                 // ⛔ التحقق من تكرار الرقم الوظيفي
-                const jobNumStr = String(editingEmployee.jobNumber || '').trim();
+                const jobNumStr = normalizeJobNumber(editingEmployee.jobNumber);
                 if (!jobNumStr) {
                     alert('⚠️ الرقم الوظيفي مطلوب!');
                     return;
@@ -6712,6 +6689,9 @@
                 if (field === 'name' && value) {
                     const guessedGender = guessGender(value);
                     setEditingEmployee({...editingEmployee, name: value, gender: guessedGender});
+                } else if (field === 'jobNumber') {
+                    // يُوحَّد فور الكتابة، لا عند المقارنة وحدها — فلا تتراكم بيانات جديدة بخط أرقام مختلف
+                    setEditingEmployee({...editingEmployee, jobNumber: normalizeJobNumber(value)});
                 } else {
                     setEditingEmployee({...editingEmployee, [field]: value});
                 }
@@ -7779,7 +7759,33 @@
 
 
 
-            return (
+                        // إغلاق موحّد بـEsc: مستمع واحد يُسجَّل أثناء ظهور النافذة فقط ويُزال عند إغلاقها
+            const useEscapeClose = (active, onClose) => {
+                React.useEffect(() => {
+                    if (!active) return;
+                    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+                    window.addEventListener('keydown', onKey);
+                    return () => window.removeEventListener('keydown', onKey);
+                }, [active, onClose]);
+            };
+            useEscapeClose(showSetPinOffer && !!pendingPinOfferUser, () => setShowSetPinOffer(false));
+            useEscapeClose(showSyncModal, () => setShowSyncModal(false));
+            useEscapeClose(!!selectedEmployeeCard, () => setSelectedEmployeeCard(null));
+            useEscapeClose(showLoginModal, () => setShowLoginModal(false));
+            useEscapeClose(showUserManagementModal, () => setShowUserManagementModal(false));
+            useEscapeClose(showRestoreCenterModal, () => setShowRestoreCenterModal(false));
+            useEscapeClose(showPasteModal, () => setShowPasteModal(false));
+            useEscapeClose(showHolidaysModal, () => setShowHolidaysModal(false));
+            useEscapeClose(!!pendingShiftConfirm, () => setPendingShiftConfirm(null));
+            useEscapeClose(!!quickPeriod, () => setQuickPeriod(null));
+            useEscapeClose(showUserMenu, () => setShowUserMenu(false));
+            useEscapeClose(showPreview, () => setShowPreview(false));
+            useEscapeClose(showEditModal && !!editingEmployee, cancelEdit);
+            useEscapeClose(showPrintForm, () => setShowPrintForm(false));
+            useEscapeClose(!!waterMemoGroup, () => setWaterMemoGroup(null));
+
+
+return (
                 <div className="min-h-screen bg-gray-50">
 
                     {/* Splash Screen - نافذة ترحيبية متحركة */}
@@ -12196,7 +12202,7 @@
                                                     </div>
                                                     <div className="max-h-28 overflow-y-auto space-y-0.5 text-[11px]">
                                                         {analysis.added.map((emp, aIdx) => {
-                                                            const num = String(emp.jobNumber || '').trim();
+                                                            const num = normalizeJobNumber(emp.jobNumber);
                                                             const picked = !!mergeAddSelection[num];
                                                             const wasDeleted = (analysis.previouslyDeleted || {})[num];
                                                             return (
@@ -12513,27 +12519,23 @@
 
                                         {/* الخيار الأول: الدمج الذكي */}
                                         {(() => {
+                                            // ملخّص بلا تفاعل: الزرّ الفعلي انتقل إلى الذيل الثابت أسفل النافذة، فلا يبقى الوصول
+                                            // إليه مرهوناً بالتمرير حتى آخر القائمة مهما طال عرض الفروقات
                                             const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0 && mergeAttendanceCount === 0;
                                             return (
-                                        <button
-                                            disabled={nothingToDo}
-                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection, mergePeriodSelection, mergeClearDaysSelection, mergeAttendanceSelection, mergeDeleteSelection)}
-                                            className={`w-full text-right p-4 rounded-2xl border-2 transition group flex gap-4 items-start ${
-                                                nothingToDo
-                                                    ? 'border-slate-100 opacity-50 cursor-not-allowed'
-                                                    : 'border-indigo-100 hover:border-indigo-500 hover:bg-indigo-50/30'
-                                            }`}
-                                        >
-                                            <div className="text-2xl p-2.5 bg-indigo-50 rounded-xl group-hover:bg-indigo-100 transition">🔄</div>
+                                        <div className={`w-full text-right p-4 rounded-2xl border-2 flex gap-4 items-start ${
+                                                nothingToDo ? 'border-slate-100 opacity-50' : 'border-indigo-100 bg-indigo-50/10'
+                                            }`}>
+                                            <div className="text-2xl p-2.5 bg-indigo-50 rounded-xl">🔄</div>
                                             <div>
                                                 <h4 className="font-bold text-indigo-900 text-sm">تطبيق ما اخترته (موصى به)</h4>
                                                 <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
                                                     {nothingToDo
                                                         ? 'لم تختر شيئاً بعد — أشِّر ما تريد نقله من الملف أعلاه.'
-                                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}${mergePeriodCount > 0 ? ` ويطبّق ${mergePeriodCount} فترة مؤرخة` : ''}${mergeAttendanceCount > 0 ? ` ومن المواقف والعطل والإعدادات ${mergeAttendanceCount}` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس.`}
+                                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}${mergePeriodCount > 0 ? ` ويطبّق ${mergePeriodCount} فترة مؤرخة` : ''}${mergeAttendanceCount > 0 ? ` ومن المواقف والعطل والإعدادات ${mergeAttendanceCount}` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس. زرّ التطبيق أسفل النافذة.`}
                                                 </p>
                                             </div>
-                                        </button>
+                                        </div>
                                             );
                                         })()}
 
@@ -12556,13 +12558,29 @@
                                             </div>
                                         </button>
                                     </div>
-                                    <div className="bg-slate-50 px-6 py-4 flex justify-end border-t border-slate-100 flex-shrink-0">
+                                    <div className="bg-slate-50 px-6 py-4 flex items-center justify-between gap-3 border-t border-slate-100 flex-shrink-0">
                                         <button 
                                             onClick={cancelMerge}
-                                            className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition"
+                                            className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition flex-shrink-0"
                                         >
                                             إلغاء العملية
                                         </button>
+                                        {(() => {
+                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0 && mergeAttendanceCount === 0;
+                                            return (
+                                        <button
+                                            disabled={nothingToDo}
+                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection, mergePeriodSelection, mergeClearDaysSelection, mergeAttendanceSelection, mergeDeleteSelection)}
+                                            className={`px-5 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 flex-shrink-0 ${
+                                                nothingToDo
+                                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20'
+                                            }`}
+                                        >
+                                            <span>🔄</span><span>تطبيق ما اخترته</span>
+                                        </button>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -12704,177 +12722,6 @@
                             <span>مسؤول شعبة تبريد المركز ومحطة عزل نهر بن عمر</span>
                         </div>
                     </div>
-
-                    {/* قالب الطباعة لبطاقة الموظف التعريفية الفردية A4 */}
-                    {profileToPrint && (
-                        <div className="profile-print-only hidden p-8 bg-white text-black font-sans dir-rtl" style={{ width: '210mm', minHeight: '297mm', direction: 'rtl' }}>
-                            <div className="border-4 double border-indigo-900 p-6 h-full flex flex-col justify-between" style={{ minHeight: '275mm' }}>
-                                
-                                {/* الهيدر المطور للبطاقة */}
-                                <div className="border-b-2 border-indigo-900 pb-4 mb-6">
-                                    <div className="flex justify-between items-center text-xs font-bold text-gray-800">
-                                        <div className="text-right space-y-1">
-                                            <div>جمهورية العراق</div>
-                                            <div>وزارة النفط</div>
-                                            <div>شركة نفط البصرة</div>
-                                        </div>
-                                        <div className="text-center">
-                                            <div className="w-16 h-16 border-2 border-indigo-900 rounded-full flex items-center justify-center mx-auto mb-1 bg-slate-50 shadow-inner">
-                                                <span className="text-2xl">🌴</span>
-                                            </div>
-                                            <div className="text-[10px] text-gray-500">تأسست عام ١٩٦٩</div>
-                                        </div>
-                                        <div className="text-left space-y-1">
-                                            <div>هيأة الصيانة الهندسية</div>
-                                            <div>قسم التكييف والتبريد</div>
-                                            <div>شعبة تبريد المركز ومحطة عزل نهر بن عمر</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* عنوان البطاقة المعتمة */}
-                                <div className="text-center my-6">
-                                    <h2 className="text-2xl font-black text-indigo-950 inline-block border-b-4 border-indigo-900 pb-2 px-8">
-                                        بطاقة تعريف موظف (فئة أ)
-                                    </h2>
-                                    <p className="text-[10px] text-slate-500 mt-2">نظام إدارة ملاك شعبة التبريد - بطاقة معتمدة رسمياً</p>
-                                </div>
-                                
-                                {/* تفاصيل الموظف وجدول البيانات */}
-                                <div className="grid grid-cols-3 gap-6 my-6 items-start">
-                                    <div className="col-span-1 flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl shadow-inner min-h-[220px]">
-                                        {profileToPrint.photo ? (
-                                            <img src={profileToPrint.photo} className="w-[4cm] h-[5cm] object-cover rounded-lg border-2 border-white shadow-md" alt={profileToPrint.name} />
-                                        ) : (
-                                            <div className="w-[4cm] h-[5cm] bg-slate-200 rounded-lg flex flex-col items-center justify-center border-2 border-slate-300">
-                                                <span className="text-5xl text-slate-400">👤</span>
-                                                <span className="text-[10px] text-slate-500 mt-2 font-bold">صورة شخصية معتمدة</span>
-                                            </div>
-                                        )}
-                                        <span className="text-[10px] text-slate-400 mt-3 font-semibold">حجم ٤ × ٦ سم</span>
-                                    </div>
-                                    
-                                    <div className="col-span-2 space-y-4">
-                                        <div className="border-2 border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
-                                            <table className="w-full text-sm">
-                                                <tbody>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200 w-1/3">الاسم الكامل:</td>
-                                                        <td className="px-4 py-2.5 font-bold text-gray-800">{profileToPrint.name}</td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">الرقم الوظيفي:</td>
-                                                        <td className="px-4 py-2.5 font-mono font-bold text-blue-700">{profileToPrint.jobNumber}</td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">العنوان الوظيفي:</td>
-                                                        <td className="px-4 py-2.5 font-bold text-gray-800">{profileToPrint.jobTitle}</td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">الموقع والوحدة:</td>
-                                                        <td className="px-4 py-2.5 text-gray-800">
-                                                            <span className="font-bold">{profileToPrint.location}</span>
-                                                            {profileToPrint.unit && <span className="text-gray-500 text-xs"> (وحدة: {profileToPrint.unit})</span>}
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">تاريخ التعيين:</td>
-                                                        <td className="px-4 py-2.5 text-gray-800">
-                                                            <span className="font-bold">{profileToPrint.hireDate || '—'}</span>
-                                                            {profileToPrint.hireDate && (
-                                                                <span className="text-xs text-indigo-600 font-bold mr-2">
-                                                                    (سنوات الخدمة: {calculateYearsOfService(profileToPrint.hireDate)} سنة)
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">التحصيل والتخصص:</td>
-                                                        <td className="px-4 py-2.5 font-bold text-gray-800">
-                                                            {profileToPrint.education || '—'}
-                                                            {profileToPrint.specialization && <span className="text-slate-500 font-normal"> - {profileToPrint.specialization}</span>}
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">رقم الهاتف والنقال:</td>
-                                                        <td className="px-4 py-2.5 font-mono text-gray-800 font-bold">
-                                                            {profileToPrint.mobile ? fixPhoneNumber(profileToPrint.mobile) : '—'}
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">البريد الإلكتروني:</td>
-                                                        <td className="px-4 py-2.5 font-mono text-gray-800">
-                                                            {profileToPrint.email || '—'}
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">عنوان السكن:</td>
-                                                        <td className="px-4 py-2.5 font-bold text-gray-800">
-                                                            {profileToPrint.address || '—'}
-                                                        </td>
-                                                    </tr>
-                                                    <tr className="border-b border-slate-100">
-                                                        <td className="px-4 py-2.5 bg-slate-50 font-black text-indigo-950 border-l border-slate-200">هاتف أحد ذوي الموظف:</td>
-                                                        <td className="px-4 py-2.5 font-mono text-gray-800 font-bold">
-                                                            {profileToPrint.relativePhone ? fixPhoneNumber(profileToPrint.relativePhone) : '—'}
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* تجهيزات ومقاييس السلامة */}
-                                <div className="bg-slate-50 p-4 border border-slate-200 rounded-2xl my-4">
-                                    <h4 className="font-bold text-indigo-950 text-xs mb-2.5 flex items-center gap-1.5">🦺 المقاييس وتجهيزات السلامة الخاصة بالمنتسب</h4>
-                                    <div className="grid grid-cols-3 gap-4 text-xs">
-                                        <div className="bg-white border rounded-xl p-2.5 text-center">
-                                            <div className="text-gray-400 font-bold">قياس البدلة</div>
-                                            <div className="text-base font-black text-blue-600 mt-1">{profileToPrint.uniformSize || '—'}</div>
-                                        </div>
-                                        <div className="bg-white border rounded-xl p-2.5 text-center">
-                                            <div className="text-gray-400 font-bold">قياس الحذاء</div>
-                                            <div className="text-base font-black text-green-600 mt-1">{profileToPrint.shoeSafetySize || '—'}</div>
-                                        </div>
-                                        <div className="bg-white border rounded-xl p-2.5 text-center">
-                                            <div className="text-gray-400 font-bold">تاريخ آخر تجهيز سلامة</div>
-                                            <div className="text-[11px] font-black text-amber-600 mt-1.5">{profileToPrint.lastSafetyDelivery || '—'}</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* توقيع الموظف فقط (إلغاء توقيع المسؤول كما طلب المستخدم) */}
-                                <div className="grid grid-cols-2 gap-8 my-6 mt-auto">
-                                    <div className="border-2 border-slate-200 border-dashed rounded-2xl p-4 text-center bg-indigo-50/10">
-                                        <h4 className="font-bold text-indigo-950 text-xs mb-2">توقيع المنتسب وصحة البيانات</h4>
-                                        <p className="text-[10px] text-slate-500 leading-relaxed">
-                                            أقر بصحة كافة البيانات الواردة في هذه الاستمارة التعريفية وأتحمل المسؤولية القانونية الكاملة عن أي اختلاف.
-                                        </p>
-                                        <div className="h-16 flex items-end justify-center">
-                                            <span className="text-[10px] text-slate-300 font-bold">توقيع الموظف: ____________________</span>
-                                        </div>
-                                    </div>
-                                    <div className="border border-slate-200 rounded-2xl p-4 flex flex-col justify-between bg-slate-50">
-                                        <div className="text-right">
-                                            <h4 className="font-bold text-slate-800 text-xs">تصديق النظام الإلكتروني للملاك</h4>
-                                            <p className="text-[9px] text-slate-400 mt-1">
-                                                تم استخراج هذه الاستمارة تلقائياً من نظام إدارة الملاك المتكامل (V5) المعتمد في شعبة تبريد المركز.
-                                            </p>
-                                        </div>
-                                        <div className="text-left text-[9px] text-slate-400 font-mono mt-4">
-                                            <div>تاريخ الطباعة: {new Date().toLocaleDateString('ar-IQ')}</div>
-                                            <div>رقم الرمز المعتمد: {profileToPrint.id}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="border-t border-indigo-900 pt-3 text-center text-[9px] text-indigo-900/60 font-bold">
-                                    شركة نفط البصرة · هيأة الصيانة الهندسية · قسم التكييف والتبريد · شعبة تبريد المركز ومحطة عزل نهر بن عمر
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     {showPreview && (
                         <div className="preview-overlay">
