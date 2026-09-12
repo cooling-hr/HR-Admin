@@ -551,6 +551,11 @@
         /* حدّ الشريحة النشطة في شريط التنقّل — أُضيف مع الشرائح ولولاه لبقي
            بلونه النهاري الفاتح فوق سطح داكن، بصمت وبلا خطأ في وحدة التحكم */
         html[data-theme="dark"] .border-indigo-300 { border-color: #4c5f9e !important; }
+        /* شارات سجل الفترات وأزراره — أُضيفت مع السجل */
+        html[data-theme="dark"] .border-indigo-200 { border-color: #3d4d80 !important; }
+        html[data-theme="dark"] .border-emerald-300 { border-color: #2b6b53 !important; }
+        html[data-theme="dark"] .border-sky-300 { border-color: #2f5b86 !important; }
+        html[data-theme="dark"] .border-rose-200 { border-color: #6b2b31 !important; }
 
         /* ---- حقول الإدخال ---- */
         html[data-theme="dark"] input,
@@ -568,6 +573,7 @@
         /* الأحمر = غياب · الكهرماني = تنبيه · الأخضر = حضور · النيلي = إجراء */
         html[data-theme="dark"] .bg-red-50      { background-color: #3b1518 !important; }
         html[data-theme="dark"] .text-red-800,
+        html[data-theme="dark"] .text-rose-800,
         html[data-theme="dark"] .text-red-700   { color: #fca5a5 !important; }
         html[data-theme="dark"] .bg-rose-50     { background-color: #3b1520 !important; }
         html[data-theme="dark"] .text-rose-700  { color: #fda4af !important; }
@@ -641,6 +647,7 @@
         html[data-theme="dark"] .bg-blue-100,
         html[data-theme="dark"] .bg-indigo-100    { background-color: #16233f !important; }
         html[data-theme="dark"] .bg-blue-200      { background-color: #1e2f52 !important; }
+        html[data-theme="dark"] .bg-emerald-100,
         html[data-theme="dark"] .bg-emerald-200,
         html[data-theme="dark"] .bg-green-100     { background-color: #0e3b2c !important; }
         html[data-theme="dark"] .bg-purple-100    { background-color: #251640 !important; }
@@ -650,12 +657,14 @@
         html[data-theme="dark"] .bg-red-200,
         html[data-theme="dark"] .bg-rose-200      { background-color: #4a1a1e !important; }
         html[data-theme="dark"] .bg-teal-100      { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-sky-100       { background-color: #102a40 !important; }
 
         /* ---- كل نص داكن (درجة 600 فأعلى) مستعمل في الواجهة ---- */
         /* هذه الدرجات مصمَّمة لخلفيات فاتحة، فتصبح غير مقروءة بعد تعتيم الأسطح. */
         /* الدرجات 500 فما دون تُترك عمداً: هي أصلاً فاتحة وتجلس فوق ترويسات داكنة. */
         html[data-theme="dark"] .text-blue-600,
         html[data-theme="dark"] .text-blue-800,
+        html[data-theme="dark"] .text-sky-800,
         html[data-theme="dark"] .text-blue-950
             { color: #93c5fd !important; }
         html[data-theme="dark"] .text-orange-600,
@@ -1014,10 +1023,10 @@
                 try {
                     const saved = JSON.parse(safeStorage.getItem('mergeTombstones') || 'null');
                     if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
-                        return { periods: saved.periods || {}, dailyStatus: saved.dailyStatus || {} };
+                        return { periods: saved.periods || {}, dailyStatus: saved.dailyStatus || {}, employees: saved.employees || {} };
                     }
                 } catch (e) {}
-                return { periods: {}, dailyStatus: {} };
+                return { periods: {}, dailyStatus: {}, employees: {} };
             });
             React.useEffect(() => {
                 safeStorage.setItem('mergeTombstones', JSON.stringify(mergeTombstones));
@@ -1027,17 +1036,23 @@
                 return job && date ? `${date}::${job}` : '';
             };
             // إضافة تذاكر وإزالتها دفعة واحدة — تُستدعى من معالجات الأحداث وحدها، لا أثناء الرسم
-            const updateTombstones = ({ addPeriods = [], addDays = [], removePeriods = [], removeDays = [] }) => {
+            const updateTombstones = ({ addPeriods = [], addDays = [], removePeriods = [], removeDays = [], addEmployees = [], removeEmployees = [] }) => {
                 const clean = (list) => list.filter(Boolean);
                 const ap = clean(addPeriods), ad = clean(addDays), rp = clean(removePeriods), rd = clean(removeDays);
-                if (ap.length + ad.length + rp.length + rd.length === 0) return;
+                // الموظف يُسجَّل برقمه الوظيفي (المعرّفات الداخلية تختلف بين الأجهزة) ومعه اسمه:
+                // بعد اختفائه من القاعدة لم يبقَ مكان تُقرأ منه هويته لعرضها في نافذة المزامنة
+                const ae = addEmployees.filter(x => x && String(x.job || '').trim());
+                const re = clean(removeEmployees.map(x => String(x || '').trim()));
+                if (ap.length + ad.length + rp.length + rd.length + ae.length + re.length === 0) return;
                 const at = new Date().toISOString();
                 setMergeTombstones(prev => {
-                    const next = { periods: { ...(prev.periods || {}) }, dailyStatus: { ...(prev.dailyStatus || {}) } };
+                    const next = { periods: { ...(prev.periods || {}) }, dailyStatus: { ...(prev.dailyStatus || {}) }, employees: { ...(prev.employees || {}) } };
                     ap.forEach(k => { next.periods[k] = { at }; });
                     ad.forEach(k => { next.dailyStatus[k] = { at }; });
                     rp.forEach(k => { delete next.periods[k]; });
                     rd.forEach(k => { delete next.dailyStatus[k]; });
+                    ae.forEach(x => { next.employees[String(x.job).trim()] = { at, name: x.name || '' }; });
+                    re.forEach(k => { delete next.employees[k]; });
                     return next;
                 });
             };
@@ -3747,7 +3762,7 @@
                 );
             };
 
-            const analyzeMerge = (incoming, currentStaff, overrides = {}, tombstones = null) => {
+            const analyzeMerge = (incoming, currentStaff, overrides = {}, tombstones = null, incomingTombstones = null) => {
                 // رقم وظيفي يحمله أكثر من موظف لديك: لا يُعرف أيّهم المقصود، فلا يُقارَن ولا يُعدّ جديداً — تُنبّه إليه النافذة.
                 // والفهرس بلا نموذج أولي: رقم مثل «constructor» لا يطابق خاصية موروثة
                 const currentMap = Object.create(null);
@@ -3763,15 +3778,24 @@
                 const periodItems = [];
                 const localOnlyPeriods = [];
                 const fieldsToCompare = Object.keys(FIELD_NAMES_AR);
+                // الحذف اتجاهان: ما حُذف على الجهاز الآخر وما زال لديك، وما حذفتَه أنت وما زال الملف يحمله
+                const tombEmployeesOf = (t) => (t && typeof t === 'object' && t.employees && typeof t.employees === 'object') ? t.employees : {};
+                const incTombEmployees = tombEmployeesOf(incomingTombstones);
+                const localTombEmployees = tombEmployeesOf(tombstones);
+                const incomingJobs = new Set();
+                const previouslyDeleted = Object.create(null);
 
                 incoming.forEach(inc => {
                     const key = String(inc.jobNumber || '').trim();
                     if (!key) return;
+                    incomingJobs.add(key);
 
                     if (ambiguousJobs.has(key)) return;
                     const existing = currentMap[key];
                     if (!existing) {
                         added.push(inc);
+                        // موظف حذفتَه أنت والملف ما زال يحمله: يُعرض موسوماً وبلا تأشير، لا كإضافة عادية
+                        if (localTombEmployees[key]) previouslyDeleted[key] = localTombEmployees[key];
                     } else {
                         const employeeChanges = [];
                         fieldsToCompare.forEach(field => {
@@ -3814,7 +3838,17 @@
                     }
                 });
 
-                return { added, updated, periods: periodItems, localOnlyPeriods, ambiguousJobs: Array.from(ambiguousJobs), totalIncoming: incoming.length };
+                // شاهدة حذف في الملف لموظف ما زال لديك — إلا أن يكون الملف نفسه يحمله، فالقائمة أحدث من الشاهدة
+                const deletedElsewhere = Object.keys(incTombEmployees)
+                    .map(job => String(job).trim())
+                    .filter(job => job && currentMap[job] && !ambiguousJobs.has(job) && !incomingJobs.has(job))
+                    .map(job => ({
+                        jobNumber: job,
+                        name: currentMap[job].name || (incTombEmployees[job] && incTombEmployees[job].name) || '',
+                        at: (incTombEmployees[job] && incTombEmployees[job].at) || ''
+                    }));
+
+                return { added, updated, periods: periodItems, localOnlyPeriods, deletedElsewhere, previouslyDeleted, ambiguousJobs: Array.from(ambiguousJobs), totalIncoming: incoming.length };
             };
 
                         const commitBundleMetadata = (bundle) => {
@@ -3825,7 +3859,8 @@
                     const plain = (x) => (x && typeof x === 'object' && !Array.isArray(x)) ? x : {};
                     setMergeTombstones(prev => ({
                         periods: { ...(prev.periods || {}), ...plain(incomingTombs.periods) },
-                        dailyStatus: { ...(prev.dailyStatus || {}), ...plain(incomingTombs.dailyStatus) }
+                        dailyStatus: { ...(prev.dailyStatus || {}), ...plain(incomingTombs.dailyStatus) },
+                        employees: { ...(prev.employees || {}), ...plain(incomingTombs.employees) }
                     }));
                 }
                 if (bundle.officialHolidaysList && Array.isArray(bundle.officialHolidaysList)) {
@@ -3869,8 +3904,8 @@
             // فتح النافذة والضغط، فالاشتقاق الآن يضمن مطابقة الفروقات للبيانات الحيّة. والمفاتيح
             // (رقم، حقل) تبقى صالحة، وأي فرق جديد لم يره المستخدم لا مفتاح له في selection
             // فلا يُطبَّق — الاتجاه الآمن.
-            const handleSmartMerge = (incoming, selection = null, addSelection = null, periodSelection = null, clearDaysSelection = null, attendanceSelection = null) => {
-                const analysis = analyzeMerge(incoming, staff, dailyStatusOverrides, mergeTombstones);
+            const handleSmartMerge = (incoming, selection = null, addSelection = null, periodSelection = null, clearDaysSelection = null, attendanceSelection = null, deleteSelection = null) => {
+                const analysis = analyzeMerge(incoming, staff, dailyStatusOverrides, mergeTombstones, incomingBundle && incomingBundle.mergeTombstones);
                 const isPicked = (jobNumber, field) =>
                     selection === null ? true : !!selection[`${jobNumber}::${field}`];
                 const isAddPicked = (jobNumber) =>
@@ -3969,10 +4004,25 @@
                     }
                 });
 
+                // الموظفون الذين حُذفوا على الجهاز الآخر: لا يُحذف إلا المؤشَّر صراحةً، ويُسجَّل محذوفاً هنا أيضاً
+                const pickedDeletes = (analysis.deletedElsewhere || []).filter(
+                    d => deleteSelection !== null && !!deleteSelection[d.jobNumber]
+                );
+                const deletedJobs = new Set(pickedDeletes.map(d => d.jobNumber));
+                if (pickedDeletes.length > 0) {
+                    updateTombstones({ addEmployees: pickedDeletes.map(d => ({ job: d.jobNumber, name: d.name })) });
+                }
+                // ومن اخترت إعادته بعد أن كنت حذفته: تُمحى شاهدته وإلا بقي موسوماً «محذوف» إلى الأبد
+                const restoredJobs = pickedAdds
+                    .map(inc => String(inc.jobNumber || '').trim())
+                    .filter(job => job && (analysis.previouslyDeleted || {})[job]);
+                if (restoredJobs.length > 0) updateTombstones({ removeEmployees: restoredJobs });
+
                 // دمج القائمتين مع بقية الموظفين الذين لم يتغيروا
                 const mergedList = [];
                 staff.forEach(s => {
                     const key = String(s.jobNumber || '').trim();
+                    if (key && deletedJobs.has(key)) return;
                     if (key && currentMap[key]) {
                         mergedList.push(currentMap[key]);
                     } else {
@@ -4083,7 +4133,7 @@
                 const touchedEmployees = analysis.updated.filter(
                     upd => upd.changes.some(ch => isPicked(upd.jobNumber, ch.field))
                 ).length;
-                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}\n• الفترات المؤرخة المطبَّقة: ${appliedPeriodCount}\n• المواقف والعطل والإعدادات المطبَّقة: ${appliedAttendanceCount}`);
+                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم حذف: ${pickedDeletes.length} موظف\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}\n• الفترات المؤرخة المطبَّقة: ${appliedPeriodCount}\n• المواقف والعطل والإعدادات المطبَّقة: ${appliedAttendanceCount}`);
             };
 
             // رفع ملف أقدم من حالة السحابة يمحو كل ما حفظه الزملاء بعد تصديره — وحارس الحفظ العادي لا يراه،
@@ -4375,13 +4425,15 @@
             const mergeKeyOf = (jobNumber, field) => `${jobNumber}::${field}`;
             const mergeAnalysis = useMemo(() => {
                 if (!showMergeModal || !Array.isArray(incomingStaff) || incomingStaff.length === 0) return null;
-                return analyzeMerge(incomingStaff, staff, dailyStatusOverrides, mergeTombstones);
-            }, [showMergeModal, incomingStaff, staff, dailyStatusOverrides, mergeTombstones]);
+                return analyzeMerge(incomingStaff, staff, dailyStatusOverrides, mergeTombstones, incomingBundle && incomingBundle.mergeTombstones);
+            }, [showMergeModal, incomingStaff, staff, dailyStatusOverrides, mergeTombstones, incomingBundle]);
 
             // الحقول المؤشَّرة للتطبيق، والموظفون الجدد المؤشَّرون للإضافة (كلٌّ على حدة:
             // ملف زميل قديم قد يحمل من حُذف عمداً، أو من أُضيف عنده بالخطأ)
             const [mergeSelection, setMergeSelection] = useState({});
             const [mergeAddSelection, setMergeAddSelection] = useState({});
+            // الحذف لا يُؤشَّر تلقائياً أبداً: إزالة موظف لا رجعة فيها، والقاعدة أن لا يقع شيء بلا قرار صريح
+            const [mergeDeleteSelection, setMergeDeleteSelection] = useState({});
             // الفترات المؤرخة المؤشَّرة للتطبيق، ومسح الأيام المثبَّتة المخالفة داخل كل فترة — مفتاحهما مفتاح الفترة
             const [mergePeriodSelection, setMergePeriodSelection] = useState({});
             const [mergeClearDaysSelection, setMergeClearDaysSelection] = useState({});
@@ -4390,7 +4442,7 @@
             // فيُؤشَّر تلقائياً، وما له قيمة حالية — تعارضاً كان أو فرقاً إملائياً — يحتاج قرار
             // المستخدم فيبقى بلا تأشير. افتراض قابل للتجاوز في كل سطر، لا قاعدة تمنع.
             React.useEffect(() => {
-                if (!mergeAnalysis) { setMergeSelection({}); setMergeAddSelection({}); setMergePeriodSelection({}); setMergeClearDaysSelection({}); return; }
+                if (!mergeAnalysis) { setMergeSelection({}); setMergeAddSelection({}); setMergeDeleteSelection({}); setMergePeriodSelection({}); setMergeClearDaysSelection({}); return; }
                 const initial = {};
                 mergeAnalysis.updated.forEach(upd => {
                     upd.changes.forEach(ch => { initial[mergeKeyOf(upd.jobNumber, ch.field)] = ch.wasEmpty; });
@@ -4398,8 +4450,15 @@
                 setMergeSelection(initial);
                 // الإضافة كسبٌ لا تعارض فيه، فالافتراض قبولها — والانتقاء متاح
                 const adds = {};
-                mergeAnalysis.added.forEach(emp => { adds[String(emp.jobNumber || '').trim()] = true; });
+                mergeAnalysis.added.forEach(emp => {
+                    const job = String(emp.jobNumber || '').trim();
+                    // من حذفتَه أنت لا يعود مؤشَّراً: عودته الصامتة هي بالضبط ما تمنعه الشاهدة
+                    adds[job] = !(mergeAnalysis.previouslyDeleted || {})[job];
+                });
                 setMergeAddSelection(adds);
+                const dels = {};
+                (mergeAnalysis.deletedElsewhere || []).forEach(d => { dels[d.jobNumber] = false; });
+                setMergeDeleteSelection(dels);
                 // الفترة: الجديدة التي لا تمسّ شيئاً لديك، والكسب (ملاحظة أو تأكيد مباشرة كان فارغاً لديك) ⇒ مؤشَّرة؛
                 // ما يتداخل مع فترة أو حالة غير مؤرخة، أو يخالف يوماً مثبَّتاً، أو يغيّر فترة لديك ⇒ بلا تأشير.
                 // مسح الأيام المخالفة مؤشَّر افتراضاً: لا أثر له ما لم تُؤشَّر فترته، وبدونه لا تظهر الفترة في تلك الأيام.
@@ -4415,6 +4474,8 @@
 
             const toggleMergeAdd = (jobNumber) =>
                 setMergeAddSelection(prev => ({ ...prev, [jobNumber]: !prev[jobNumber] }));
+            const toggleMergeDelete = (jobNumber) =>
+                setMergeDeleteSelection(prev => ({ ...prev, [jobNumber]: !prev[jobNumber] }));
             const setMergeAddScope = (value) => {
                 if (!mergeAnalysis) return;
                 const next = {};
@@ -5745,7 +5806,8 @@
                     return;
                 }
                 
-                // حذف الموظف
+                // حذف الموظف — ويُسجَّل محذوفاً فلا يعود صامتاً من ملف أقدم يحمله
+                updateTombstones({ addEmployees: [{ job: editingEmployee.jobNumber, name: editingEmployee.name }] });
                 setStaff(staff.filter(s => s.id !== editingEmployee.id));
                 setShowEditModal(false);
                 setEditingEmployee(null);
@@ -6090,6 +6152,24 @@
             
             const [quickPeriod, setQuickPeriod] = useState(null);
 
+            // سجل فترات موظف واحد. الجدول لا يعرض إلا نوع الفترة السارية اليوم، فمداها وبقية
+            // فتراته لم تكن مرئية في الواجهة إطلاقاً: لا في بطاقته (حُذف محرّر الفترات منها عمداً)
+            // ولا في أي شاشة أخرى — كان لا بدّ من تصدير الملف وقراءته لمعرفة متى تنتهي إجازة.
+            const [periodHistoryEmpId, setPeriodHistoryEmpId] = useState(null);
+
+            // التواريخ داخل bdi: تاريخ بعد نصّ عربي ينعكس ترتيبه في العرض ثنائي الاتجاه
+            const periodSpanJsx = (p) => (p && p.to)
+                ? (<React.Fragment><bdi dir="ltr" className="whitespace-nowrap">{p.from}</bdi> ← <bdi dir="ltr" className="whitespace-nowrap">{p.to}</bdi></React.Fragment>)
+                : (<React.Fragment>منذ <bdi dir="ltr" className="whitespace-nowrap">{p ? p.from : ''}</bdi> (مستمرة)</React.Fragment>);
+            const periodPhaseOf = (p, today) => (p && p.to && p.to < today) ? 'منتهية' : ((p && p.from > today) ? 'قادمة' : 'سارية');
+
+            React.useEffect(() => {
+                if (!periodHistoryEmpId) return;
+                const onKey = (e) => { if (e.key === 'Escape') setPeriodHistoryEmpId(null); };
+                window.addEventListener('keydown', onKey);
+                return () => window.removeEventListener('keydown', onKey);
+            }, [periodHistoryEmpId]);
+
             const addMonthsClamped = (dateStr, months) => {
                 const parts = dateStr.split('-').map(Number);
                 const target = new Date(parts[0], parts[1] - 1 + months, 1);
@@ -6153,6 +6233,68 @@
                 });
             };
 
+            // التعديل لا يفتح محرّراً ثانياً: النافذة نفسها مملوءة، فيبقى إدخال الفترات في مسار واحد
+            const openPeriodEdit = (emp, p) => {
+                if (!canEdit('staffMaster')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل موقف المنتسبين!');
+                    return;
+                }
+                // «إجازة طويلة» في النافذة فئة تتفرّع بمفتاح «براتب» إلى اعتيادية/بدون راتب، فتُعكَس هنا.
+                // أما نوع مخزَّن اسمه «إجازة طويلة» حرفياً (من استيراد قديم) فيُقفَل نوعه كي لا يتبدّل صامتاً.
+                const isSplit = (p.type === 'إجازة اعتيادية' || p.type === 'إجازة بدون راتب');
+                // فترة قديمة بلا معرّف (ملف يدوي أو نسخة سابقة على اعتماد per_<وقت>): تُمنح معرّفاً ثابتاً
+                // وتُحفظ فوراً — وإلا صار editingId أدناه undefined فتُحفَظ فترة موازية بدل استبدال هذه
+                let period = p;
+                if (!period.id) {
+                    const newId = 'per_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+                    const patched = periodsOf(emp).map(x => x === p ? { ...x, id: newId } : x);
+                    const patchedStaff = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: patched } : s);
+                    setStaff(patchedStaff);
+                    safeStorage.setItem('staffData', JSON.stringify(patchedStaff));
+                    period = { ...p, id: newId };
+                }
+                setPeriodHistoryEmpId(null);
+                setQuickPeriod({
+                    empId: emp.id,
+                    empName: emp.name,
+                    category: isSplit ? 'إجازة طويلة' : period.type,
+                    keepType: !isSplit,
+                    paid: period.type !== 'إجازة بدون راتب',
+                    from: period.from,
+                    mode: 'date',
+                    count: '',
+                    unit: 'days',
+                    to: period.to || '',
+                    editingId: period.id,
+                    note: period.note || '',
+                    originalTo: period.to || '',
+                    confirmedReturn: !!period.confirmedReturn
+                });
+            };
+
+            const deletePeriodFromHistory = (emp, p) => {
+                if (!canEdit('staffMaster')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل موقف المنتسبين!');
+                    return;
+                }
+                const NL = String.fromCharCode(10);
+                const ok = confirm('⚠️ حذف الفترة «' + p.type + '» (' + p.from + ' → ' + (p.to || 'مستمرة') + ')؟' + NL + NL +
+                    'تُحذف من جهازك، وتُسجَّل كمحذوفة فلا يُعيدها ملف أقدم عند المزامنة.');
+                if (!ok) return;
+                // تطابق المرجع وحده، لا id: p هو الكائن الحيّ نفسه من emp.statusPeriods (نافذة السجل
+                // تبنيه بـ .slice() — نسخ ضحل يبقي الكائنات كما هي)، ومقارنة id عند غيابه (undefined) كانت
+                // تحذف كل الفترات بلا معرّف معاً بدل واحدة فقط
+                const rest = periodsOf(emp).filter(x => x !== p);
+                updateTombstones({ addPeriods: [periodIdentityOf(p)] });
+                // الحالة تتبع فترة اليوم بعد الحذف، لا نوع الفترة المحذوفة
+                const activeNow = getActivePeriod({ ...emp, statusPeriods: rest }, localDateStr());
+                const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: rest, status: (activeNow && !activeNow.legacy) ? activeNow.type : 'نشط' } : s);
+                setStaff(updated);
+                safeStorage.setItem('staffData', JSON.stringify(updated));
+                pushDataToCloud();
+                if (typeof logAuditEvent === 'function') logAuditEvent('delete_period:' + p.type + ':' + (emp.jobNumber || emp.id), currentUserName);
+            };
+
             const saveQuickPeriod = () => {
                 if (!quickPeriod) return;
                 const emp = staff.find(s => s.id === quickPeriod.empId);
@@ -6163,7 +6305,9 @@
                     return;
                 }
                 // «إجازة طويلة» فئة يُضغط عليها في القائمة لا نوع مخزَّن: الطويلة براتب هي اعتيادية بمدة طويلة
-                const periodType = quickPeriod.category === 'إجازة طويلة'
+                // التعديل يُبقي الفترة بهويتها: تُستثنى من فحص التداخل مع نفسها، ويُعاد استعمال معرّفها
+                const editingId = quickPeriod.editingId || null;
+                const periodType = (quickPeriod.category === 'إجازة طويلة' && !quickPeriod.keepType)
                     ? (quickPeriod.paid ? 'إجازة اعتيادية' : 'إجازة بدون راتب')
                     : quickPeriod.category;
                 const to = quickPeriodEnd(quickPeriod);
@@ -6176,7 +6320,7 @@
                     return;
                 }
 
-                const existing = periodsOf(emp).filter(p => p && p.from);
+                const existing = periodsOf(emp).filter(p => p && p.from && p.id !== editingId);
                 const newEnd = to || '9999-12-31';
                 const conflicts = existing.filter(p => {
                     const pEnd = p.to || '9999-12-31';
@@ -6195,7 +6339,7 @@
                     );
                     if (!ok) return;
                 }
-                const keptPeriods = periodsOf(emp).filter(p => !conflicts.some(c => c.id === p.id));
+                const keptPeriods = periodsOf(emp).filter(p => !conflicts.some(c => c.id === p.id) && p.id !== editingId);
 
                 // موظف بحالة قديمة بلا فترات: إضافة أول فترة له تُسقِط الرجوع الضمني إلى emp.status
                 // (getActivePeriod يتوقف عن استخدامه بمجرد وجود أي فترة) — فتُرحَّل الحالة القديمة
@@ -6203,7 +6347,13 @@
                 const legacySeed = (periodsOf(emp).length === 0 && emp.status && emp.status !== 'نشط' && emp.status !== periodType)
                     ? [{ id: 'per_legacy_' + Date.now(), type: emp.status, from: '1900-01-01', to: localDateStr(new Date(from).getTime() - 86400000), note: 'ترحيل تلقائي من الحالة القديمة' }]
                     : [];
-                const newPeriod = { id: 'per_' + Date.now(), type: periodType, from, to, note: '' };
+                // تأكيد المباشرة يسقط إن تغيّرت نهاية الفترة: النهاية الجديدة تُسأل عنها من جديد
+                const newPeriod = {
+                    id: editingId || ('per_' + Date.now()),
+                    type: periodType, from, to,
+                    note: quickPeriod.note || '',
+                    ...((editingId && quickPeriod.confirmedReturn && (quickPeriod.originalTo || '') === (to || '')) ? { confirmedReturn: true } : {})
+                };
                 const updatedPeriods = [...legacySeed, ...keptPeriods, newPeriod];
 
                 // التعديلات اليومية تسبق الفترات في getEmployeeDailyStatus، فيوم مُثبَّت يدوياً
@@ -6243,7 +6393,10 @@
                     // الفترة المحفوظة الآن حيّة: لا تبقى لهويتها تذكرة (تُزال بعد الإضافة فتغلب إن تطابقت الهويتان)
                     removePeriods: [periodIdentityOf(newPeriod)]
                 });
-                const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: updatedPeriods, status: periodType } : s);
+                // الحالة تتبع الفترة السارية اليوم لا الفترة المحفوظة: فترة تبدأ الشهر القادم
+                // كانت تجعل المنتسب «في دورة» من الآن في العدّادات وشارة الجدول
+                const activeToday = getActivePeriod({ ...emp, statusPeriods: updatedPeriods }, localDateStr());
+                const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: updatedPeriods, status: (activeToday && !activeToday.legacy) ? activeToday.type : 'نشط' } : s);
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
                 pushDataToCloud();
@@ -10677,6 +10830,7 @@
                                                                                 if (confirm(`⚠️ هل أنت متأكد من حذف الموظف؟\n\nالموظف: ${s.name}\nالرقم الوظيفي: ${s.jobNumber}\n\n⚠️ هذه العملية لا يمكن التراجع عنها!`)) {
                                                                                     const userInput = prompt(`⚠️⚠️ تأكيد نهائي ⚠️⚠️\n\nأنت على وشك حذف: ${s.name}\n\nاكتب اسم الموظف الأول (${firstName}) للتأكيد:`);
                                                                                     if (userInput === firstName) {
+                                                                                        updateTombstones({ addEmployees: [{ job: s.jobNumber, name: s.name }] });
                                                                                         setStaff(staff.filter(emp => emp.id !== s.id));
                                                                                         alert('✅ تم حذف الموظف من النظام');
                                                                                     } else {
@@ -10767,6 +10921,22 @@
                                                                     </span>
                                                                 );
                                                             })()}
+                                                            {(() => {
+                                                                // مدى الفترة السارية تحت الشارة: يُقرأ بلا نقرة، والنقر يفتح السجل كاملاً
+                                                                const periodList = periodsOf(s);
+                                                                if (periodList.length === 0) return null;
+                                                                const activeNow = getActivePeriod(s, localDateStr());
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setPeriodHistoryEmpId(s.id)}
+                                                                        title="عرض سجل الفترات المؤرخة لهذا المنتسب"
+                                                                        className="mt-1 mx-auto block text-[11px] font-bold text-slate-500 hover:text-indigo-700 hover:underline cursor-pointer"
+                                                                    >
+                                                                        📅 {(activeNow && !activeNow.legacy) ? periodSpanJsx(activeNow) : `سجل الفترات (${periodList.length})`}
+                                                                    </button>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         )}
                                                     </tr>
@@ -10844,6 +11014,34 @@
                                                 <span>{incomingStaff.length} موظف</span>
                                             </div>
 
+                                            {(analysis.deletedElsewhere || []).length > 0 && (
+                                                <div className="mt-2 bg-white bg-opacity-80 p-3 rounded-xl border border-rose-100 font-normal space-y-1.5 text-right">
+                                                    <div className="border-b border-rose-100 pb-1.5">
+                                                        <span className="font-black text-rose-900">🗑️ موظفون محذوفون على الجهاز الآخر وما زالوا لديك:</span>
+                                                    </div>
+                                                    <div className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                                                        لا يُحذف أحد إلا بتأشيرك. الحذف يُزيل الموظف من جهازك ويُسجَّل، فلا يعود من ملف أقدم.
+                                                    </div>
+                                                    <div className="max-h-28 overflow-y-auto space-y-0.5 text-[11px]">
+                                                        {(analysis.deletedElsewhere || []).map((del, dIdx) => {
+                                                            const picked = !!mergeDeleteSelection[del.jobNumber];
+                                                            return (
+                                                                <label key={del.jobNumber || dIdx} data-delete-job={del.jobNumber}
+                                                                    className={`flex items-center gap-1.5 cursor-pointer rounded px-1 py-0.5 ${picked ? 'bg-rose-50' : ''}`}>
+                                                                    <input type="checkbox" checked={picked}
+                                                                        onChange={() => toggleMergeDelete(del.jobNumber)}
+                                                                        className="w-3.5 h-3.5 accent-rose-600 cursor-pointer" />
+                                                                    <span className={picked ? 'text-rose-900 font-bold' : 'text-slate-500'}>
+                                                                        {picked ? 'سيُحذف من جهازك:' : 'يبقى لديك:'} {del.name} <span className="font-mono">({del.jobNumber})</span>
+                                                                        {del.at ? <span className="text-slate-400"> — حُذف هناك <bdi dir="ltr" className="whitespace-nowrap">{String(del.at).slice(0, 10)}</bdi></span> : null}
+                                                                    </span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             {analysis.added.length > 0 && (
                                                 <div className="mt-2 bg-white bg-opacity-80 p-3 rounded-xl border border-indigo-100 font-normal space-y-1.5 text-right">
                                                     <div className="flex justify-between items-center flex-wrap gap-1.5 border-b pb-1.5">
@@ -10859,14 +11057,18 @@
                                                         {analysis.added.map((emp, aIdx) => {
                                                             const num = String(emp.jobNumber || '').trim();
                                                             const picked = !!mergeAddSelection[num];
+                                                            const wasDeleted = (analysis.previouslyDeleted || {})[num];
                                                             return (
-                                                                <label key={num || aIdx}
+                                                                <label key={num || aIdx} data-add-job={num}
                                                                     className={`flex items-center gap-1.5 cursor-pointer rounded px-1 py-0.5 ${picked ? 'bg-indigo-50/60' : ''}`}>
                                                                     <input type="checkbox" checked={picked}
                                                                         onChange={() => toggleMergeAdd(num)}
                                                                         className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
                                                                     <span className={picked ? 'text-indigo-950 font-bold' : 'text-slate-400'}>
                                                                         {emp.name} <span className="font-mono">({num})</span>
+                                                                        {wasDeleted ? (
+                                                                            <span className="text-rose-700 font-bold"> — حذفتَه سابقاً{wasDeleted.at ? <React.Fragment> <bdi dir="ltr" className="whitespace-nowrap">{String(wasDeleted.at).slice(0, 10)}</bdi></React.Fragment> : null}؛ التأشير يُعيده</span>
+                                                                        ) : null}
                                                                     </span>
                                                                 </label>
                                                             );
@@ -11174,7 +11376,7 @@
                                             return (
                                         <button
                                             disabled={nothingToDo}
-                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection, mergePeriodSelection, mergeClearDaysSelection, mergeAttendanceSelection)}
+                                            onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection, mergePeriodSelection, mergeClearDaysSelection, mergeAttendanceSelection, mergeDeleteSelection)}
                                             className={`w-full text-right p-4 rounded-2xl border-2 transition group flex gap-4 items-start ${
                                                 nothingToDo
                                                     ? 'border-slate-100 opacity-50 cursor-not-allowed'
@@ -11983,7 +12185,7 @@
                 <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[130] flex items-center justify-center p-4 no-print">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
                         <div className="bg-gradient-to-r from-indigo-700 to-blue-800 p-4 text-white">
-                            <h3 className="text-base font-black flex items-center gap-2"><span>📅</span><span>تسجيل فترة: {quickPeriod.category}</span></h3>
+                            <h3 className="text-base font-black flex items-center gap-2"><span>📅</span><span>{quickPeriod.editingId ? 'تعديل فترة' : 'تسجيل فترة'}: {quickPeriod.category}</span></h3>
                         </div>
                         <div className="p-5 space-y-4 text-right">
                             <p className="text-sm font-black text-slate-900">{quickPeriod.empName}</p>
@@ -12082,7 +12284,7 @@
                             <div className="flex gap-2">
                                 <button type="button" onClick={saveQuickPeriod} disabled={!quickPeriodEnd(quickPeriod) && quickPeriod.category !== 'غياب'}
                                     className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">
-                                    💾 حفظ الفترة
+                                    {quickPeriod.editingId ? '💾 حفظ التعديل' : '💾 حفظ الفترة'}
                                 </button>
                                 <button type="button" onClick={() => setQuickPeriod(null)} className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black rounded-xl text-xs transition cursor-pointer">
                                     ✕ إلغاء
@@ -12092,6 +12294,62 @@
                     </div>
                 </div>
             )}
+
+            {periodHistoryEmpId && (() => {
+                const emp = (staff || []).find(s => s.id === periodHistoryEmpId);
+                if (!emp) return null;
+                const today = localDateStr();
+                const list = periodsOf(emp).slice().sort((a, b) => (a.from < b.from ? 1 : -1));
+                const canManage = canEdit('staffMaster');
+                return (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[120] p-4 no-print" onClick={() => setPeriodHistoryEmpId(null)}>
+                    <div className="bg-white rounded-3xl max-w-lg w-full max-h-[88vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200" onClick={(e) => e.stopPropagation()}>
+                        <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white p-4 flex items-center justify-between flex-shrink-0">
+                            <div className="text-right">
+                                <h3 className="text-base font-black">📅 سجل فترات الموظف</h3>
+                                <p className="text-xs font-bold text-indigo-100 mt-0.5">{emp.name} — {emp.jobNumber}</p>
+                            </div>
+                            <button type="button" onClick={() => setPeriodHistoryEmpId(null)} aria-label="إغلاق سجل الفترات" title="إغلاق (Esc)"
+                                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-bold transition cursor-pointer flex-shrink-0">✕</button>
+                        </div>
+                        <div className="p-4 space-y-2 overflow-y-auto">
+                            {list.length === 0 ? (
+                                <p className="text-sm font-bold text-slate-500 text-center py-6">لا فترات مؤرخة لهذا المنتسب.</p>
+                            ) : list.map((p, idx) => {
+                                const phase = periodPhaseOf(p, today);
+                                const phaseClass = phase === 'سارية' ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                    : phase === 'قادمة' ? 'bg-sky-100 text-sky-800 border-sky-300'
+                                    : 'bg-slate-100 text-slate-600 border-slate-300';
+                                return (
+                                    <div key={p.id || (p.type + p.from + idx)} data-period-id={p.id || ''}
+                                        className="border border-slate-200 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2 py-0.5 rounded-full text-[11px] font-black border ${phaseClass}`}>{phase}</span>
+                                                <span className="text-sm font-black text-slate-800">{p.type}</span>
+                                            </div>
+                                            <div className="text-xs font-bold text-slate-600">{periodSpanJsx(p)}</div>
+                                            {p.note ? <div className="text-[11px] font-bold text-slate-500">📝 {p.note}</div> : null}
+                                        </div>
+                                        {canManage && (
+                                            <div className="flex gap-2 flex-shrink-0">
+                                                <button type="button" onClick={() => openPeriodEdit(emp, p)}
+                                                    className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-black border border-indigo-200 transition cursor-pointer">تعديل</button>
+                                                <button type="button" onClick={() => deletePeriodFromHistory(emp, p)}
+                                                    className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 text-xs font-black border border-rose-200 transition cursor-pointer">حذف</button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 text-[11px] font-bold text-slate-600 flex-shrink-0">
+                            التعديل يفتح نافذة الفترة نفسها مملوءة، والحذف يُسجَّل فلا يُعيده ملف أقدم.
+                        </div>
+                    </div>
+                </div>
+                );
+            })()}
 
             {waterMemoGroup && (() => {
                 const sum = getWaterGroupSummary(waterMemoGroup, waterMonth);
