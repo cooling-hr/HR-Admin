@@ -4775,6 +4775,65 @@
                 alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}\n• الفترات المؤرخة المطبَّقة: ${appliedPeriodCount}\n• المواقف والعطل والإعدادات المطبَّقة: ${appliedAttendanceCount}`);
             };
 
+            // رفع ملف أقدم من حالة السحابة يمحو كل ما حفظه الزملاء بعد تصديره — وحارس الحفظ العادي لا يراه،
+            // لأن الجهاز حمّل السحابة للتوّ فختمها يطابق ما يعرفه. فيُقرأ ختم الخادم ويُقارَن بمرجع النسخة
+            // السحابية المكتوب في الملف (baseCloudUpdate)، لا بتاريخ تصديره: جهاز لم يزامن منذ أيام يصدّر
+            // اليوم ملفاً بيانات قديمة. في الأوفلاين لا سحابة أصلاً، فتمرّ العملية بلا فحص.
+            const confirmCloudFreshness = async (bundle) => {
+                if (typeof FIREBASE_DB_URL === 'undefined' || !FIREBASE_DB_URL || typeof cloudFetch !== 'function') return true;
+                if (window.location.protocol === 'file:') return true;
+                const NL = String.fromCharCode(10);
+                const ms = (v) => {
+                    if (typeof v !== 'string' || !v) return null;
+                    const t = Date.parse(v);
+                    return Number.isFinite(t) ? t : null;
+                };
+                const human = (v) => {
+                    const t = ms(v);
+                    return t === null ? 'غير مذكور' : new Date(t).toISOString().slice(0, 16).replace('T', ' ');
+                };
+                // التوقف هو الافتراض: الاستبدال الكامل لا يُراجَع بعده شيء
+                const ask = (head) => confirm(head + NL + NL + 'موافق = المتابعة على مسؤوليتك.' + NL + 'إلغاء = إيقاف العملية.');
+                let serverStamp = null;
+                try {
+                    const res = await cloudFetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now());
+                    if (!res.ok) {
+                        return ask('⚠️ تعذّر التحقق من حالة السحابة قبل الاستبدال (رمز ' + res.status + ').' + NL +
+                            'لا نعرف هل في السحابة عمل أحدث من هذا الملف، والاستبدال الكامل يمحوه إن وُجد.');
+                    }
+                    serverStamp = await res.json();
+                } catch (e) {
+                    return ask('⚠️ تعذّر الاتصال بالسحابة للتحقق قبل الاستبدال.' + NL +
+                        'لا نعرف هل في السحابة عمل أحدث من هذا الملف، والاستبدال الكامل يمحوه إن وُجد.');
+                }
+                const serverMs = ms(serverStamp);
+                if (serverMs === null) {
+                    return ask('⚠️ تعذّر قراءة ختم آخر حفظ سحابي، فلا يمكن التحقق من أن هذا الملف أحدث.');
+                }
+                const baseMs = ms(bundle && bundle.baseCloudUpdate);
+                if (baseMs !== null) {
+                    // التطابق النصّي التام وحده يُقبل: المرجع يأتي من الملف نفسه، فمرجع من المستقبل (ملف معدَّل
+                    // أو ساعة جهاز مختلّة) — أو صيغة نصّية أخرى للحظة نفسها — لا يُثبت أنه ختم الخادم بعينه
+                    if (bundle.baseCloudUpdate === serverStamp) return true;
+                    if (baseMs >= serverMs) {
+                        return ask('⚠️ مرجع النسخة السحابية في هذا الملف لا يطابق آخر ختم سحابي.' + NL + NL +
+                            'آخر حفظ سحابي: ' + human(serverStamp) + NL +
+                            'المرجع المذكور في الملف: ' + human(bundle.baseCloudUpdate) + NL + NL +
+                            'لا يمكن إثبات أن هذا الملف يحمل كل ما في السحابة.');
+                    }
+                    return ask('⚠️ السحابة أحدث من هذا الملف!' + NL + NL +
+                        'آخر حفظ سحابي: ' + human(serverStamp) + NL +
+                        'النسخة السحابية التي بُني عليها الملف: ' + human(bundle.baseCloudUpdate) + NL + NL +
+                        'الاستبدال الكامل يمحو كل ما حفظه الزملاء بعد تلك النسخة.' + NL +
+                        'الأسلم: استورد نسخة السحابة إلى جهازك أولاً، ثم ارفع.');
+                }
+                return ask('⚠️ هذا الملف لا يحمل مرجع النسخة السحابية التي بُني عليها، فلا يمكن إثبات أنه أحدث.' + NL + NL +
+                    'آخر حفظ سحابي: ' + human(serverStamp) + NL +
+                    'تاريخ تصدير الملف: ' + human(bundle && bundle.exportDate) + NL + NL +
+                    'الاستبدال الكامل يمحو كل ما في السحابة ويضع مكانه هذا الملف.' + NL +
+                    'الأسلم: استورد نسخة السحابة إلى جهازك أولاً، ثم ارفع.');
+            };
+
             const handleFullOverwrite = (incoming) => {
                 commitBundleMetadata(incomingBundle);
                 const sorted = sortByUnit(incoming);
@@ -6129,7 +6188,9 @@
                         twoShiftAnchorSquad: twoShiftAnchorSquad,
                         dataEntryOperator: dataEntryOperator,
                         overtimeSelectedIds: overtimeIds,
-                        mergeTombstones: mergeTombstones
+                        mergeTombstones: mergeTombstones,
+                        // مرجع النسخة السحابية التي بُني عليها هذا الملف: يُقارَن قبل أي استبدال كامل
+                        baseCloudUpdate: (typeof knownServerUpdateRef !== 'undefined' && knownServerUpdateRef && knownServerUpdateRef.current) ? knownServerUpdateRef.current : ''
                     };
                     const dataStr = JSON.stringify(backupData, null, 2);
                     const dataBlob = new Blob([dataStr], {type: 'application/json'});
@@ -12230,7 +12291,8 @@
 
                                         {/* الخيار الثاني: الاستبدال الكامل */}
                                         <button 
-                                            onClick={() => {
+                                            onClick={async () => {
+                                                if (!(await confirmCloudFreshness(incomingBundle))) return;
                                                 if (confirm('⚠️ تنبيه هام: هذا الإجراء سيقوم بحذف كل البيانات الحالية واستبدالها بالكامل ببيانات الملف المرفوع! هل أنت متأكد؟')) {
                                                     handleFullOverwrite(incomingStaff);
                                                 }
