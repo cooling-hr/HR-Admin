@@ -22,12 +22,12 @@ DESKTOP = os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop")
 if not os.path.isdir(DESKTOP):
     DESKTOP = os.path.join(os.path.expanduser("~"), "Desktop")
 
-CLOUD_SRC = os.path.join(WORKSPACE, "نظام_ادارة_الملاك_v9.0_cloud.html")
-OFFLINE_SRC = os.path.join(WORKSPACE, "نظام_ادارة_الملاك_v9.0_offline.html")
+CLOUD_SRC = os.path.join(WORKSPACE, "نظام_ادارة_الملاك_v9.5_cloud.html")
+OFFLINE_SRC = os.path.join(WORKSPACE, "نظام_ادارة_الملاك_v9.5_offline.html")
 INDEX_SRC = os.path.join(WORKSPACE, "index.html")
 
-CLOUD_DEST = os.path.join(DESKTOP, "نظام_ادارة_الملاك_v9.0_سحابي_رسمي.html")
-OFFLINE_DEST = os.path.join(DESKTOP, "نظام_ادارة_الملاك_v9.0_أوفلاين_محلي_مستقل.html")
+CLOUD_DEST = os.path.join(DESKTOP, "نظام_ادارة_الملاك_v9.5_سحابي_رسمي.html")
+OFFLINE_DEST = os.path.join(DESKTOP, "نظام_ادارة_الملاك_v9.5_أوفلاين_محلي_مستقل.html")
 
 CLOUD_MARKERS = ("firebaseio", "identitytoolkit", "AIza")
 
@@ -49,7 +49,7 @@ def main():
 
     # 1. النسخة السحابية يجب أن تطابق index.html بايت ببايت
     if read(INDEX_SRC) != read(CLOUD_SRC):
-        fail("النسخة السحابية لا تطابق index.html. شغّل: cp index.html \"نظام_ادارة_الملاك_v9.0_cloud.html\"")
+        fail("النسخة السحابية لا تطابق index.html. شغّل: cp index.html \"نظام_ادارة_الملاك_v9.5_cloud.html\"")
     print("  ✓ النسخة السحابية مطابقة لـ index.html")
 
     # 2. النسخة الأوفلاين يجب أن تخلو من أي أثر للسحابة
