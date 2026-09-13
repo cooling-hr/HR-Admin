@@ -1197,6 +1197,7 @@
             const [periodUnitFilter, setPeriodUnitFilter] = useState('all');
             const [periodWorkTypeFilter, setPeriodWorkTypeFilter] = useState('all');
             const [periodShowMatrix, setPeriodShowMatrix] = useState(false);
+            const [showSquadSchedule, setShowSquadSchedule] = useState(false);
             const [periodSearchQuery, setPeriodSearchQuery] = useState('');
             const [expandedEmpPeriod, setExpandedEmpPeriod] = useState(null);
 
@@ -3079,6 +3080,21 @@
                 const d1 = new Date(parseInt(p1[0]), parseInt(p1[1]) - 1, parseInt(p1[2]));
                 const d2 = new Date(parseInt(p2[0]), parseInt(p2[1]) - 1, parseInt(p2[2]));
                 return Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
+            };
+
+            // الوجبات المستلمة في يوم ما من دورة المناوبة المعتمدة وحدها — بلا إجازات ولا تعديلات فردية.
+            // مطابقة حرفياً للدورة في getEmployeeDefaultNaturalStatus: الثلاثية وجبة واحدة 24 ساعة،
+            // والثنائية صباحي + مسائي بالتسلسل A/B ثم C/A ثم D/C ثم B/D.
+            const getSquadsOnDuty = (dateStr) => {
+                const diffDays = getDaysBetweenDates(dateStr, anchorDate);
+                const squads = ['A', 'B', 'C', 'D'];
+                const idxAnchor = squads.indexOf(threeShiftAnchorSquad);
+                const triple = idxAnchor === -1 ? '' : squads[(idxAnchor + (diffDays % 4) + 4) % 4];
+                const squadToDayMap = { 'A': 1, 'C': 2, 'D': 3, 'B': 4 };
+                const anchorDay = squadToDayMap[twoShiftAnchorSquad] || 1;
+                const cycleDay = ((anchorDay - 1 + diffDays) % 4 + 4) % 4 + 1;
+                const doubleByDay = { 1: ['A', 'B'], 2: ['C', 'A'], 3: ['D', 'C'], 4: ['B', 'D'] };
+                return { triple, morning: doubleByDay[cycleDay][0], evening: doubleByDay[cycleDay][1] };
             };
 
             const getArabicDayName = (dateStr) => {
@@ -7808,6 +7824,7 @@
             useEscapeClose(showEditModal && !!editingEmployee, cancelEdit);
             useEscapeClose(showPrintForm, () => setShowPrintForm(false));
             useEscapeClose(!!waterMemoGroup, () => setWaterMemoGroup(null));
+            useEscapeClose(showSquadSchedule, () => setShowSquadSchedule(false));
 
 
 return (
@@ -10902,6 +10919,18 @@ return (
                                                             📅 مصفوفة الأيام
                                                         </button>
                                                     </div>
+                                                    <button
+                                                        onClick={() => setShowSquadSchedule(true)}
+                                                        disabled={periodReportData.datesList.length === 0}
+                                                        className={`px-3 py-1.5 rounded-xl text-[11px] font-black shadow-sm transition no-print flex items-center gap-1 ${
+                                                            periodReportData.datesList.length === 0
+                                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95'
+                                                        }`}
+                                                        title="جدول الوجبات المستلمة لكل يوم في الفترة وفق دورة المناوبة، بغض النظر عن الإجازات"
+                                                    >
+                                                        🔄 توزيع الوجبات
+                                                    </button>
                                                     {/* الطباعة هنا لا في زر التصدير العام: ذاك يُخرج مستند الإجماليات، وهذا يُخرج المصفوفة */}
                                                     {periodShowMatrix && (
                                                         <button
@@ -13475,6 +13504,79 @@ return (
                 </div>
                 );
             })()}
+
+            {showSquadSchedule && (
+                <div className="preview-overlay">
+                    <div className="preview-container" style={{maxWidth: '850px', width: '100%'}}>
+                        <div className="preview-header no-print">
+                            <div>
+                                <h2 className="text-2xl font-bold">🔄 توزيع وجبات المناوبين</h2>
+                                <p className="text-sm mt-1 opacity-90">وفق دورة الوجبات المعتمدة — لا يتضمن الإجازات أو التبديلات الفردية</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => window.print()} className="bg-white text-cyan-700 px-4 py-2 rounded-lg font-bold hover:bg-cyan-50 transition">🖨️ طباعة</button>
+                                <button onClick={() => setShowSquadSchedule(false)} className="text-white hover:bg-white hover:bg-opacity-20 px-4 py-2 rounded-lg transition">✕ إغلاق</button>
+                            </div>
+                        </div>
+
+                        <div className="preview-body paper-sheet p-8 bg-white text-black font-sans" style={{maxHeight: '75vh', overflowY: 'auto'}} dir="rtl">
+                            <div className="flex justify-between items-start text-[11px] mb-2">
+                                <img src={BOC_LOGO_DATA_URI} alt="B.O.C" className="w-16 h-16 rounded-full object-cover border border-black" />
+                                <div className="text-center">
+                                    <div className="font-bold">جمهورية العراق</div>
+                                    <div className="font-bold">وزارة النفط</div>
+                                    <div className="font-bold">شركة نفط البصرة (شركة عامة)</div>
+                                    <div className="font-bold text-sm">شعبة تبريد المركز ومحطة عزل نهر بن عمر</div>
+                                </div>
+                                <div className="w-16"></div>
+                            </div>
+
+                            <div className="text-center mt-4 mb-1">
+                                <span className="font-black text-base underline">م/جدول توزيع وجبات المناوبين</span>
+                            </div>
+                            <p className="text-center font-bold text-sm mb-3">للفترة من {periodStartDate} إلى {periodEndDate}</p>
+
+                            <table className="w-full border-collapse border border-black text-[11px] text-center">
+                                <thead>
+                                    <tr className="bg-slate-200 font-bold">
+                                        <th className="border border-black p-1" rowSpan={2}>التاريخ</th>
+                                        <th className="border border-black p-1" rowSpan={2}>اليوم</th>
+                                        <th className="border border-black p-1">المناوبة الثلاثية (24 ساعة)</th>
+                                        <th className="border border-black p-1" colSpan={2}>المناوبة الثنائية (12 ساعة)</th>
+                                    </tr>
+                                    <tr className="bg-slate-100 font-bold">
+                                        <th className="border border-black p-1">الوجبة المستلمة</th>
+                                        <th className="border border-black p-1">الوجبة الصباحية</th>
+                                        <th className="border border-black p-1">الوجبة المسائية</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {periodReportData.datesList.map(d => {
+                                        const s = getSquadsOnDuty(d);
+                                        return (
+                                            <tr key={d} data-squad-date={d}>
+                                                <td className="border border-black p-1 font-mono">{d}</td>
+                                                <td className="border border-black p-1">{getArabicDayName(d)}</td>
+                                                <td className="border border-black p-1 font-black">{s.triple || '—'}</td>
+                                                <td className="border border-black p-1 font-black">{s.morning}</td>
+                                                <td className="border border-black p-1 font-black">{s.evening}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+
+                            <div className="grid grid-cols-3 gap-4 mt-10 text-center text-xs font-bold">
+                                <div>
+                                    <div className="border-t border-black pt-1 mt-8">مسؤول الشعبة</div>
+                                </div>
+                                <div></div>
+                                <div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showEditModal && editingEmployee && (
                         <div className="preview-overlay">
