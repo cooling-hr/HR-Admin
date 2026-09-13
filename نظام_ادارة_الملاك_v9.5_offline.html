@@ -5842,7 +5842,7 @@
                     return;
                 }
                 const duplicate = staff.find(s =>
-                    String(s.jobNumber).trim() === jobNumStr && s.id !== editingEmployee.id
+                    normalizeJobNumber(s.jobNumber) === jobNumStr && s.id !== editingEmployee.id
                 );
                 if (duplicate) {
                     alert(`⛔ الرقم الوظيفي ${jobNumStr} مستخدم مسبقاً!\n\nالموظف: ${duplicate.name}\nالوحدة: ${duplicate.unit}\n\nالرجاء إدخال رقم وظيفي مختلف.`);
