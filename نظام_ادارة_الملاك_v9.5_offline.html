@@ -12398,13 +12398,13 @@ return (
                                     <tr className="bg-slate-200 font-bold">
                                         <th className="border border-black p-1" rowSpan={2}>التاريخ</th>
                                         <th className="border border-black p-1" rowSpan={2}>اليوم</th>
-                                        <th className="border border-black p-1">المناوبة الثلاثية (24 ساعة)</th>
-                                        <th className="border border-black p-1" colSpan={2}>المناوبة الثنائية (12 ساعة)</th>
+                                        <th className="border border-black p-1">المناوبة الثلاثية</th>
+                                        <th className="border border-black p-1" colSpan={2}>المناوبة الثنائية</th>
                                     </tr>
                                     <tr className="bg-slate-100 font-bold">
-                                        <th className="border border-black p-1">الوجبة المستلمة</th>
-                                        <th className="border border-black p-1">الوجبة الصباحية</th>
-                                        <th className="border border-black p-1">الوجبة المسائية</th>
+                                        <th className="border border-black p-1">مستلمة</th>
+                                        <th className="border border-black p-1">صباحي</th>
+                                        <th className="border border-black p-1">مسائي</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -12414,9 +12414,9 @@ return (
                                             <tr key={d} data-squad-date={d}>
                                                 <td className="border border-black p-1 font-mono">{d}</td>
                                                 <td className="border border-black p-1">{getArabicDayName(d)}</td>
-                                                <td className="border border-black p-1 font-black">{s.triple || '—'}</td>
-                                                <td className="border border-black p-1 font-black">{s.morning}</td>
-                                                <td className="border border-black p-1 font-black">{s.evening}</td>
+                                                <td className="border border-black p-1 font-black">{s.triple ? 'الوجبة ' + s.triple : '—'}</td>
+                                                <td className="border border-black p-1 font-black">{'الوجبة ' + s.morning}</td>
+                                                <td className="border border-black p-1 font-black">{'الوجبة ' + s.evening}</td>
                                             </tr>
                                         );
                                     })}
