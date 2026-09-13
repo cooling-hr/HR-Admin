@@ -507,6 +507,20 @@
 
         /* ---- الأسطح البنيوية ---- */
         html[data-theme="dark"] .bg-white          { background-color: #131c2b !important; }
+        /* الأوراق الرسمية المعروضة للطباعة (مذكرة الماء، استمارة الموظف) تبقى ورقة بيضاء بألوانها
+           النهارية في الوضع الليلي — وإلا صار نصّها الأسود فوق خلفية داكنة غير مقروء */
+        html[data-theme="dark"] .paper-sheet,
+        html[data-theme="dark"] .paper-sheet .bg-white { background-color: #ffffff !important; color: #000000 !important; }
+        html[data-theme="dark"] .paper-sheet .bg-slate-100 { background-color: #f1f5f9 !important; }
+        html[data-theme="dark"] .paper-sheet .bg-slate-200 { background-color: #e2e8f0 !important; }
+        html[data-theme="dark"] .paper-sheet .bg-blue-50 { background-color: #eff6ff !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-800 { color: #1f2937 !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-700 { color: #374151 !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-600 { color: #4b5563 !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-400 { color: #9ca3af !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-300 { color: #d1d5db !important; }
+        html[data-theme="dark"] .paper-sheet .text-blue-900 { color: #1e3a8a !important; }
+        html[data-theme="dark"] .paper-sheet .border-gray-400 { border-color: #9ca3af !important; }
         html[data-theme="dark"] .bg-slate-50,
         html[data-theme="dark"] .bg-gray-50,
         html[data-theme="dark"] .bg-slate-100,
@@ -12227,20 +12241,20 @@ return (
                             </div>
                         </div>
 
-                        <div className="preview-body p-8 bg-white text-black font-sans" style={{maxHeight: '75vh', overflowY: 'auto'}} dir="rtl">
+                        <div className="preview-body paper-sheet p-8 bg-white text-black font-sans" style={{maxHeight: '75vh', overflowY: 'auto'}} dir="rtl">
                             <div className="flex justify-between items-start text-[11px] mb-2">
-                                <div>
-                                    <div>رمز التشكيل: BOC-ED-07-01</div>
-                                    <div>العدد: .....................</div>
-                                    <div>التاريخ: .....................</div>
-                                </div>
+                                <img src={BOC_LOGO_DATA_URI} alt="B.O.C" className="w-16 h-16 rounded-full object-cover border border-black" />
                                 <div className="text-center">
                                     <div className="font-bold">جمهورية العراق</div>
                                     <div className="font-bold">وزارة النفط</div>
                                     <div className="font-bold">شركة نفط البصرة (شركة عامة)</div>
                                     <div className="font-bold text-sm">شعبة تبريد المركز ومحطة عزل نهر بن عمر</div>
                                 </div>
-                                <img src={BOC_LOGO_DATA_URI} alt="B.O.C" className="w-16 h-16 rounded-full object-cover border border-black" />
+                                <div>
+                                    <div>رمز التشكيل: BOC-ED-07-01</div>
+                                    <div>العدد: .....................</div>
+                                    <div>التاريخ: .....................</div>
+                                </div>
                             </div>
 
                             <div className="text-center mt-4 mb-3">
@@ -12304,13 +12318,13 @@ return (
 
                             <div className="grid grid-cols-3 gap-4 mt-10 text-center text-xs font-bold">
                                 <div>
-                                    <div className="border-t border-black pt-1 mt-8">مدير الهيئة</div>
+                                    <div className="border-t border-black pt-1 mt-8">مسؤول الشعبة</div>
                                 </div>
                                 <div>
                                     <div className="border-t border-black pt-1 mt-8">مدير القسم</div>
                                 </div>
                                 <div>
-                                    <div className="border-t border-black pt-1 mt-8">مسؤول الشعبة</div>
+                                    <div className="border-t border-black pt-1 mt-8">مدير الهيأة</div>
                                 </div>
                             </div>
                         </div>
@@ -12810,7 +12824,7 @@ return (
                                     </button>
                                 </div>
                                 
-                                <div className="preview-body p-8 bg-white text-black font-sans" style={{maxHeight: '75vh', overflowY: 'auto'}} dir="rtl">
+                                <div className="preview-body paper-sheet p-8 bg-white text-black font-sans" style={{maxHeight: '75vh', overflowY: 'auto'}} dir="rtl">
                                     {/* رأس الاستمارة الرسمي */}
                                     <div className="text-center border-b-2 border-black pb-4 mb-6">
                                         <h1 className="text-xl font-bold mb-1">جمهورية العراق</h1>
