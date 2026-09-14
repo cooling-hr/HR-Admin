@@ -2376,15 +2376,31 @@
             // ورقة تعريفية بأفراد كل وجبة — من هم بالاسم، اليوم، لا مرتبطة بفترة معينة. الوجبة A في
             // نهر بن عمر (ثلاثية) مجموعة أشخاص مختلفة تماماً عن الوجبة A في بقية الوحدات (ثنائية)،
             // فتُحسَب المجموعتان منفصلتين رغم تطابق حرف الوجبة.
+            // المناوبة الثنائية تجمع أكثر من وحدة تنظيمية (باب الزبير، المركز الثقافي، المكينة)،
+            // فتُقسَّم أسماء كل وجبة داخلها حسب الوحدة — نفس ترتيب الوحدات المعتمد في مذكرة الماء (سطر 5889).
+            const DOUBLE_DUTY_UNIT_ORDER = ['تبريد باب الزبير', 'تبريد المركز الثقافي', 'تبريد المكينة'];
             const squadRosters = useMemo(() => {
                 const mk = () => ({ A: [], B: [], C: [], D: [] });
-                const triple = mk(), double = mk();
+                const triple = mk(), doubleFlat = mk();
                 staff.forEach(s => {
                     if (s.workType !== 'مناوب' || s.status !== 'نشط') return;
-                    const bucket = (s.location && s.location.includes('نهر بن عمر')) ? triple : double;
-                    if (bucket[s.squad]) bucket[s.squad].push({ id: s.id, name: s.name });
+                    const bucket = (s.location && s.location.includes('نهر بن عمر')) ? triple : doubleFlat;
+                    if (bucket[s.squad]) bucket[s.squad].push({ id: s.id, name: s.name, unit: String(s.unit || '').trim() || 'غير محدد' });
                 });
-                [triple, double].forEach(g => Object.values(g).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name, 'ar'))));
+                Object.values(triple).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name, 'ar')));
+                const double = mk();
+                Object.keys(doubleFlat).forEach(q => {
+                    // Object.create(null): بيانات الوحدة قد تصل من استيراد JSON/Excel خارجي غير مقيَّد
+                    // بالقائمة المنسدلة، فلا يصح استخدام كائن عادي قد يصطدم بمفاتيح موروثة مثل __proto__.
+                    const byUnit = Object.create(null);
+                    doubleFlat[q].forEach(e => { (byUnit[e.unit] || (byUnit[e.unit] = [])).push(e); });
+                    Object.values(byUnit).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name, 'ar')));
+                    const orderedUnits = [
+                        ...DOUBLE_DUTY_UNIT_ORDER.filter(u => byUnit[u]),
+                        ...Object.keys(byUnit).filter(u => !DOUBLE_DUTY_UNIT_ORDER.includes(u)).sort((a, b) => a.localeCompare(b, 'ar'))
+                    ];
+                    double[q] = orderedUnits.map(u => ({ unit: u, employees: byUnit[u] }));
+                });
                 return { triple, double };
             }, [staff]);
 
@@ -12476,7 +12492,16 @@ return (
                                                 <div key={q} className="border border-black rounded">
                                                     <div className="bg-slate-200 font-black p-1 text-center border-b border-black text-[11px]">الوجبة {q}</div>
                                                     <div className="p-1.5 text-[10px] leading-relaxed" data-squad-roster={group.key + q}>
-                                                        {group.data[q].length ? group.data[q].map(e => <div key={e.id}>{e.name}</div>) : <div className="text-gray-400">—</div>}
+                                                        {group.key === 'd' ? (
+                                                            group.data[q].length ? group.data[q].map((u, ui) => (
+                                                                <div key={u.unit} className={ui > 0 ? 'mt-1.5' : ''}>
+                                                                    <div className="font-bold text-gray-600 border-b border-gray-400 mb-0.5">{u.unit}</div>
+                                                                    {u.employees.map(e => <div key={e.id} data-squad-name={group.key + q}>{e.name}</div>)}
+                                                                </div>
+                                                            )) : <div className="text-gray-400">—</div>
+                                                        ) : (
+                                                            group.data[q].length ? group.data[q].map(e => <div key={e.id} data-squad-name={group.key + q}>{e.name}</div>) : <div className="text-gray-400">—</div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
