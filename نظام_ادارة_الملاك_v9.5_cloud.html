@@ -648,6 +648,13 @@
         html[data-theme="dark"] .bg-amber-50\/10 { background-color: #3b2a09 !important; }
         html[data-theme="dark"] .bg-white\/85 { background-color: #131c2b !important; }
         html[data-theme="dark"] .bg-white\/80 { background-color: #131c2b !important; }
+        /* نمط الشرائح الموحّد (seg-track): الحبّة النشطة bg-white تُعتَّم إلى #131c2b فتصير أغمق
+           من مسارها (#1a2536) كأنها ثقب لا حبّة مرفوعة — فتُرفَع هنا فوقه. وتحويم الأزرار
+           (hover:bg-slate-200 / hover:text-slate-700) لم يكن معرَّفاً قط، فكان يومض بلونه
+           النهاري: خلفية فاتحة تحت نص فاتح في الأقسام، ونص داكن فوق مسار داكن في الشرائح. */
+        html[data-theme="dark"] .seg-track .bg-white { background-color: #2b3a52 !important; }
+        html[data-theme="dark"] .hover\:bg-slate-200:hover { background-color: #24324a !important; }
+        html[data-theme="dark"] .hover\:text-slate-700:hover { color: #e6edf5 !important; }
 
         /* ---- بقية الدرجات الفاتحة (100 و200) المستعملة في الشارات ---- */
         html[data-theme="dark"] .bg-gray-200      { background-color: #24324a !important; }
@@ -8335,12 +8342,14 @@ return (
                         };
                         return (
                     <nav ref={observeNavHeight} className="bg-white/85 backdrop-blur-md border-b border-slate-100 sticky top-0 z-30 px-4 py-3 shadow-sm transition-all duration-300">
-                        {/* flex-wrap لا overflow-x مع scrollbar-none: الشريط المخفيّ تمريره
-                            كان يُخفي أواخر التبويبات بلا أي دليل عليها. الالتفاف لا يُخفي شيئاً أبداً. */}
+                        {/* شبكة لا overflow-x مع scrollbar-none: الشريط المخفيّ تمريره كان يُخفي
+                            أواخر التبويبات بلا أي دليل عليها. الشبكة تلتفّ صفوفاً فلا تُخفي شيئاً،
+                            وتوزّع الأقسام بعرض متساوٍ يملأ الشريط بدل تكدّسها في جهة واحدة.
+                            ستة أعمدة من 1280px فقط: دونها يفيض «تجهيزات السلامة» مع شارته. */}
                         {/* لا role="tablist": نمط التبويبات يقتضي aria-controls وتنقّلاً بالأسهم
                             لم يُبنيا هنا، وادّعاء النمط ناقصاً أسوأ لقارئ الشاشة من أزرار صريحة
                             تحمل aria-current. */}
-                        <div className="max-w-7xl mx-auto flex flex-wrap gap-2 pr-1" aria-label="أقسام النظام">
+                        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2" aria-label="أقسام النظام">
                             {sections.map(s => {
                                 const isActive = activeSection && activeSection.id === s.id;
                                 return (
@@ -8348,7 +8357,7 @@ return (
                                         key={s.id}
                                         aria-current={isActive ? 'page' : undefined}
                                         onClick={() => openSection(s)}
-                                        className={`px-4 py-2 rounded-xl text-xs md:text-sm font-bold whitespace-nowrap transition-all duration-300 relative ${
+                                        className={`flex items-center justify-center px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold whitespace-nowrap transition-all duration-300 relative ${
                                             isActive
                                                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -8367,30 +8376,36 @@ return (
                                 );
                             })}
                         </div>
-                        {/* الشرائح تظهر فقط حيث تعني شيئاً: قسم يضمّ أكثر من عرض */}
+                        {/* الشرائح تظهر فقط حيث تعني شيئاً: قسم يضمّ أكثر من عرض.
+                            نمط الشرائح الموحّد في النظام (segmented control): مسار رمادي «seg-track»
+                            تُرفَع فيه الشريحة النشطة حبّةً بيضاء، بأعمدة متساوية تملأ الشريط أيّاً كان
+                            عددها (grid-flow-col + auto-cols-fr)، وتتكدّس عمودياً على الهاتف.
+                            حلّ محلّ شرائح باهتة (bg-indigo-50 وحدّ رفيع) كادت لا تُرى بجوار الأقسام. */}
                         {activeSection && activeSection.views.length > 1 && (
-                            <div className="max-w-7xl mx-auto flex flex-wrap gap-1.5 pr-1 mt-2 pt-2 border-t border-slate-100"
-                                 aria-label={`شرائح ${activeSection.label}`}>
-                                {activeSection.views.map(x => {
-                                    const on = view === x.v;
-                                    return (
-                                        <button
-                                            key={x.v}
-                                            aria-pressed={on ? 'true' : 'false'}
-                                            onClick={() => {
-                                                setView(x.v);
-                                                setSectionMemory(m => ({ ...m, [activeSection.id]: x.v }));
-                                            }}
-                                            className={`px-3 py-1 rounded-full text-[11px] md:text-xs font-bold whitespace-nowrap border transition ${
-                                                on
-                                                    ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
-                                                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                                            }`}
-                                        >
-                                            {x.l}
-                                        </button>
-                                    );
-                                })}
+                            <div className="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-100">
+                                <div className="seg-track grid grid-cols-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr gap-1 p-1 bg-slate-100 rounded-xl"
+                                     aria-label={`شرائح ${activeSection.label}`}>
+                                    {activeSection.views.map(x => {
+                                        const on = view === x.v;
+                                        return (
+                                            <button
+                                                key={x.v}
+                                                aria-pressed={on ? 'true' : 'false'}
+                                                onClick={() => {
+                                                    setView(x.v);
+                                                    setSectionMemory(m => ({ ...m, [activeSection.id]: x.v }));
+                                                }}
+                                                className={`flex items-center justify-center text-center px-3 py-2 rounded-lg text-xs md:text-sm font-bold leading-snug transition-all duration-200 cursor-pointer ${
+                                                    on
+                                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                {x.l}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
                         {/* ============================================================= */}
@@ -8407,36 +8422,40 @@ return (
                         {/* «مصفوفة الأيام» مفتاحاً داخل تقرير الفترة لا وجهة رابعة.        */}
                         {/* ============================================================= */}
                         {activeSection && activeSection.id === 'attendance' && (
-                            <div className="max-w-7xl mx-auto flex flex-wrap gap-1.5 pr-1 mt-2 pt-2 border-t border-slate-100"
-                                 aria-label="شاشات الوحدات والموقف">
-                                {[
-                                    // الاسم كاملاً عمداً: هذه الشاشة مكان سلّة العمل الإضافي، ومن يبحث عن
-                                    // الكشف الشهري يبحث عنه باسمه. قُصِّر مرة لأنه كان يلتفّ داخل صندوق ضيّق،
-                                    // ثم أُزيل الصندوق — والتلميح وحده لا يظهر على الهاتف واللوح.
-                                    { v: 'roster', icon: '👥', l: 'ملاك الوحدات والعمل الإضافي',
-                                      t: 'ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد للشعبة' },
-                                    { v: 'dailyStatus', icon: '📋', l: 'الموقف اليومي',
-                                      t: 'موقف وحضور اليوم' },
-                                    { v: 'periodReport', icon: '📊', l: 'تقرير الفترة',
-                                      t: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' }
-                                ].map(sub => {
-                                    const on = unitsSubView === sub.v;
-                                    return (
-                                        <button
-                                            key={sub.v}
-                                            onClick={() => setUnitsSubView(sub.v)}
-                                            aria-pressed={on ? 'true' : 'false'}
-                                            title={sub.t}
-                                            className={`px-3 py-1 rounded-full text-[11px] md:text-xs font-bold whitespace-nowrap border transition cursor-pointer ${
-                                                on
-                                                    ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
-                                                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                                            }`}
-                                        >
-                                            {sub.icon} {sub.l}
-                                        </button>
-                                    );
-                                })}
+                            <div className="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-100">
+                                <div className="seg-track grid grid-cols-1 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr gap-1 p-1 bg-slate-100 rounded-xl"
+                                     aria-label="شاشات الوحدات والموقف">
+                                    {[
+                                        // الاسم كاملاً عمداً: هذه الشاشة مكان سلّة العمل الإضافي، ومن يبحث عن
+                                        // الكشف الشهري يبحث عنه باسمه. قُصِّر مرة لأنه كان يلتفّ داخل صندوق ضيّق،
+                                        // ثم أُزيل الصندوق — والتلميح وحده لا يظهر على الهاتف واللوح. ولا
+                                        // whitespace-nowrap هنا: خلية الشبكة أضيق من الاسم قرب 640px، فيلتفّ
+                                        // داخلها سطرين بدل أن يفيض خارجها.
+                                        { v: 'roster', icon: '👥', l: 'ملاك الوحدات والعمل الإضافي',
+                                          t: 'ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد للشعبة' },
+                                        { v: 'dailyStatus', icon: '📋', l: 'الموقف اليومي',
+                                          t: 'موقف وحضور اليوم' },
+                                        { v: 'periodReport', icon: '📊', l: 'تقرير الفترة',
+                                          t: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' }
+                                    ].map(sub => {
+                                        const on = unitsSubView === sub.v;
+                                        return (
+                                            <button
+                                                key={sub.v}
+                                                onClick={() => setUnitsSubView(sub.v)}
+                                                aria-pressed={on ? 'true' : 'false'}
+                                                title={sub.t}
+                                                className={`flex items-center justify-center text-center px-3 py-2 rounded-lg text-xs md:text-sm font-bold leading-snug transition-all duration-200 cursor-pointer ${
+                                                    on
+                                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5'
+                                                        : 'text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                {sub.icon} {sub.l}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
                     </nav>
