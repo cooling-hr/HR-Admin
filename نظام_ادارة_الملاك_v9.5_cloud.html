@@ -3148,12 +3148,17 @@
             };
 
             // ===== الفترات المؤرَّخة للحالات (Dated Status Periods) =====
-            const PERIOD_TYPES = ['إجازة اعتيادية', 'في دورة', 'إيفاد', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
+            const PERIOD_TYPES = ['إجازة اعتيادية', 'في دورة', 'إيفاد', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
+
+            // الأنواع مفتوحة النهاية: تُدخَل بتاريخ بداية فقط بلا مدة ولا تاريخ نهاية، وتبقى سارية
+            // حتى تُنهى يدوياً بإعادة الحالة إلى «نشط». سحب اليد يُعامَل مطابقةً تامة للغياب هنا
+            // وفي الإحصائيات وقوائم الماء (WATER_LEAVE_TALLY_TYPES) — قرار صريح من المستخدم.
+            const OPEN_ENDED_PERIOD_TYPES = ['غياب', 'سحب يد'];
 
             // خيارات الإجراء السريع في جدول الملاك. الحالة المخزَّنة قد تكون خارجها (إجازة اعتيادية،
             // بدون راتب، أو حالة قديمة من استيراد Excel)، فتُضاف عندئذٍ كخيار معروض حتى لا تعرض
             // القائمة أول خيار زوراً — وحينها لا يُطلق اختيار «نشط» حدث تغيير أصلاً.
-            const QUICK_STATUS_OPTIONS = ['نشط', 'في دورة', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
+            const QUICK_STATUS_OPTIONS = ['نشط', 'في دورة', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
 
             const periodsOf = (emp) => (emp && Array.isArray(emp.statusPeriods)) ? emp.statusPeriods : [];
 
@@ -3455,7 +3460,7 @@
                 return (m >= 5 && m <= 9) ? 4 : 2;
             };
 
-            const WATER_LEAVE_TALLY_TYPES = ['إجازة اعتيادية', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب'];
+            const WATER_LEAVE_TALLY_TYPES = ['إجازة اعتيادية', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
 
             // استثناء ثنائي المرحلة، وفق النموذج الرسمي لاستمارة تجهيز المياه المعدنية:
             //  • في دورة / إيفاد → أي تماس مع الشهر يستبعد فوراً، ولو يوماً واحداً.
@@ -3901,7 +3906,7 @@
                         overtimeDuty++;
                     } else if (status.includes('استراحة') || status.includes('عطلة') || status === 'عطلة رسمية') {
                         rest++;
-                    } else if (status.includes('إجازة') || status.includes('غياب') || status.includes('دورة') || status.includes('إيفاد') || status.includes('مرضية') || status.includes('زمنية')) {
+                    } else if (status.includes('إجازة') || status.includes('غياب') || status === 'سحب يد' || status.includes('دورة') || status.includes('إيفاد') || status.includes('مرضية') || status.includes('زمنية')) {
                         off++;
                     }
                 });
@@ -4008,7 +4013,7 @@
                                 courses++;
                             } else if (status.includes('إيفاد')) {
                                 deputations++;
-                            } else if (status === 'غياب') {
+                            } else if (status === 'غياب' || status === 'سحب يد') {
                                 absence++;
                             } else if (status.includes('استراحة') || status === 'عطلة رسمية') {
                                 rest++;
@@ -4069,6 +4074,7 @@
                 if (s === 'استراحة نهاية الأسبوع') return { code: 'ع', cls: 'bg-slate-100 text-slate-400', label: s };
                 if (s === 'عطلة رسمية') return { code: 'ر.س', cls: 'bg-slate-200 text-slate-600', label: s };
                 if (s === 'غياب') return { code: 'غ', cls: 'bg-red-100 text-red-800', label: s };
+                if (s === 'سحب يد') return { code: 'س', cls: 'bg-red-200 text-red-800', label: s };
                 if (s === 'في دورة') return { code: 'د', cls: 'bg-indigo-100 text-indigo-800', label: s };
                 if (s === 'إيفاد') return { code: 'ف', cls: 'bg-purple-100 text-purple-800', label: s };
                 if (s === 'إجازة أمومة') return { code: 'أم', cls: 'bg-pink-100 text-pink-800', label: s };
@@ -4096,7 +4102,8 @@
                 { code: 'أم', label: 'إجازة أمومة', cls: 'bg-pink-100 text-pink-800' },
                 { code: 'د', label: 'في دورة', cls: 'bg-indigo-100 text-indigo-800' },
                 { code: 'ف', label: 'إيفاد', cls: 'bg-purple-100 text-purple-800' },
-                { code: 'غ', label: 'غياب', cls: 'bg-red-100 text-red-800' }
+                { code: 'غ', label: 'غياب', cls: 'bg-red-100 text-red-800' },
+                { code: 'س', label: 'سحب يد', cls: 'bg-red-200 text-red-800' }
             ];
 
             const exportPeriodReportExcel = () => {
@@ -7102,8 +7109,8 @@
                     ? (quickPeriod.paid ? 'إجازة اعتيادية' : 'إجازة بدون راتب')
                     : quickPeriod.category;
                 const to = quickPeriodEnd(quickPeriod);
-                if (!to && quickPeriod.category !== 'غياب') {
-                    alert('⛔ المدة مطلوبة لهذا النوع من الفترات. الغياب وحده يُترك مفتوح النهاية.');
+                if (!to && !OPEN_ENDED_PERIOD_TYPES.includes(quickPeriod.category)) {
+                    alert('⛔ المدة مطلوبة لهذا النوع من الفترات. الغياب وسحب اليد وحدهما يُتركان مفتوحي النهاية.');
                     return;
                 }
                 if (to && to < from) {
@@ -10706,6 +10713,7 @@ return (
                                                                         else if (status.includes('تعذر') || status.includes('توقف موقع')) statusBadgeColor = 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 font-bold';
                                                                         else if (status.includes('دورة')) statusBadgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100';
                                                                         else if (status === 'غياب') statusBadgeColor = 'bg-red-600 text-white border-red-600 hover:bg-red-700';
+                                                                        else if (status === 'سحب يد') statusBadgeColor = 'bg-red-800 text-white border-red-800 hover:bg-red-900';
                                                                         
                                                                         const selectValue = isOverride ? ((status.includes('تعذر') || status.includes('توقف موقع')) ? 'تعذر حضور' : status) : 'default';
 
@@ -10754,7 +10762,7 @@ return (
                                                                                         <option value="مكلف بواجب" className="bg-white text-sky-700 font-bold">🛠️ مكلف بواجب</option>
                                                                                         <option value="تعذر حضور" className="bg-white text-amber-800 font-bold">🚧 تعذر حضور</option>
                                                                                         <option value="استراحة ذوي الاحتياجات الخاصة" className="bg-white text-teal-800 font-bold">♿ استراحة ذوي الاحتياجات الخاصة</option>
-                                                                                        <option value="سحب يد" className="bg-white text-slate-700 font-bold">✋ سحب يد</option>
+                                                                                        <option value="سحب يد" className="bg-white text-red-700 font-bold">✋ سحب يد</option>
                                                                                         <option value="غياب" className="bg-white text-red-700 font-bold">❌ غياب</option>
                                                                                     </select>
                                                                                 </td>
@@ -11131,6 +11139,7 @@ return (
                                                                                             else if (dayItem.status === 'دوام إضافي' || dayItem.status.includes('إضافي')) bgClass = 'bg-amber-950 border-amber-500 text-amber-300 font-black';
                                                                                             else if (dayItem.status.includes('إجازة') || dayItem.status.includes('مرضية')) bgClass = 'bg-rose-950 border-rose-500 text-rose-300';
                                                                                             else if (dayItem.status === 'غياب') bgClass = 'bg-red-900 border-red-500 text-white font-black';
+                                                                                            else if (dayItem.status === 'سحب يد') bgClass = 'bg-red-900 border-red-300 text-white font-black';
 
                                                                                             return (
                                                                                                 <div key={dayItem.dateStr} className={`p-2 rounded-lg border text-xs space-y-1 ${bgClass}`}>
@@ -12143,6 +12152,7 @@ return (
                                                                         <option value="إجازة طويلة">إجازة طويلة</option>
                                                                         <option value="إجازة أمومة">إجازة أمومة</option>
                                                                         <option value="غياب">غياب</option>
+                                                                        <option value="سحب يد">سحب يد</option>
                                                                     </select>
                                                                 ) : (
                                                                     <span className={`px-3 py-1 rounded-full text-sm font-bold ${
@@ -13280,6 +13290,26 @@ return (
                                 </div>
                             )}
 
+                            {/* سحب اليد غالباً يأتي بعد غياب فعلي (وليس دائماً)، فيحتاج المسؤول أحياناً
+                                إعادة تصنيف فترة غياب قائمة إلى سحب يد بعد صدور قرار إداري/قانوني —
+                                هذا التبديل متاح فقط عند تعديل فترة موجودة، لا عند تسجيل فترة جديدة
+                                (فالتصنيف عندها يُختار مسبقاً من قائمة «الحالة» نفسها) */}
+                            {quickPeriod.editingId && OPEN_ENDED_PERIOD_TYPES.includes(quickPeriod.category) && (
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-black text-slate-700">تبديل التصنيف:</label>
+                                    <div className="flex gap-2">
+                                        <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, category: 'غياب' })}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black border-2 transition cursor-pointer ${quickPeriod.category === 'غياب' ? 'bg-red-600 text-white border-red-700' : 'bg-white text-slate-700 border-slate-300 hover:border-red-400'}`}>
+                                            غياب
+                                        </button>
+                                        <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, category: 'سحب يد' })}
+                                            className={`flex-1 py-2 rounded-xl text-xs font-black border-2 transition cursor-pointer ${quickPeriod.category === 'سحب يد' ? 'bg-red-800 text-white border-red-900' : 'bg-white text-slate-700 border-slate-300 hover:border-red-400'}`}>
+                                            سحب يد
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-1">
                                 <label className="block text-xs font-black text-slate-700">📅 من تاريخ:</label>
                                 <input
@@ -13290,9 +13320,9 @@ return (
                                 />
                             </div>
 
-                            {/* الغياب يُحدَّد بتاريخ بداية فقط — مفتوح النهاية دائماً بلا استثناء، فلا معنى
-                                لعرض اختيار مدة أو تاريخ نهاية له إطلاقاً، بخلاف بقية أنواع الفترات */}
-                            {quickPeriod.category !== 'غياب' && (
+                            {/* الغياب وسحب اليد يُحدَّدان بتاريخ بداية فقط — مفتوحا النهاية دائماً بلا
+                                استثناء، فلا معنى لعرض اختيار مدة أو تاريخ نهاية لهما، بخلاف بقية الأنواع */}
+                            {!OPEN_ENDED_PERIOD_TYPES.includes(quickPeriod.category) && (
                                 <>
                                     <div className="space-y-1">
                                         <label className="block text-xs font-black text-slate-700">طريقة تحديد النهاية:</label>
@@ -13348,15 +13378,15 @@ return (
                             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 leading-relaxed">
                                 {quickPeriodEnd(quickPeriod) ? (
                                     <span>الفترة المحسوبة: <span className="font-mono text-indigo-800">{quickPeriod.from}</span> ← <span className="font-mono text-indigo-800">{quickPeriodEnd(quickPeriod)}</span></span>
-                                ) : quickPeriod.category === 'غياب' ? (
-                                    <span>غياب مفتوح النهاية — يبقى ظاهراً في الكشف حتى تُنهيه بإعادة الحالة إلى «نشط».</span>
+                                ) : OPEN_ENDED_PERIOD_TYPES.includes(quickPeriod.category) ? (
+                                    <span>{quickPeriod.category} مفتوح النهاية — يبقى ظاهراً في الكشف حتى تُنهيه بإعادة الحالة إلى «نشط».</span>
                                 ) : (
                                     <span className="text-rose-700">حدّد المدة أو تاريخ النهاية أولاً.</span>
                                 )}
                             </div>
 
                             <div className="flex gap-2">
-                                <button type="button" onClick={saveQuickPeriod} disabled={!quickPeriodEnd(quickPeriod) && quickPeriod.category !== 'غياب'}
+                                <button type="button" onClick={saveQuickPeriod} disabled={!quickPeriodEnd(quickPeriod) && !OPEN_ENDED_PERIOD_TYPES.includes(quickPeriod.category)}
                                     className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">
                                     {quickPeriod.editingId ? '💾 حفظ التعديل' : '💾 حفظ الفترة'}
                                 </button>
