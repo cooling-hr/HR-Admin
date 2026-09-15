@@ -461,6 +461,27 @@
         @media (prefers-reduced-motion: reduce) {
             .tab-enter { animation: none !important; }
         }
+
+        :root {
+            --surface: #ffffff;
+            --surface-muted: #f1f5f9;
+            --surface-raised: #ffffff;
+            --border: #e2e8f0;
+            --border-strong: #cbd5e1;
+            --ink: #0f172a;
+            --ink-2: #64748b;
+            --action: #4f46e5;
+            --action-hover: #4338ca;
+            --action-ink: #4338ca;
+            --action-tint: #eef2ff;
+            --ok: #047857;
+            --ok-tint: #ecfdf5;
+            --warn: #b45309;
+            --warn-tint: #fffbeb;
+            --danger: #b91c1c;
+            --danger-tint: #fef2f2;
+            --danger-border: #fecaca;
+        }
     </style>
 
     <!-- ================================================================= -->
@@ -502,6 +523,27 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             color-scheme: dark;
+            /* رموز التصميم (design tokens) — القيم مأخوذة من لوحة الوضع الليلي القائمة نفسها،
+               فلا يتغيّر إحساس الوضع الليلي الحالي. كل مكوّن جديد يستهلك هذه المتغيرات فقط،
+               لا فئة لونية صريحة — الفئات الصريحة الجديدة لا مدخل لها في القائمة المعدَّدة أدناه. */
+            --surface: #131c2b;
+            --surface-muted: #1a2536;
+            --surface-raised: #2b3a52;
+            --border: #2b3a52;
+            --border-strong: #3a4c68;
+            --ink: #e6edf5;
+            --ink-2: #94a3b8;
+            --action: #6366f1;
+            --action-hover: #818cf8;
+            --action-ink: #a5b4fc;
+            --action-tint: #16233f;
+            --ok: #6ee7b7;
+            --ok-tint: #0b2f24;
+            --warn: #fcd34d;
+            --warn-tint: #3b2a09;
+            --danger: #fca5a5;
+            --danger-tint: #3b1518;
+            --danger-border: #6b2b31;
         }
         html[data-theme="dark"] body { background: #0b1220; }
 
