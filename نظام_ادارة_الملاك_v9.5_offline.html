@@ -938,6 +938,38 @@
             </svg>
         );
 
+        // شريحة مُعمَّمة (segmented control): مسار رمادي بحبّة نشطة مرفوعة، يملأ العرض بأعمدة
+        // متساوية (grid-flow-col + auto-cols-fr)، ويتكدّس عمودياً تحت `sm` عند stackBelow='sm'.
+        // نفس ما شُحن في bfedff2 لشرائح الملاك وشاشات الوحدات، مُستخرَجاً هنا مكوّناً واحداً
+        // بدل نسختين متطابقتين من نفس JSX.
+        const Segmented = ({ options, value, onChange, ariaLabel, stackBelow = 'sm' }) => {
+            const stackClass = stackBelow === 'sm'
+                ? 'grid-cols-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr'
+                : 'grid-cols-1 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr';
+            return (
+                <div className={`seg-track grid ${stackClass} gap-1 p-1 bg-slate-100 rounded-xl`} aria-label={ariaLabel}>
+                    {options.map(opt => {
+                        const on = value === opt.value;
+                        return (
+                            <button
+                                key={opt.value}
+                                onClick={() => onChange(opt.value)}
+                                aria-pressed={on ? 'true' : 'false'}
+                                title={opt.title}
+                                className={`flex items-center justify-center text-center gap-1 px-3 py-2 rounded-lg text-xs md:text-sm font-bold leading-snug transition-all duration-200 cursor-pointer ${
+                                    on
+                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5'
+                                        : 'text-slate-500 hover:text-slate-700'
+                                }`}
+                            >
+                                {opt.icon ? <span>{opt.icon}</span> : null}{opt.label}
+                            </button>
+                        );
+                    })}
+                </div>
+            );
+        };
+
         function StaffSystem() {
             const isLongOrMaternityLeave = (statusStr) => {
                 if (!statusStr) return false;
@@ -7503,29 +7535,13 @@ return (
                             حلّ محلّ شرائح باهتة (bg-indigo-50 وحدّ رفيع) كادت لا تُرى بجوار الأقسام. */}
                         {activeSection && activeSection.views.length > 1 && (
                             <div className="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-100">
-                                <div className="seg-track grid grid-cols-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr gap-1 p-1 bg-slate-100 rounded-xl"
-                                     aria-label={`شرائح ${activeSection.label}`}>
-                                    {activeSection.views.map(x => {
-                                        const on = view === x.v;
-                                        return (
-                                            <button
-                                                key={x.v}
-                                                aria-pressed={on ? 'true' : 'false'}
-                                                onClick={() => {
-                                                    setView(x.v);
-                                                    setSectionMemory(m => ({ ...m, [activeSection.id]: x.v }));
-                                                }}
-                                                className={`flex items-center justify-center text-center px-3 py-2 rounded-lg text-xs md:text-sm font-bold leading-snug transition-all duration-200 cursor-pointer ${
-                                                    on
-                                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5'
-                                                        : 'text-slate-500 hover:text-slate-700'
-                                                }`}
-                                            >
-                                                {x.l}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                <Segmented
+                                    ariaLabel={`شرائح ${activeSection.label}`}
+                                    stackBelow="sm"
+                                    options={activeSection.views.map(x => ({ value: x.v, label: x.l }))}
+                                    value={view}
+                                    onChange={(v) => { setView(v); setSectionMemory(m => ({ ...m, [activeSection.id]: v })); }}
+                                />
                             </div>
                         )}
                         {/* ============================================================= */}
@@ -7543,39 +7559,23 @@ return (
                         {/* ============================================================= */}
                         {activeSection && activeSection.id === 'attendance' && (
                             <div className="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-100">
-                                <div className="seg-track grid grid-cols-1 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr gap-1 p-1 bg-slate-100 rounded-xl"
-                                     aria-label="شاشات الوحدات والموقف">
-                                    {[
+                                <Segmented
+                                    ariaLabel="شاشات الوحدات والموقف"
+                                    stackBelow="none"
+                                    options={[
                                         // الاسم كاملاً عمداً: هذه الشاشة مكان سلّة العمل الإضافي، ومن يبحث عن
                                         // الكشف الشهري يبحث عنه باسمه. قُصِّر مرة لأنه كان يلتفّ داخل صندوق ضيّق،
-                                        // ثم أُزيل الصندوق — والتلميح وحده لا يظهر على الهاتف واللوح. ولا
-                                        // whitespace-nowrap هنا: خلية الشبكة أضيق من الاسم قرب 640px، فيلتفّ
-                                        // داخلها سطرين بدل أن يفيض خارجها.
-                                        { v: 'roster', icon: '👥', l: 'ملاك الوحدات والعمل الإضافي',
-                                          t: 'ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد للشعبة' },
-                                        { v: 'dailyStatus', icon: '📋', l: 'الموقف اليومي',
-                                          t: 'موقف وحضور اليوم' },
-                                        { v: 'periodReport', icon: '📊', l: 'تقرير الفترة',
-                                          t: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' }
-                                    ].map(sub => {
-                                        const on = unitsSubView === sub.v;
-                                        return (
-                                            <button
-                                                key={sub.v}
-                                                onClick={() => setUnitsSubView(sub.v)}
-                                                aria-pressed={on ? 'true' : 'false'}
-                                                title={sub.t}
-                                                className={`flex items-center justify-center text-center px-3 py-2 rounded-lg text-xs md:text-sm font-bold leading-snug transition-all duration-200 cursor-pointer ${
-                                                    on
-                                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5'
-                                                        : 'text-slate-500 hover:text-slate-700'
-                                                }`}
-                                            >
-                                                {sub.icon} {sub.l}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                        // ثم أُزيل الصندوق — والتلميح وحده لا يظهر على الهاتف واللوح.
+                                        { value: 'roster', icon: '👥', label: 'ملاك الوحدات والعمل الإضافي',
+                                          title: 'ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد للشعبة' },
+                                        { value: 'dailyStatus', icon: '📋', label: 'الموقف اليومي',
+                                          title: 'موقف وحضور اليوم' },
+                                        { value: 'periodReport', icon: '📊', label: 'تقرير الفترة',
+                                          title: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' }
+                                    ]}
+                                    value={unitsSubView}
+                                    onChange={setUnitsSubView}
+                                />
                             </div>
                         )}
                     </nav>
