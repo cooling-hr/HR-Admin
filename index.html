@@ -697,6 +697,25 @@
         html[data-theme="dark"] .seg-track .bg-white { background-color: #2b3a52 !important; }
         html[data-theme="dark"] .hover\:bg-slate-200:hover { background-color: #24324a !important; }
         html[data-theme="dark"] .hover\:text-slate-700:hover { color: #e6edf5 !important; }
+        /* شرائح seg-track (المواصفة §14.2): على شاشة عريضة كان كل خيار يمتد نحو 600px بلا فاصل،
+           فيُقرأ الشريط زراً واحداً طويلاً. صار المسار بعرض أطول خياراته لا بعرض الشريط، وبين
+           الخيارات فاصل رفيع يختفي بجوار الخيار النشط أو المُحوَّم، وللتحويم لون خفيف يُظهر حدود
+           كل خيار. الفاصل من 640px فقط: تحتها تتكدّس الخيارات صفوفاً فلا معنى لفاصل عمودي.
+           هنا لا في JSX لأن الفاصل عنصر ::before يتبع aria-pressed، ولونه من المتغيرات فيتبع الليلي. */
+        .seg-opt { position: relative; }
+        .seg-opt[aria-pressed="false"]:hover { background-color: rgb(255 255 255 / 0.6); }
+        html[data-theme="dark"] .seg-opt[aria-pressed="false"]:hover { background-color: rgb(255 255 255 / 0.06) !important; }
+        @media (min-width: 640px) {
+            .seg-opt + .seg-opt::before {
+                content: ''; position: absolute; inset-inline-start: calc(-0.125rem - 0.5px);
+                top: 25%; bottom: 25%; width: 1px; background-color: var(--border-strong);
+                transition: opacity 150ms;
+            }
+            .seg-opt[aria-pressed="true"]::before,
+            .seg-opt[aria-pressed="true"] + .seg-opt::before,
+            .seg-opt:hover::before,
+            .seg-opt:hover + .seg-opt::before { opacity: 0; }
+        }
 
         /* ---- بقية الدرجات الفاتحة (100 و200) المستعملة في الشارات ---- */
         html[data-theme="dark"] .bg-gray-200      { background-color: #24324a !important; }
@@ -929,25 +948,28 @@
             'building-2': <><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></>,
             'star': <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
             'droplet': <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.5-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>,
-            'hard-hat': <><path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1 8 8 0 0 0-8-8h-1V7a3 3 0 0 0-6 0v3H8a8 8 0 0 0-8 8Z"/><path d="M10 10V7a3 3 0 0 1 6 0v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/></>
+            'shield-check': <><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></>,
+            'shirt': <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>,
+            // حذاء السلامة مرسوم خصيصاً: مكتبة Lucide لا تحوي حذاءً. خطّ مقدّمته المقوّس هو الغطاء الواقي.
+            'safety-boot': <><path d="M6 2.5h6.5v7l4.8 1.6A4.8 4.8 0 0 1 21 15.6v1.9H4v-3.2c1-.4 2-1.5 2-3.3z"/><path d="M3 17.5h19v1.8a1.2 1.2 0 0 1-1.2 1.2H4.2A1.2 1.2 0 0 1 3 19.3z"/><path d="M15.5 17.5a4 4 0 0 0-3-6.2"/></>
         };
         const Icon = ({ name, className = 'w-4 h-4' }) => (
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                 strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+                 strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true" data-icon={name}>
                 {ICON_PATHS[name] || null}
             </svg>
         );
 
-        // شريحة مُعمَّمة (segmented control): مسار رمادي بحبّة نشطة مرفوعة، يملأ العرض بأعمدة
-        // متساوية (grid-flow-col + auto-cols-fr)، ويتكدّس عمودياً تحت `sm` عند stackBelow='sm'.
-        // نفس ما شُحن في bfedff2 لشرائح الملاك وشاشات الوحدات، مُستخرَجاً هنا مكوّناً واحداً
-        // بدل نسختين متطابقتين من نفس JSX.
+        // شريحة مُعمَّمة (segmented control): مسار رمادي بحبّة نشطة مرفوعة، بأعمدة متساوية
+        // (grid-flow-col + auto-cols-fr) عرضُ كلٍّ منها بقدر أطول الخيارات، والمسار بعرضها لا بعرض
+        // الشريط (sm:w-fit) — ممتدّاً كان يُقرأ زراً واحداً (المواصفة §14.2). يتكدّس تحت `sm`.
+        // الفاصل بين الخيارات ولون التحويم في CSS تحت «.seg-opt».
         const Segmented = ({ options, value, onChange, ariaLabel, stackBelow = 'sm' }) => {
             const stackClass = stackBelow === 'sm'
                 ? 'grid-cols-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr'
                 : 'grid-cols-1 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr';
             return (
-                <div className={`seg-track grid ${stackClass} gap-1 p-1 bg-slate-100 rounded-xl`} aria-label={ariaLabel}>
+                <div className={`seg-track grid ${stackClass} gap-1 p-1 bg-slate-100 rounded-xl sm:w-fit sm:max-w-full`} aria-label={ariaLabel}>
                     {options.map(opt => {
                         const on = value === opt.value;
                         return (
@@ -956,7 +978,7 @@
                                 onClick={() => onChange(opt.value)}
                                 aria-pressed={on ? 'true' : 'false'}
                                 title={opt.title}
-                                className={`flex items-center justify-center text-center gap-1 px-3 py-2 rounded-lg text-xs md:text-sm font-bold leading-snug transition-all duration-200 cursor-pointer ${
+                                className={`seg-opt min-w-0 [overflow-wrap:anywhere] flex items-center justify-center text-center gap-1 px-3 py-2 rounded-lg text-xs md:text-sm font-bold leading-snug transition-all duration-200 cursor-pointer ${
                                     on
                                         ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5'
                                         : 'text-slate-500 hover:text-slate-700'
@@ -8459,7 +8481,7 @@ return (
                             { id: 'water', icon: 'droplet', label: 'الماء',
                               badge: stats.maaMorning + stats.maaShift,
                               views: [{ v: 'maa', l: 'الماء' }] },
-                            { id: 'safety', icon: 'hard-hat', label: 'تجهيزات السلامة',
+                            { id: 'safety', icon: 'shield-check', label: 'تجهيزات السلامة',
                               badge: stats.safety,
                               views: [{ v: 'safety', l: 'تجهيزات السلامة' }] }
                         ];
@@ -8506,7 +8528,7 @@ return (
                         </div>
                         {/* الشرائح تظهر فقط حيث تعني شيئاً: قسم يضمّ أكثر من عرض.
                             نمط الشرائح الموحّد في النظام (segmented control): مسار رمادي «seg-track»
-                            تُرفَع فيه الشريحة النشطة حبّةً بيضاء، بأعمدة متساوية تملأ الشريط أيّاً كان
+                            تُرفَع فيه الشريحة النشطة حبّةً بيضاء، بأعمدة متساوية بعرض أطول خياراتها أيّاً كان
                             عددها (grid-flow-col + auto-cols-fr)، وتتكدّس عمودياً على الهاتف.
                             حلّ محلّ شرائح باهتة (bg-indigo-50 وحدّ رفيع) كادت لا تُرى بجوار الأقسام. */}
                         {activeSection && activeSection.views.length > 1 && (
@@ -11733,7 +11755,7 @@ return (
                                                     {/* بطاقة ملخص البدلات */}
                                                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="flex items-start gap-3.5">
-                                                            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl text-2xl">🧥</div>
+                                                            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Icon name="shirt" className="w-7 h-7" /></div>
                                                             <div>
                                                                 <h4 className="font-extrabold text-slate-800 text-base mb-0.5">تجهيزات البدلات</h4>
                                                                 <p className="text-xs text-slate-500 font-medium font-sans">تغطية قياسات البدلة للمنتسبين</p>
@@ -11766,7 +11788,7 @@ return (
                                                     {/* بطاقة ملخص الأحذية */}
                                                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="flex items-start gap-3.5">
-                                                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl text-2xl">🦺</div>
+                                                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon name="safety-boot" className="w-7 h-7" /></div>
                                                             <div>
                                                                 <h4 className="font-extrabold text-slate-800 text-base mb-0.5">أحذية السلامة</h4>
                                                                 <p className="text-xs text-slate-500 font-medium font-sans">تغطية قياسات الأحذية للمنتسبين</p>
@@ -11804,7 +11826,7 @@ return (
                                                         <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col">
                                                             <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
                                                                 <h4 className="font-extrabold text-blue-700 flex items-center gap-2">
-                                                                    <span>🧥</span>
+                                                                    <Icon name="shirt" className="w-5 h-5 flex-shrink-0" />
                                                                     <span>تفاصيل مقاسات البدلات المجهزة</span>
                                                                 </h4>
                                                                 <span className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-bold">
@@ -11851,7 +11873,7 @@ return (
                                                         <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col">
                                                             <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
                                                                 <h4 className="font-extrabold text-emerald-700 flex items-center gap-2">
-                                                                    <span>👟</span>
+                                                                    <Icon name="safety-boot" className="w-5 h-5 flex-shrink-0" />
                                                                     <span>تفاصيل مقاسات أحذية السلامة</span>
                                                                 </h4>
                                                                 <span className="text-xs bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-bold">
