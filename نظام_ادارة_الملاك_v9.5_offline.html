@@ -10285,71 +10285,69 @@ return (
                                         
                                         return (
                                             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                                                <div className={`p-6 bg-gradient-to-r ${selectedUnit.gradient} text-white`}>
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-4">
+                                                <PageHeader
+                                                    icon={<span className="text-4xl flex-shrink-0">{selectedUnit.icon}</span>}
+                                                    title={`منتسبو ${selectedUnit.name}`}
+                                                    meta={
+                                                        <>
+                                                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--surface-muted)] text-[color:var(--ink-2)]">{sortedStaff.length} موظف</span>
+                                                            {sortedStaff.filter(s => overtimeIds.includes(s.id)).length > 0 && (
+                                                                <span className="bg-emerald-500 text-white font-bold px-2.5 py-0.5 rounded text-xs shadow-sm inline-flex items-center gap-1">
+                                                                    <span>🛒 مشمولو الإضافي بالوحدة:</span>
+                                                                    <span>{sortedStaff.filter(s => overtimeIds.includes(s.id)).length}</span>
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    }
+                                                    actions={
+                                                        <>
                                                             <button
                                                                 onClick={() => setSelectedUnit(null)}
-                                                                className="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg px-4 py-2 font-bold transition backdrop-blur-sm"
+                                                                className="bg-[var(--surface-muted)] hover:bg-[var(--border)] text-[color:var(--ink)] border border-[color:var(--border-strong)] rounded-lg px-4 py-2 font-bold transition"
                                                             >
                                                                 ← عودة
                                                             </button>
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="text-4xl">{selectedUnit.icon}</span>
-                                                                <div>
-                                                                    <h2 className="text-2xl font-bold">منتسبو {selectedUnit.name}</h2>
-                                                                    <p className="text-sm opacity-90 mt-1 flex flex-wrap items-center gap-2">
-                                                                        <span>{sortedStaff.length} موظف</span>
-                                                                        {sortedStaff.filter(s => overtimeIds.includes(s.id)).length > 0 && (
-                                                                            <span className="bg-emerald-500 bg-opacity-90 border border-emerald-400 text-white font-bold px-2.5 py-0.5 rounded text-xs shadow-sm flex items-center gap-1">
-                                                                                <span>🛒 مشمولو الإضافي بالوحدة:</span>
-                                                                                <span>{sortedStaff.filter(s => overtimeIds.includes(s.id)).length}</span>
-                                                                            </span>
-                                                                        )}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => {
-                                                                const exportData = sortedStaff.map((s, i) => ({
-                                                                    type: 'data',
-                                                                    'ت': i + 1,
-                                                                    'الاسم الكامل': s.name,
-                                                                    'الرقم الوظيفي': s.jobNumber || '',
-                                                                    'العنوان الوظيفي': s.jobTitle || '',
-                                                                    'القسم': s.department || '',
-                                                                    'الشعبة': s.section || '',
-                                                                    'الموقع': s.location || '',
-                                                                    'الوحدة': s.unit || '',
-                                                                    'طبيعة العمل': s.workType || '',
-                                                                    'هاتف العمل': s.workPhone || '',
-                                                                    'التولد': s.birthDate || '',
-                                                                    'رقم العمل': s.workNumber || '',
-                                                                    'تاريخ التعيين': s.hireDate || '',
-                                                                    'التحصيل الدراسي': s.education || '',
-                                                                    'سنة التخرج': s.graduationYear || '',
-                                                                    'الاختصاص': s.specialization || '',
-                                                                    'الجنس': s.gender || '',
-                                                                    'التوطين': s.bank || '',
-                                                                    'النقال': s.mobile || '',
-                                                                    'الحالة': s.status || '',
-                                                                    'أيام الإجازة': s.vacationDays || '',
-                                                                    'قياس البدلة': s.uniformSize || '',
-                                                                    'قياس حذاء السلامة': s.shoeSafetySize || '',
-                                                                    'تاريخ آخر تجهيز': s.lastSafetyDelivery || '',
-                                                                    'البريد الإلكتروني': s.email || ''
-                                                                }));
-                                                                setPreviewData(exportData);
-                                                                setVisiblePreviewColumns(['الرقم الوظيفي', 'العنوان الوظيفي', 'رقم الهاتف النقال']);
-                                                                setShowPreview(true);
-                                                            }}
-                                                            className="bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg px-6 py-3 font-bold transition backdrop-blur-sm"
-                                                        >
-                                                            👁️ معاينة وتصدير
-                                                        </button>
-                                                    </div>
-                                                </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    const exportData = sortedStaff.map((s, i) => ({
+                                                                        type: 'data',
+                                                                        'ت': i + 1,
+                                                                        'الاسم الكامل': s.name,
+                                                                        'الرقم الوظيفي': s.jobNumber || '',
+                                                                        'العنوان الوظيفي': s.jobTitle || '',
+                                                                        'القسم': s.department || '',
+                                                                        'الشعبة': s.section || '',
+                                                                        'الموقع': s.location || '',
+                                                                        'الوحدة': s.unit || '',
+                                                                        'طبيعة العمل': s.workType || '',
+                                                                        'هاتف العمل': s.workPhone || '',
+                                                                        'التولد': s.birthDate || '',
+                                                                        'رقم العمل': s.workNumber || '',
+                                                                        'تاريخ التعيين': s.hireDate || '',
+                                                                        'التحصيل الدراسي': s.education || '',
+                                                                        'سنة التخرج': s.graduationYear || '',
+                                                                        'الاختصاص': s.specialization || '',
+                                                                        'الجنس': s.gender || '',
+                                                                        'التوطين': s.bank || '',
+                                                                        'النقال': s.mobile || '',
+                                                                        'الحالة': s.status || '',
+                                                                        'أيام الإجازة': s.vacationDays || '',
+                                                                        'قياس البدلة': s.uniformSize || '',
+                                                                        'قياس حذاء السلامة': s.shoeSafetySize || '',
+                                                                        'تاريخ آخر تجهيز': s.lastSafetyDelivery || '',
+                                                                        'البريد الإلكتروني': s.email || ''
+                                                                    }));
+                                                                    setPreviewData(exportData);
+                                                                    setVisiblePreviewColumns(['الرقم الوظيفي', 'العنوان الوظيفي', 'رقم الهاتف النقال']);
+                                                                    setShowPreview(true);
+                                                                }}
+                                                                className="bg-[var(--action)] hover:bg-[var(--action-hover)] text-white rounded-lg px-6 py-3 font-bold transition shadow-sm"
+                                                            >
+                                                                👁️ معاينة وتصدير
+                                                            </button>
+                                                        </>
+                                                    }
+                                                />
                                                 
                                                 <div className="p-6">
                                                     {sortedStaff.length > 0 ? (
