@@ -970,6 +970,39 @@
             );
         };
 
+        // الأزرار بأربع درجات (المواصفة §6.2)، وألوانها من رموز التصميم وحدها — فلا تحتاج أي
+        // مدخل في طبقة الوضع الليلي. className للتخطيط فقط (عرض، ترتيب، flex-shrink): فئة تنافس
+        // فئات الدرجة أو المقاس (px-/py-/rounded-/bg-/justify-) لا تفوز بموضعها في النص بل بترتيب
+        // Tailwind الداخلي، فتُهمَل بصمت. شكل جديد يُضاف درجةً أو مقاساً هنا، لا تجاوزاً في الاستعمال.
+        const BUTTON_BASE = 'inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--action)]';
+        const BUTTON_VARIANTS = {
+            primary: 'bg-[var(--action)] hover:bg-[var(--action-hover)] text-white shadow-sm',
+            secondary: 'bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-[color:var(--ink)] border border-[color:var(--border-strong)]',
+            ghost: 'text-[color:var(--ink-2)] hover:text-[color:var(--ink)] hover:bg-[var(--surface-muted)]',
+            danger: 'bg-[var(--danger-tint)] text-[color:var(--danger)] border border-[color:var(--danger-border)]'
+        };
+        const BUTTON_SIZES = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm' };
+        const Button = ({ variant = 'secondary', size = 'md', type = 'button', className = '', children, ...rest }) => (
+            <button type={type} className={`${BUTTON_BASE} ${BUTTON_VARIANTS[variant]} ${BUTTON_SIZES[size]} ${className}`} {...rest}>
+                {children}
+            </button>
+        );
+
+        // شارة حالة دلالية (المواصفة §6.4): ok حضور/نجاح، warn تنبيه، danger غياب/حذف،
+        // action تحديد/إجراء، neutral للأعداد التي لا تحمل دلالة. القاعدة نفسها في className.
+        const BADGE_TONES = {
+            ok: 'bg-[var(--ok-tint)] text-[color:var(--ok)]',
+            warn: 'bg-[var(--warn-tint)] text-[color:var(--warn)]',
+            danger: 'bg-[var(--danger-tint)] text-[color:var(--danger)]',
+            action: 'bg-[var(--action-tint)] text-[color:var(--action-ink)]',
+            neutral: 'bg-[var(--surface-muted)] text-[color:var(--ink-2)]'
+        };
+        const StatusBadge = ({ tone = 'neutral', className = '', children, ...rest }) => (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${BADGE_TONES[tone]} ${className}`} {...rest}>
+                {children}
+            </span>
+        );
+
         function StaffSystem() {
             const isLongOrMaternityLeave = (statusStr) => {
                 if (!statusStr) return false;
@@ -11269,7 +11302,7 @@ return (
                                                     </div>
                                                     {/* المؤشَّر تلقائياً هو ما كان حقلك فيه فارغاً — كسبٌ بلا تعارض */}
                                                     <div className="text-[10px] font-bold text-slate-500 leading-relaxed">
-                                                        المؤشَّر تلقائياً: الحقول الفارغة لديك (لا تعارض فيها). ما وُسم <span className="text-amber-700">تعارض</span> لديك فيه قيمة مختلفة، وما وُسم <span className="text-sky-700">إملائي</span> نفس النص بصيغة كتابة أخرى — تُركا بلا تأشير لتقرّرهما بنفسك.
+                                                        المؤشَّر تلقائياً: الحقول الفارغة لديك (لا تعارض فيها). ما وُسم <span className="font-bold text-[color:var(--warn)]">تعارض</span> لديك فيه قيمة مختلفة، وما وُسم <span className="font-bold text-[color:var(--action-ink)]">إملائي</span> نفس النص بصيغة كتابة أخرى — تُركا بلا تأشير لتقرّرهما بنفسك.
                                                     </div>
                                                     <div className="max-h-44 overflow-y-auto space-y-2 pl-1">
                                                     {analysis.updated.map((upd, uIdx) => (
@@ -11296,8 +11329,8 @@ return (
                                                                                     className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
                                                                                 <span>حقل {ch.fieldNameAr}:</span>
                                                                                 {ch.cosmeticOnly
-                                                                                    ? <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1 rounded" title="نفس النص بصيغة كتابة مختلفة (مسافة أو همزة أو تاء مربوطة)">إملائي</span>
-                                                                                    : !ch.wasEmpty && <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1 rounded">تعارض</span>}
+                                                                                    ? <StatusBadge tone="action" title="نفس النص بصيغة كتابة مختلفة (مسافة أو همزة أو تاء مربوطة)">إملائي</StatusBadge>
+                                                                                    : !ch.wasEmpty && <StatusBadge tone="warn">تعارض</StatusBadge>}
                                                                             </span>
                                                                             {/* الكلمات تقول ما سيحدث، لا الشطب وحده: قُرئ الشطب الرمادي على قيمة الملف «تأشيراً»، وسُئل عن الأحمر «أهو الإلغاء؟» */}
                                                                             <span className="font-semibold flex flex-wrap items-center gap-1">
@@ -11588,26 +11621,20 @@ return (
                                         </button>
                                     </div>
                                     <div className="bg-slate-50 px-6 py-4 flex items-center justify-between gap-3 border-t border-slate-100 flex-shrink-0">
-                                        <button 
-                                            onClick={cancelMerge}
-                                            className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition flex-shrink-0"
-                                        >
+                                        <Button variant="secondary" onClick={cancelMerge} className="flex-shrink-0">
                                             إلغاء العملية
-                                        </button>
+                                        </Button>
                                         {(() => {
                                             const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0 && mergeAttendanceCount === 0;
                                             return (
-                                        <button
+                                        <Button
+                                            variant="primary"
                                             disabled={nothingToDo}
                                             onClick={() => handleSmartMerge(incomingStaff, mergeSelection, mergeAddSelection, mergePeriodSelection, mergeClearDaysSelection, mergeAttendanceSelection, mergeDeleteSelection)}
-                                            className={`px-5 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 flex-shrink-0 ${
-                                                nothingToDo
-                                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20'
-                                            }`}
+                                            className="flex-shrink-0"
                                         >
                                             <span>🔄</span><span>تطبيق ما اخترته</span>
-                                        </button>
+                                        </Button>
                                             );
                                         })()}
                                     </div>
