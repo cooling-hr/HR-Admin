@@ -4673,6 +4673,12 @@
                 () => Object.values(mergeAddSelection).filter(Boolean).length,
                 [mergeAddSelection]
             );
+            // تأشيرات الحذف تُحسب في «لا شيء يُطبَّق» كبقية الاختيارات: ملف فرقه الوحيد حذف موظف كان
+            // يُبقي «تطبيق ما اخترته» معطَّلاً بعد تأشير الحذف، فلا يُطبَّق أبداً
+            const mergeDeleteCount = useMemo(
+                () => Object.values(mergeDeleteSelection).filter(Boolean).length,
+                [mergeDeleteSelection]
+            );
 
             const mergeSelectedCount = useMemo(
                 () => Object.values(mergeSelection).filter(Boolean).length,
@@ -11583,7 +11589,7 @@ return (
                                         {(() => {
                                             // ملخّص بلا تفاعل: الزرّ الفعلي انتقل إلى الذيل الثابت أسفل النافذة، فلا يبقى الوصول
                                             // إليه مرهوناً بالتمرير حتى آخر القائمة مهما طال عرض الفروقات
-                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0 && mergeAttendanceCount === 0;
+                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0 && mergeAttendanceCount === 0 && mergeDeleteCount === 0;
                                             return (
                                         <div className={`w-full text-right p-4 rounded-2xl border-2 flex gap-4 items-start ${
                                                 nothingToDo ? 'border-slate-100 opacity-50' : 'border-indigo-100 bg-indigo-50/10'
@@ -11625,7 +11631,7 @@ return (
                                             إلغاء العملية
                                         </Button>
                                         {(() => {
-                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0 && mergeAttendanceCount === 0;
+                                            const nothingToDo = mergeSelectedCount === 0 && mergeAddCount === 0 && mergePeriodCount === 0 && mergeAttendanceCount === 0 && mergeDeleteCount === 0;
                                             return (
                                         <Button
                                             variant="primary"
