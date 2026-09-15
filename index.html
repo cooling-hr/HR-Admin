@@ -10943,29 +10943,20 @@ return (
                                     <div className="space-y-6 animate-fadeIn">
                                         {/* شريط العنوان والتقرير الشامل للفترة */}
                                         <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
-                                            <div className="p-6 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                                <div>
-                                                    <h2 className="text-2xl font-black flex items-center gap-2">
-                                                        <span>📊</span>
-                                                        <span>محرك تقارير موقف الحضور والدوام للفترة المحددة</span>
-                                                    </h2>
-                                                    <p className="text-xs md:text-sm mt-1 text-blue-100 opacity-95 font-medium">
-                                                        حدد الفترة الزمنية واضغط على استخراج الموقف لمعاينة وسجل إجازات ودورات وغياب ودواير المنتسبين للفترة
-                                                    </p>
-                                                </div>
-                                                <div className="flex gap-2 flex-wrap w-full md:w-auto">
-                                                    {/* حُذف زرّ «العودة للموقف اليومي»: صار تقرير الفترة وجهة في
-                                                        الشريط الفرعي، فالخروج منه كالدخول إليه — من الشريط نفسه.
-                                                        وزرّ تنقّل ثالث في موضع ثالث كان يشتّت لا يساعد. */}
-                                                    <button 
-                                                        onClick={exportPeriodReportExcel} 
-                                                        className="bg-white text-indigo-700 hover:bg-blue-50 px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm shadow-md transition active:scale-95 flex items-center gap-1.5 flex-1 md:flex-initial justify-center cursor-pointer"
+                                            <PageHeader
+                                                icon="chart-column"
+                                                title="محرك تقارير موقف الحضور والدوام للفترة المحددة"
+                                                description="حدد الفترة الزمنية واضغط على استخراج الموقف لمعاينة وسجل إجازات ودورات وغياب ودواير المنتسبين للفترة"
+                                                actions={
+                                                    <button
+                                                        onClick={exportPeriodReportExcel}
+                                                        className="bg-[var(--action)] hover:bg-[var(--action-hover)] text-white px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm shadow-sm transition active:scale-95 flex items-center gap-1.5 flex-1 md:flex-initial justify-center cursor-pointer"
                                                     >
                                                         <span>📊</span>
                                                         <span>معاينة وتصدير تقرير الفترة</span>
                                                     </button>
-                                                </div>
-                                            </div>
+                                                }
+                                            />
 
                                             {/* شريط التحكم بالفترة والفلترة */}
                                             <div className="p-6 bg-slate-50/70 border-b border-slate-200 space-y-4">
