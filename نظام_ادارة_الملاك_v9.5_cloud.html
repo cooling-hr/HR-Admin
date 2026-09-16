@@ -11582,8 +11582,8 @@ return (
                                 
                                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                                     <PageHeader
-                                        icon={{ all: 'users', morning: 'users', shift: 'users', contract: 'users', evaluation: 'star', maa: 'droplet', safety: 'shield-check' }[view]}
-                                        title={{ all: 'الملاك', morning: 'الملاك', shift: 'الملاك', contract: 'الملاك', evaluation: 'التقييم', maa: 'الماء', safety: 'تجهيزات السلامة' }[view]}
+                                        icon={{ all: 'users', morning: 'users', shift: 'users', contract: 'users', evaluation: 'star', maa: 'droplet', maaMorning: 'droplet', maaShift: 'droplet', safety: 'shield-check' }[view]}
+                                        title={{ all: 'الملاك', morning: 'الملاك', shift: 'الملاك', contract: 'الملاك', evaluation: 'التقييم', maa: 'الماء', maaMorning: 'الماء', maaShift: 'الماء', safety: 'تجهيزات السلامة' }[view]}
                                         description={
                                             (view === 'maa' && 'استبعاد من في دورة، ومن غاب نصف الشهر فأكثر بإجازة طويلة أو أمومة، ومن استُثني دائماً') ||
                                             (view === 'evaluation' && 'استبعاد الإجازات الطويلة طويلة وأمومة') ||
