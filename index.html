@@ -949,15 +949,10 @@
             'star': <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
             'droplet': <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.5-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>,
             'shield-check': <><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></>,
-            // 2026-09-16: شيرت وأقدام عامّتان لا تمثّلان معدات السلامة تحديداً (ملاحظة مستخدم
-            // مباشرة) — استُبدل استعمالهما ببطاقتَي "تجهيزات البدلات/الأحذية" بـshield-user وsport-shoe
-            // أدناه؛ أُبقيتا معرَّفتين غير مستخدَمتين حالياً، لا داعي لحذفهما.
             'shirt': <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>,
             // أيقونة أقدام Lucide الرسمية: المستخدم رفض محاولة أولى برسم حذاء يدوي (بدا غير متّسق
             // بجوار أيقونتين حقيقيتين من نفس المكتبة) — لا رسم يدوي بعد اليوم، مصدر Lucide الرسمي دائماً.
             'footprints': <><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></>,
-            'shield-user': <><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/></>,
-            'sport-shoe': <><path d="m15 10.42 4.8-5.07"/><path d="M19 18h3"/><path d="M9.5 22 21.414 9.415A2 2 0 0 0 21.2 6.4l-5.61-4.208A1 1 0 0 0 14 3v2a2 2 0 0 1-1.394 1.906L8.677 8.053A1 1 0 0 0 8 9c-.155 6.393-2.082 9-4 9a2 2 0 0 0 0 4h14"/></>,
             // Lucide الرسمي (رخصة ISC)، جُلب بـcurl لا من الذاكرة. اسم المواصفة الأصلي
             // `bar-chart-3` حُذف من المكتبة الحالية؛ `chart-column` هو نفس مفهوم الأعمدة
             // العمودية بالاسم الحديث — تحقّق فعلي عبر curl قبل الاستعمال، لا افتراض.
@@ -8548,16 +8543,16 @@ return (
                                         key={s.id}
                                         aria-current={isActive ? 'page' : undefined}
                                         onClick={() => openSection(s)}
-                                        className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 xl:px-2.5 py-2.5 rounded-lg text-xs xl:text-sm font-bold whitespace-nowrap transition-all duration-200 ${
+                                        className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold whitespace-nowrap transition-all duration-300 ${
                                             isActive
-                                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 ring-1 ring-indigo-500'
+                                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                                         }`}
                                     >
                                         <Icon name={s.icon} className="w-4 h-4 flex-shrink-0" />
-                                        <span className="truncate min-w-0">{s.label}</span>
+                                        <span>{s.label}</span>
                                         {typeof s.badge === 'number' && (
-                                            <span className={`flex-shrink-0 min-w-[18px] px-1.5 py-0.5 text-center rounded-full text-[10px] font-black leading-tight ${
+                                            <span className={`mr-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-black ${
                                                 isActive ? 'bg-white/25 text-white' : 'bg-white text-slate-600'
                                             }`}>{s.badge}</span>
                                         )}
@@ -11790,7 +11785,7 @@ return (
                                                     {/* بطاقة ملخص البدلات */}
                                                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="flex items-start gap-3.5">
-                                                            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Icon name="shield-user" className="w-7 h-7" /></div>
+                                                            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Icon name="shirt" className="w-7 h-7" /></div>
                                                             <div>
                                                                 <h4 className="font-extrabold text-slate-800 text-base mb-0.5">تجهيزات البدلات</h4>
                                                                 <p className="text-xs text-slate-500 font-medium font-sans">تغطية قياسات البدلة للمنتسبين</p>
@@ -11823,7 +11818,7 @@ return (
                                                     {/* بطاقة ملخص الأحذية */}
                                                     <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm hover:shadow-md transition duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                         <div className="flex items-start gap-3.5">
-                                                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon name="sport-shoe" className="w-7 h-7" /></div>
+                                                            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon name="footprints" className="w-7 h-7" /></div>
                                                             <div>
                                                                 <h4 className="font-extrabold text-slate-800 text-base mb-0.5">أحذية السلامة</h4>
                                                                 <p className="text-xs text-slate-500 font-medium font-sans">تغطية قياسات الأحذية للمنتسبين</p>
@@ -11861,7 +11856,7 @@ return (
                                                         <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col">
                                                             <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
                                                                 <h4 className="font-extrabold text-blue-700 flex items-center gap-2">
-                                                                    <Icon name="shield-user" className="w-5 h-5 flex-shrink-0" />
+                                                                    <Icon name="shirt" className="w-5 h-5 flex-shrink-0" />
                                                                     <span>تفاصيل مقاسات البدلات المجهزة</span>
                                                                 </h4>
                                                                 <span className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-bold">
@@ -11908,7 +11903,7 @@ return (
                                                         <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col">
                                                             <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-100">
                                                                 <h4 className="font-extrabold text-emerald-700 flex items-center gap-2">
-                                                                    <Icon name="sport-shoe" className="w-5 h-5 flex-shrink-0" />
+                                                                    <Icon name="footprints" className="w-5 h-5 flex-shrink-0" />
                                                                     <span>تفاصيل مقاسات أحذية السلامة</span>
                                                                 </h4>
                                                                 <span className="text-xs bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-bold">
