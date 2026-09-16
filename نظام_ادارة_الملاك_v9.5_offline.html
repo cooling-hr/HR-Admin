@@ -10438,42 +10438,45 @@ return (
                                 </div>
                                 
                                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                                    <div className="p-6 bg-gradient-to-r from-blue-500 to-indigo-500 text-white flex justify-between items-center">
-                                        <div>
-                                            <h2 className="text-2xl font-bold">{current.length} موظف</h2>
-                                            <p className="text-sm opacity-90 mt-1">
-                                                {view === 'maa' && 'استبعاد من في دورة، ومن غاب نصف الشهر فأكثر بإجازة طويلة أو أمومة، ومن استُثني دائماً'}
-                                                {view === 'evaluation' && 'استبعاد الإجازات الطويلة طويلة وأمومة'}
-                                                {view === 'morning' && 'الاسم الثلاثي فقط'}
-                                                {view === 'contract' && `عقود 315: ${stats.contract315} · عقود المحافظة: ${stats.contractGov}${stats.contractUnclassified ? ` · غير مصنّف: ${stats.contractUnclassified}` : ''}`}
-                                                {view === 'shift' && 'مرتب حسب المواقع'}
-                                            </p>
-                                        </div>
-                                        <div className="flex gap-3 flex-wrap justify-end">
-                                            {view === 'safety' && (
-                                                <button 
-                                                    onClick={() => setShowDueSafetyOnly(!showDueSafetyOnly)}
-                                                    className={`px-5 py-2.5 rounded-lg font-bold shadow-md transition active:scale-95 flex items-center gap-1.5 border ${
-                                                        showDueSafetyOnly 
-                                                            ? 'bg-amber-500 hover:bg-amber-600 text-white border-white' 
-                                                            : 'bg-white/20 hover:bg-white/30 text-white border-white/40'
-                                                    }`}
-                                                >
-                                                    <span>🦺</span>
-                                                    <span>{showDueSafetyOnly ? 'عرض كل المجهزين' : 'عرض مستحقي التجديد فقط'}</span>
+                                    <PageHeader
+                                        icon={{ all: 'users', morning: 'users', shift: 'users', contract: 'users', evaluation: 'star', maa: 'droplet', safety: 'shield-check' }[view]}
+                                        title={{ all: 'الملاك', morning: 'الملاك', shift: 'الملاك', contract: 'الملاك', evaluation: 'التقييم', maa: 'الماء', safety: 'تجهيزات السلامة' }[view]}
+                                        description={
+                                            (view === 'maa' && 'استبعاد من في دورة، ومن غاب نصف الشهر فأكثر بإجازة طويلة أو أمومة، ومن استُثني دائماً') ||
+                                            (view === 'evaluation' && 'استبعاد الإجازات الطويلة طويلة وأمومة') ||
+                                            (view === 'morning' && 'الاسم الثلاثي فقط') ||
+                                            (view === 'contract' && `عقود 315: ${stats.contract315} · عقود المحافظة: ${stats.contractGov}${stats.contractUnclassified ? ` · غير مصنّف: ${stats.contractUnclassified}` : ''}`) ||
+                                            (view === 'shift' && 'مرتب حسب المواقع') ||
+                                            undefined
+                                        }
+                                        meta={<span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--surface-muted)] text-[color:var(--ink-2)]">{current.length} موظف</span>}
+                                        actions={
+                                            <>
+                                                {view === 'safety' && (
+                                                    <button
+                                                        onClick={() => setShowDueSafetyOnly(!showDueSafetyOnly)}
+                                                        className={`px-5 py-2.5 rounded-lg font-bold shadow-sm transition active:scale-95 flex items-center gap-1.5 border ${
+                                                            showDueSafetyOnly
+                                                                ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500'
+                                                                : 'bg-[var(--surface-muted)] hover:bg-[var(--border)] text-[color:var(--ink-2)] border-[color:var(--border-strong)]'
+                                                        }`}
+                                                    >
+                                                        <span>🦺</span>
+                                                        <span>{showDueSafetyOnly ? 'عرض كل المجهزين' : 'عرض مستحقي التجديد فقط'}</span>
+                                                    </button>
+                                                )}
+                                                <button onClick={preparePreview} className="bg-[var(--action)] hover:bg-[var(--action-hover)] text-white px-6 py-3 rounded-lg font-bold shadow-sm transition">
+                                                    👁️ معاينة وتصدير
                                                 </button>
-                                            )}
-                                            <button onClick={preparePreview} className="bg-white text-blue-600 px-6 py-3 rounded-lg font-bold hover:bg-blue-50 shadow-lg transition">
-                                                👁️ معاينة وتصدير
-                                            </button>
-                                            {view === 'all' && (
-                                                <button onClick={exportStandardExcel}
-                                                    className="bg-blue-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-600 shadow-lg transition">
-                                                    📊 تصدير جدول قياسي Excel
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
+                                                {view === 'all' && (
+                                                    <button onClick={exportStandardExcel}
+                                                        className="bg-blue-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-600 shadow-lg transition">
+                                                        📊 تصدير جدول قياسي Excel
+                                                    </button>
+                                                )}
+                                            </>
+                                        }
+                                    />
 
                                     {(view === 'maa' || view === 'maaMorning' || view === 'maaShift') && (
                                         <div className="mb-3 p-3 bg-cyan-50 border border-cyan-200 rounded-xl flex flex-wrap items-center gap-3 no-print">
