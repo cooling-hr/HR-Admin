@@ -945,6 +945,7 @@
         const ICON_PATHS = {
             'layout-dashboard': <><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></>,
             'gauge-color': <><path d="M3.34 19a10 10 0 1 1 17.32 0" stroke="#3b82f6"/><path d="m12 14 4-4" stroke="#f97316" strokeWidth="2.5"/><circle cx="12" cy="14" r="1.3" fill="#f97316" stroke="none"/></>,
+            'sliders-color': <><path d="M10 5H3" stroke="#3b82f6"/><path d="M12 19H3" stroke="#3b82f6"/><path d="M21 12h-9" stroke="#3b82f6"/><path d="M21 19h-5" stroke="#3b82f6"/><path d="M21 5h-7" stroke="#3b82f6"/><path d="M8 12H3" stroke="#3b82f6"/><path d="M14 3v4" stroke="#f97316" strokeWidth="3"/><path d="M16 17v4" stroke="#f97316" strokeWidth="3"/><path d="M8 10v4" stroke="#f97316" strokeWidth="3"/></>,
             'users': <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
             'building-2': <><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></>,
             'star': <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
@@ -7568,7 +7569,7 @@ return (
                     {/* ================================================================= */}
                     {(() => {
                         const sections = [
-                            { id: 'dashboard', icon: 'gauge-color', label: 'لوحة التحكم',
+                            { id: 'dashboard', icon: 'sliders-color', label: 'لوحة التحكم',
                               views: [{ v: 'dashboard', l: 'لوحة التحكم' }] },
                             // العدد شارةً على كل قسم مفرد: كان ظاهراً على التبويبات القديمة،
                             // وإخفاؤه خلف قسم يحرم المستخدم من لمحة يعرف بها أن البيانات محمَّلة.
@@ -8616,7 +8617,7 @@ return (
                 </div>
             )}
 
-                                <PageHeader icon="gauge-color" title="لوحة التحكم" />
+                                <PageHeader icon="sliders-color" title="لوحة التحكم" />
                                 {/* تنبيه النسخ الاحتياطي التلقائي */}
                                 {showBackupWarning && (
                                     <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white p-4 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4 animate-pulse border border-amber-400/20 shadow-md">
