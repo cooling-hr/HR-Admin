@@ -8179,8 +8179,8 @@ return (
                         const activeLock = selectedPinUid ? deviceLocks.find(l => l.uid === selectedPinUid) : null;
                         return (
                         <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full overflow-hidden animate-fadeInUp">
-                                <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-6 text-white text-center">
+                            <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full max-h-[92vh] flex flex-col overflow-hidden animate-fadeInUp">
+                                <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-6 text-white text-center flex-shrink-0">
                                     <div className="text-4xl mb-2">🔒</div>
                                     <h2 className="text-xl font-black">
                                         {activeLock ? `مرحباً بعودتك، ${activeLock.name || ''}` : 'من أنت؟'}
@@ -8192,7 +8192,7 @@ return (
 
                                 {!activeLock ? (
                                     /* خطوة الاختيار: تظهر فقط حين يتشارك الجهاز أكثر من موظف */
-                                    <div className="p-6 space-y-2">
+                                    <div className="p-6 space-y-2 overflow-y-auto min-h-0 flex-1">
                                         {deviceLocks.map(l => (
                                             <button
                                                 key={l.uid}
@@ -8217,7 +8217,7 @@ return (
                                 ) : (
                                     <form
                                         onSubmit={(e) => { e.preventDefault(); if (pinInput.length === 4) handlePinLogin(activeLock.uid); }}
-                                        className="p-6 space-y-4"
+                                        className="p-6 space-y-4 overflow-y-auto min-h-0 flex-1"
                                     >
                                         <input
                                             type="password"
@@ -8271,7 +8271,7 @@ return (
                     {/* عرض إتاحة رمز رباعي لهذا الجهاز بعد أول دخول كامل ببريد وكلمة مرور */}
                     {showSetPinOffer && pendingPinOfferUser && (
                         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full overflow-hidden animate-fadeInUp p-6 text-center space-y-4">
+                            <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-sm w-full max-h-[92vh] overflow-y-auto animate-fadeInUp p-6 text-center space-y-4">
                                 <div className="text-4xl">🔢</div>
                                 <h2 className="text-lg font-black text-slate-800">دخول أسرع في المرات القادمة؟</h2>
                                 <p className="text-xs text-slate-500 leading-relaxed">
@@ -8665,10 +8665,10 @@ return (
             {/* نافذة تفاصيل المزامنة السحابية والمحلية لشعبة تبريد المركز */}
             {showSyncModal && (
                 <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden animate-fadeInUp">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-fadeInUp">
                         {/* رأس النافذة */}
-                        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-6 text-white relative">
-                            <button 
+                        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-6 text-white relative flex-shrink-0">
+                            <button
                                 onClick={() => setShowSyncModal(false)}
                                 className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold transition"
                             >
@@ -8684,7 +8684,7 @@ return (
                         </div>
 
                         {/* محتوى النافذة */}
-                        <div className="p-6 space-y-5">
+                        <div className="p-6 space-y-5 overflow-y-auto min-h-0 flex-1">
                             {/* بطاقة حالة الاتصال */}
                             {cloudSyncStatus && cloudSyncStatus.connected ? (
                                 <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-200 text-right space-y-2">
@@ -8748,26 +8748,26 @@ return (
                                     </p>
                                 </div>
                             )}
+                        </div>
 
-                            {/* أزرار التحكم والإجراءات */}
-                            <div className="flex items-center justify-between gap-3 pt-2">
-                                <button
-                                    onClick={() => {
-                                        pushDataToServer();
-                                        alert('🔄 تم بث وتعميم البيانات الحالية للسيرفر بنجاح!');
-                                    }}
-                                    className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-2xl text-xs shadow-md transition flex items-center justify-center gap-2"
-                                >
-                                    <span>🔄</span>
-                                    <span>مزامنة حية الآن (Force Sync)</span>
-                                </button>
-                                <button
-                                    onClick={() => setShowSyncModal(false)}
-                                    className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs transition"
-                                >
-                                    إغلاق
-                                </button>
-                            </div>
+                        {/* أزرار التحكم والإجراءات — تذييل ثابت لا يمرّ مع المحتوى */}
+                        <div className="flex items-center justify-between gap-3 p-6 pt-4 border-t border-slate-100 flex-shrink-0">
+                            <button
+                                onClick={() => {
+                                    pushDataToServer();
+                                    alert('🔄 تم بث وتعميم البيانات الحالية للسيرفر بنجاح!');
+                                }}
+                                className="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-2xl text-xs shadow-md transition flex items-center justify-center gap-2"
+                            >
+                                <span>🔄</span>
+                                <span>مزامنة حية الآن (Force Sync)</span>
+                            </button>
+                            <button
+                                onClick={() => setShowSyncModal(false)}
+                                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs transition"
+                            >
+                                إغلاق
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -8986,9 +8986,9 @@ return (
             {/* نافذة تسجيل الدخول للنظام بالتعرف التلقائي الذكي على كلمة المرور */}
             {showLoginModal && (
                 <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden animate-fadeInUp">
-                        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-6 text-white text-center relative">
-                            <button 
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden animate-fadeInUp">
+                        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 p-6 text-white text-center relative flex-shrink-0">
+                            <button
                                 onClick={() => setShowLoginModal(false)}
                                 className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold transition"
                             >
@@ -8999,7 +8999,7 @@ return (
                             <p className="text-xs text-blue-200 mt-1">الدخول بحساب موثّق عبر Firebase — تُحدَّد صلاحياتك آلياً حسب الدور المسند لحسابك</p>
                         </div>
 
-                        <form onSubmit={handleLogin} className="p-6 space-y-4">
+                        <form onSubmit={handleLogin} className="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
                             <div className="space-y-1.5">
                                 <label className="block text-xs font-black text-slate-700">📧 البريد الإلكتروني:</label>
                                 <input
@@ -12867,16 +12867,23 @@ return (
                     {/* نافذة استيراد النص المنسوخ JSON (للهواتف) */}
                     {showPasteModal && (
                         <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[110] p-4 animate-fadeIn no-print">
-                            <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 animate-scaleUp">
-                                <div className="bg-gradient-to-r from-teal-600 via-teal-700 to-teal-800 text-white p-6 text-center">
+                            <div className="bg-white rounded-3xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl border border-slate-200 animate-scaleUp">
+                                <div className="bg-gradient-to-r from-teal-600 via-teal-700 to-teal-800 text-white p-6 text-center relative flex-shrink-0">
+                                    <button
+                                        onClick={() => { setShowPasteModal(false); setPastedJsonText(''); }}
+                                        aria-label="إغلاق" title="إغلاق (Esc)"
+                                        className="absolute top-4 left-4 bg-white/10 hover:bg-white/20 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold transition"
+                                    >
+                                        ✕
+                                    </button>
                                     <div className="text-4xl mb-3">📋</div>
                                     <h3 className="text-lg font-bold">استيراد قاعدة البيانات بنسخ ولصق النص</h3>
                                     <p className="text-teal-100 text-xs mt-1.5 opacity-90">
                                         انسخ محتوى ملف الاحتياط (JSON) من هاتفك، ثم الصقه في المربع أدناه:
                                     </p>
                                 </div>
-                                <div className="p-6 space-y-4">
-                                    <textarea 
+                                <div className="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
+                                    <textarea
                                         rows="8"
                                         placeholder="الصق نص الـ JSON هنا..."
                                         value={pastedJsonText}
@@ -12885,7 +12892,7 @@ return (
                                         style={{ direction: 'ltr' }}
                                     ></textarea>
                                 </div>
-                                <div className="bg-slate-50 px-6 py-4 flex justify-between border-t border-slate-100">
+                                <div className="bg-slate-50 px-6 py-4 flex justify-between border-t border-slate-100 flex-shrink-0">
                                     <button 
                                         onClick={() => {
                                             setShowPasteModal(false);
@@ -13340,8 +13347,8 @@ return (
 
             {pendingShiftConfirm && (
                 <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-fadeIn no-print">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden animate-scaleUp">
-                        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 p-5 text-white flex items-center gap-3">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-scaleUp">
+                        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 p-5 text-white flex items-center gap-3 flex-shrink-0">
                             <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner border border-white/30">
                                 ⚠️
                             </div>
@@ -13351,7 +13358,7 @@ return (
                             </div>
                         </div>
 
-                        <div className="p-6 space-y-4 text-right">
+                        <div className="p-6 space-y-4 text-right overflow-y-auto min-h-0 flex-1">
                             <div className="bg-amber-50 border-2 border-amber-200/80 p-4 rounded-2xl space-y-2 text-amber-900">
                                 <p className="text-xs md:text-sm font-black leading-relaxed">
                                     تنبيه هـام: تغيير وتحديد <span className="bg-amber-500 text-white px-2.5 py-0.5 rounded-lg font-black font-mono">الوجبة {pendingShiftConfirm.squad}</span> كوجبة مستلمة بتاريخ <span className="underline font-black dir-ltr inline-block">{pendingShiftConfirm.date}</span> سيؤدي إلى إعادة حساب وتحديث جدول الوجبات لجميع الأيام القادمة والسابقة بناءً على هذا التعديل.
@@ -13363,7 +13370,7 @@ return (
                             </p>
                         </div>
 
-                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center gap-3">
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center gap-3 flex-shrink-0">
                             <button
                                 onClick={() => {
                                     const targetDate = pendingShiftConfirm.date || dailyReportDate;
@@ -13421,11 +13428,11 @@ return (
 
             {pendingReturnPrompt && (
                 <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[130] flex items-center justify-center p-4 no-print">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
-                        <div className="bg-gradient-to-r from-emerald-700 to-teal-800 p-4 text-white">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
+                        <div className="bg-gradient-to-r from-emerald-700 to-teal-800 p-4 text-white flex-shrink-0">
                             <h3 className="text-base font-black flex items-center gap-2"><span>✅</span><span>تأكيد المباشرة</span></h3>
                         </div>
-                        <div className="p-5 space-y-4 text-right">
+                        <div className="p-5 space-y-4 text-right overflow-y-auto min-h-0 flex-1">
                             <p className="text-sm font-bold text-slate-800 leading-relaxed">
                                 عاد <span className="font-black text-emerald-800">{pendingReturnPrompt.emp.name}</span> إلى الوضع الطبيعي بانتهاء ({pendingReturnPrompt.period.type}) في {pendingReturnPrompt.period.to}.
                             </p>
@@ -13448,11 +13455,13 @@ return (
 
             {quickPeriod && (
                 <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[130] flex items-center justify-center p-4 no-print">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
-                        <div className="bg-gradient-to-r from-indigo-700 to-blue-800 p-4 text-white">
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
+                        <div className="bg-gradient-to-r from-indigo-700 to-blue-800 p-4 text-white flex-shrink-0 flex items-center justify-between">
                             <h3 className="text-base font-black flex items-center gap-2"><span>📅</span><span>{quickPeriod.editingId ? 'تعديل فترة' : 'تسجيل فترة'}: {quickPeriod.category}</span></h3>
+                            <button type="button" onClick={() => setQuickPeriod(null)} aria-label="إغلاق" title="إغلاق (Esc)"
+                                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-bold transition cursor-pointer flex-shrink-0">✕</button>
                         </div>
-                        <div className="p-5 space-y-4 text-right">
+                        <div className="p-5 space-y-4 text-right overflow-y-auto min-h-0 flex-1">
                             <p className="text-sm font-black text-slate-900">{quickPeriod.empName}</p>
 
                             {quickPeriod.category === 'إجازة طويلة' && (
@@ -13566,15 +13575,16 @@ return (
                                 )}
                             </div>
 
-                            <div className="flex gap-2">
-                                <button type="button" onClick={saveQuickPeriod} disabled={!quickPeriodEnd(quickPeriod) && !OPEN_ENDED_PERIOD_TYPES.includes(quickPeriod.category)}
-                                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">
-                                    {quickPeriod.editingId ? '💾 حفظ التعديل' : '💾 حفظ الفترة'}
-                                </button>
-                                <button type="button" onClick={() => setQuickPeriod(null)} className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black rounded-xl text-xs transition cursor-pointer">
-                                    ✕ إلغاء
-                                </button>
-                            </div>
+                        </div>
+
+                        <div className="flex gap-2 p-5 pt-3 border-t border-slate-100 flex-shrink-0">
+                            <button type="button" onClick={saveQuickPeriod} disabled={!quickPeriodEnd(quickPeriod) && !OPEN_ENDED_PERIOD_TYPES.includes(quickPeriod.category)}
+                                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">
+                                {quickPeriod.editingId ? '💾 حفظ التعديل' : '💾 حفظ الفترة'}
+                            </button>
+                            <button type="button" onClick={() => setQuickPeriod(null)} className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black rounded-xl text-xs transition cursor-pointer">
+                                ✕ إلغاء
+                            </button>
                         </div>
                     </div>
                 </div>
