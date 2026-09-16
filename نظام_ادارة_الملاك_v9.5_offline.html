@@ -9373,6 +9373,7 @@ return (
                                     <div className="space-y-5 animate-fadeIn">
                                         {/* شريط الموقف اليومي البصري */}
                                         <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+                                        <div className="px-6 pt-6">
                                         <PageHeader
                                             icon="clipboard-list"
                                             title="الموقف اليومي لمنتسبي الشعبة"
@@ -9384,7 +9385,8 @@ return (
                                                 </button>
                                             }
                                         />
-                                            
+                                        </div>
+
                                             <div className="p-6 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                                                 {/* منتقي التاريخ - 4 أعمدة يمين في RTL */}
                                                 <div className="md:col-span-4 space-y-1.5">
@@ -9802,6 +9804,7 @@ return (
                                     <div className="space-y-6 animate-fadeIn">
                                         {/* شريط العنوان والتقرير الشامل للفترة */}
                                         <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
+                                            <div className="px-6 pt-6">
                                             <PageHeader
                                                 icon="chart-column"
                                                 title="محرك تقارير موقف الحضور والدوام للفترة المحددة"
@@ -9816,6 +9819,7 @@ return (
                                                     </button>
                                                 }
                                             />
+                                            </div>
 
                                             {/* شريط التحكم بالفترة والفلترة */}
                                             <div className="p-6 bg-slate-50/70 border-b border-slate-200 space-y-4">
@@ -10232,8 +10236,10 @@ return (
                                 {!selectedUnit ? (
                                     // عرض الملصقات
                                     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                                        <div className="px-6 pt-6">
                                         <PageHeader icon="building-2" title="الوحدات الإدارية" description="اختر وحدة لعرض موظفيها" />
-                                        
+                                        </div>
+
                                         <div className="p-8">
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                                 {[
@@ -10286,6 +10292,7 @@ return (
                                         
                                         return (
                                             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                                                <div className="px-6 pt-6">
                                                 <PageHeader
                                                     icon={<span className="text-4xl flex-shrink-0">{selectedUnit.icon}</span>}
                                                     title={`منتسبو ${selectedUnit.name}`}
@@ -10304,7 +10311,7 @@ return (
                                                         <>
                                                             <button
                                                                 onClick={() => setSelectedUnit(null)}
-                                                                className="bg-[var(--surface-muted)] hover:bg-[var(--border)] text-[color:var(--ink)] border border-[color:var(--border-strong)] rounded-lg px-4 py-2 font-bold transition"
+                                                                className="bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-[color:var(--ink)] border border-[color:var(--border-strong)] rounded-lg px-4 py-2 font-bold transition"
                                                             >
                                                                 ← عودة
                                                             </button>
@@ -10349,7 +10356,8 @@ return (
                                                         </>
                                                     }
                                                 />
-                                                
+                                                </div>
+
                                                 <div className="p-6">
                                                     {sortedStaff.length > 0 ? (
                                                         <div className="overflow-x-auto">
@@ -10439,6 +10447,7 @@ return (
                                 </div>
                                 
                                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                                    <div className="px-6 pt-6">
                                     <PageHeader
                                         icon={{ all: 'users', morning: 'users', shift: 'users', contract: 'users', evaluation: 'star', maa: 'droplet', maaMorning: 'droplet', maaShift: 'droplet', safety: 'shield-check' }[view]}
                                         title={{ all: 'الملاك', morning: 'الملاك', shift: 'الملاك', contract: 'الملاك', evaluation: 'التقييم', maa: 'الماء', maaMorning: 'الماء', maaShift: 'الماء', safety: 'تجهيزات السلامة' }[view]}
@@ -10459,7 +10468,7 @@ return (
                                                         className={`px-5 py-2.5 rounded-lg font-bold shadow-sm transition active:scale-95 flex items-center gap-1.5 border ${
                                                             showDueSafetyOnly
                                                                 ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500'
-                                                                : 'bg-[var(--surface-muted)] hover:bg-[var(--border)] text-[color:var(--ink-2)] border-[color:var(--border-strong)]'
+                                                                : 'bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-[color:var(--ink)] border-[color:var(--border-strong)]'
                                                         }`}
                                                     >
                                                         <span>🦺</span>
@@ -10478,6 +10487,7 @@ return (
                                             </>
                                         }
                                     />
+                                    </div>
 
                                     {(view === 'maa' || view === 'maaMorning' || view === 'maaShift') && (
                                         <div className="mb-3 p-3 bg-cyan-50 border border-cyan-200 rounded-xl flex flex-wrap items-center gap-3 no-print">
