@@ -7572,19 +7572,19 @@ return (
                               views: [{ v: 'dashboard', l: 'لوحة التحكم' }] },
                             // العدد شارةً على كل قسم مفرد: كان ظاهراً على التبويبات القديمة،
                             // وإخفاؤه خلف قسم يحرم المستخدم من لمحة يعرف بها أن البيانات محمَّلة.
-                            { id: 'staff', icon: 'users', label: 'الملاك', badge: stats.total,
+                            { id: 'staff', icon: '👥', label: 'الملاك', badge: stats.total,
                               views: [
                                 { v: 'all', l: `الكل (${stats.total})` },
                                 { v: 'morning', l: `صباحي (${stats.morning})` },
                                 { v: 'shift', l: `مناوب (${stats.shift})` },
                                 { v: 'contract', l: `عقود (${stats.contract})` }
                               ] },
-                            { id: 'attendance', icon: 'building-2', label: 'الوحدات والموقف',
+                            { id: 'attendance', icon: '🏢', label: 'الوحدات والموقف',
                               views: [{ v: 'units', l: 'الوحدات والموقف' }] },
                             // التقييم قسم مستقل لا شريحة تحت «الملاك»: evaluation مفتاح صلاحية
                             // قائم بذاته في canEdit تماماً كـsafety، فدفنه داخل قسم عام يعيد
                             // الخطأ نفسه الذي جمع الماء بالسلامة — وضع مسؤولية مستقلة داخل غيرها.
-                            { id: 'evaluation', icon: 'star', label: 'التقييم',
+                            { id: 'evaluation', icon: '⭐', label: 'التقييم',
                               badge: stats.evaluation,
                               views: [{ v: 'evaluation', l: 'التقييم' }] },
                             // الماء والسلامة قسمان منفصلان عمداً، ولا يُجمعان مهما بدا أنهما
@@ -7594,10 +7594,10 @@ return (
                             // مستقل في canEdit، والماء ليس له مفتاح أصلاً). جمعُهما مرة واحدة
                             // وضع منطقة محكومة بصلاحية بجانب منطقة ليست كذلك — لا تُعِده.
                             // والدورات، حين تُضاف، قسم فنّي ثالث لا شريحة تحت أيٍّ منهما.
-                            { id: 'water', icon: 'droplet', label: 'الماء',
+                            { id: 'water', icon: '💧', label: 'الماء',
                               badge: stats.maaMorning + stats.maaShift,
                               views: [{ v: 'maa', l: 'الماء' }] },
-                            { id: 'safety', icon: 'shield-check', label: 'تجهيزات السلامة',
+                            { id: 'safety', icon: '🦺', label: 'تجهيزات السلامة',
                               badge: stats.safety,
                               views: [{ v: 'safety', l: 'تجهيزات السلامة' }] }
                         ];
@@ -7631,7 +7631,7 @@ return (
                                                 : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                                         }`}
                                     >
-                                        <Icon name={s.icon} className="w-4 h-4 flex-shrink-0" />
+                                        {ICON_PATHS[s.icon] ? <Icon name={s.icon} className="w-4 h-4 flex-shrink-0" /> : <span className="text-sm flex-shrink-0">{s.icon}</span>}
                                         <span className="truncate min-w-0">{s.label}</span>
                                         {typeof s.badge === 'number' && (
                                             <span className={`flex-shrink-0 min-w-[18px] px-1.5 py-0.5 text-center rounded-full text-[10px] font-black leading-tight ${
