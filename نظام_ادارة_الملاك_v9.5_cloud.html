@@ -972,6 +972,8 @@
             'cloud': <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>,
             'server': <><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></>,
             'cloud-off': <><path d="M10.94 5.274A7 7 0 0 1 15.71 10h1.79a4.5 4.5 0 0 1 4.222 6.057"/><path d="M18.796 18.81A4.5 4.5 0 0 1 17.5 19H9A7 7 0 0 1 5.79 5.78"/><path d="m2 2 20 20"/></>,
+            'user-cog': <><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m14.305 16.53.923-.382"/><path d="m15.228 13.852-.923-.383"/><path d="m16.852 12.228-.383-.923"/><path d="m16.852 17.772-.383.924"/><path d="m19.148 12.228.383-.923"/><path d="m19.53 18.696-.382-.924"/><path d="m20.772 13.852.924-.383"/><path d="m20.772 16.148.924.383"/><circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/></>,
+            'server-off': <><path d="M7 2h13a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-5"/><path d="M10 10 2.5 2.5C2 2 2 2.5 2 5v3a2 2 0 0 0 2 2h6z"/><path d="M22 17v-1a2 2 0 0 0-2-2h-1"/><path d="M4 14a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16.5l1-.5.5.5-8-8H4z"/><path d="M6 18h.01"/><path d="m2 2 20 20"/></>,
             // Lucide الرسمي (رخصة ISC)، جُلب بـcurl لا من الذاكرة. اسم المواصفة الأصلي
             // `bar-chart-3` حُذف من المكتبة الحالية؛ `chart-column` هو نفس مفهوم الأعمدة
             // العمودية بالاسم الحديث — تحقّق فعلي عبر curl قبل الاستعمال، لا افتراض.
@@ -8413,7 +8415,7 @@ return (
                                     )}
                                 </span>
                                 <span className="text-xs font-bold flex items-center gap-1">
-                                    <Icon name={(typeof cloudSyncStatus !== 'undefined' && cloudSyncStatus && cloudSyncStatus.connected) ? 'cloud' : (syncStatus.connected ? 'server' : 'cloud-off')} className="w-3.5 h-3.5" />
+                                    <Icon name={(typeof cloudSyncStatus !== 'undefined' && cloudSyncStatus && cloudSyncStatus.connected) ? 'cloud' : (syncStatus.connected ? 'server' : 'server-off')} className="w-3.5 h-3.5" />
                                     {(typeof cloudSyncStatus !== 'undefined' && cloudSyncStatus && cloudSyncStatus.connected) ? 'متصل بالسحابة الحية (أونلاين 24/7)' : (syncStatus.connected ? `السيرفر المحلي نشط (${syncStatus.ip || 'Local'})` : 'أوفلاين محلي')}
                                 </span>
                             </div>
@@ -8442,14 +8444,14 @@ return (
                                         className="px-3 py-1 bg-red-500/80 hover:bg-red-600 text-white rounded-full text-xs font-bold shadow transition flex items-center gap-1 cursor-pointer order-2"
                                         title="تسجيل الخروج أو تبديل المستخدم"
                                     >
-                                        <Icon name="log-out" className="w-3.5 h-3.5" /> خروج
+                                        <Icon name="log-out" className="w-3.5 h-3.5 -scale-x-100" /> خروج
                                     </button>
                                     <button
                                         onClick={() => setShowUserMenu(v => !v)}
                                         className="flex items-center gap-1.5 px-3 py-1 bg-white/15 hover:bg-white/25 backdrop-blur-md rounded-full border border-white/20 text-xs font-extrabold text-white shadow-sm transition cursor-pointer"
                                         title="حسابك وإدارة النظام"
                                     >
-                                        <Icon name={currentUserRole === 'admin' ? 'crown' : (currentUserRole === 'manager' ? 'shield' : (currentUserRole === 'operator' ? 'pen-line' : 'eye'))} className="w-3.5 h-3.5" />
+                                        <Icon name={currentUserRole === 'admin' ? 'crown' : (currentUserRole === 'manager' ? 'user-cog' : (currentUserRole === 'operator' ? 'pen-line' : 'eye'))} className="w-3.5 h-3.5" />
                                         <span>{currentUserRole === 'admin' ? (currentUserName || 'مدير النظام') : (currentUserRole === 'manager' ? (currentUserName || 'إداري') : (currentUserRole === 'operator' ? (currentUserName || 'إداري مُدخل') : (currentUserName || 'مستعرض')))}</span>
                                         <span className={`text-[9px] transition-transform ${showUserMenu ? 'rotate-180' : ''}`}>▼</span>
                                     </button>
