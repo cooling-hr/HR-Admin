@@ -1783,9 +1783,10 @@
 
                 setCurrentUserRole(targetUser.role);
                 setCurrentUserName(targetUser.name);
-                if (targetUser.role === 'operator' || targetUser.role === 'admin') {
-                    setDataEntryOperator(targetUser.name.split('(')[0].trim());
-                }
+                // لا نُعيّن dataEntryOperator تلقائياً هنا — حقل "اسم منظم الموقف" مشترك بين كل
+                // الأجهزة على الشبكة المحلية، لا حالة دخول شخصية. كان يُستبدَل باسم كل من يسجّل
+                // الدخول من أي جهاز فيُبعث للجميع، فيرى إداري اسم زميله يحل محل اسمه على شاشته
+                // (نُقل نفس الإصلاح من index.html — انظر التعليق المقابل هناك).
                 setIsCheckingLogin(false);
                 setShowWelcome(false);
                 setLoginInputPin('');

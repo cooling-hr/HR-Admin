@@ -2049,9 +2049,13 @@
                 setCurrentUserRole(targetUser.role);
                 setCurrentUserName(targetUser.name);
                 setCurrentUserPermissions(targetUser.permissions);
-                if (targetUser.role === 'operator' || targetUser.role === 'manager' || targetUser.role === 'admin') {
-                    setDataEntryOperator(targetUser.name.split('(')[0].trim());
-                }
+                // ملاحظة: لا نُعيّن dataEntryOperator تلقائياً هنا — هذا الحقل سحابي مشترك بين
+                // كل الأجهزة (حقل "اسم منظم الموقف" في شاشة الموقف اليومي)، لا حالة دخول شخصية.
+                // كان يُستبدَل هنا باسم كل من يسجّل الدخول من أي جهاز، فيرى إداري آخر اسم زميله
+                // يحل محل اسمه على شاشته خلال ثوانٍ (شكوى: "حساب قاسم يظهر اسم فاطمة") — ويُبعث
+                // هذا التبديل للسحابة فيُصادم أي حفظ آخر جارٍ في تلك اللحظة (انظر ملاحظة حارس
+                // التعارض في pushDataToCloud)، ما يفسّر أيضاً حاجة تكرار حفظ الموقف اليومي عدة
+                // مرات. الحقل يبقى قابلاً للتعديل يدوياً من شاشته كما هو مصمَّم أصلاً.
                 logAuditEvent('login', targetUser.name);
                 setIsCheckingLogin(false);
                 setPendingTakeover(null);
@@ -2182,6 +2186,12 @@
                     }
 
                     const targetUser = { id: refreshed.uid, name: roleData.name || '', role: roleData.role, permissions: roleData.permissions || {} };
+                    // اسم التسجيل المحلي على هذا الجهاز لقطة أُخذت عند ضبط الرمز — لو غيّر مدير
+                    // النظام اسم الحساب لاحقاً (مثلاً أُعيد إسناد الحساب لموظف آخر)، تبقى شاشة
+                    // "من أنت؟" على هذا الجهاز تعرض الاسم القديم حتى يُحدَّث هنا من مصدر الحقيقة
+                    if (roleData.name && roleData.name !== lock.name) {
+                        updateDevicePinLock(uid, { name: roleData.name });
+                    }
                     await proceedAfterAuth(targetUser, roleData);
                 } finally {
                     isPinSubmittingRef.current = false;
@@ -2649,6 +2659,10 @@
                 } catch (e) { return null; }
             };
 
+            // حارس عدم تداخل جلبات السحابة: الاستطلاع الدوري (كل 5 ثوانٍ) وجلبات تصحيحية فورية
+            // (بعد الدخول، أو بعد تعارض حفظ) قد تتقاطع زمنياً على اتصال بطيء — جلبتان متزامنتان
+            // تتنافسان على applyDataBundleToState بلا ترتيب مضمون فتُطبَّق الأحدث ثم الأقدم فوقها
+            const isFetchingCloudRef = React.useRef(false);
             // جلب البيانات السحابية الحية فورياً وتحديث كافة الأجهزة
             const fetchCloudData = async () => {
                 if (window.location.protocol === 'file:' || !FIREBASE_DB_URL) {
@@ -2656,6 +2670,8 @@
                     isInitialCloudLoadCompleteRef.current = true;
                     return;
                 }
+                if (isFetchingCloudRef.current) return;
+                isFetchingCloudRef.current = true;
                 try {
                     setCloudSyncStatus(prev => ({ ...prev, syncing: true }));
                     // موثَّق عمداً: بيانات الملاك (أسماء وهواتف وعناوين) لم تعد مقروءة للعموم،
@@ -2687,6 +2703,7 @@
                     setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false }));
                 } finally {
                     isInitialCloudLoadCompleteRef.current = true;
+                    isFetchingCloudRef.current = false;
                 }
             };
 
@@ -2756,6 +2773,13 @@
                         if (serverStamp && knownServerUpdateRef.current && serverStamp > knownServerUpdateRef.current) {
                             setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false, error: 'حفظ مستخدم آخر تعديلات بعد آخر تحديث لديك. أعد تحميل الصفحة قبل الحفظ.' }));
                             alert('⚠️ حفظ مستخدم آخر تعديلات بعد آخر تحديث وصل إلى جهازك.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
+                            // (جُرِّب هنا سابقاً سحب تصحيحي فوري/مؤجَّل لتصحيح الشاشة بلا انتظار
+                            // الاستطلاع الدوري — رفضته مراجعة Codex مرتين: كتابة الجهاز الآخر
+                            // خطوتان منفصلتان (مطالبة بالختم ثم الحزمة الكاملة)، وأي سحب بينهما
+                            // يتبنّى ختماً جديداً ببيانات قديمة فيتجاهل التحديث الحقيقي لاحقاً
+                            // نهائياً (ختمه يصل بنفس القيمة لا أكبر). التنبيه أعلاه كافٍ فعلاً —
+                            // يُخبر المستخدم صراحة أن حفظه لم يصل، فلا داعي لسحب إضافي يخاطر
+                            // بعطل صامت أدهى. الاستطلاع الدوري كل 5 ثوانٍ يُصحِّح الشاشة كما كان)
                             return;
                         }
                         // إيتاغ الخادم لحالة الختم الحالية: أساس المطالبة الذرّية أدناه (C1)
@@ -2786,6 +2810,7 @@
                             if (claimRes.status === 412) {
                                 setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false, error: 'حفظ مستخدم آخر تعديلات في اللحظة نفسها. أعد تحميل الصفحة قبل الحفظ.' }));
                                 alert('⚠️ حفظ مستخدم آخر تعديلات في اللحظة نفسها بالضبط.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
+                                // انظر التعليق أعلاه على فرع التعارض الأول — نفس السبب لعدم السحب هنا أيضاً
                                 return;
                             }
                             if (!claimRes.ok) {
@@ -3075,7 +3100,11 @@
                     setTwoShiftAnchorSquad(bundle.twoShiftAnchorSquad);
                     safeStorage.setItem('twoShiftAnchorSquad', bundle.twoShiftAnchorSquad);
                 }
-                if (bundle.dataEntryOperator) {
+                // فحص وجود الحقل لا صدقه: الآن وقد صار تعديله يدوياً حصرياً (بعد إزالة تعيينه
+                // التلقائي عند الدخول)، تفريغه عمداً إلى نص فارغ تعديل شرعي يجب أن يصل لبقية
+                // الأجهزة أيضاً — والشرط القديم `if (bundle.dataEntryOperator)` كان يتجاهل
+                // النص الفارغ فيُبقي الاسم القديم ظاهراً على الأجهزة الأخرى رغم تفريغه (ملاحظة Codex)
+                if (typeof bundle.dataEntryOperator === 'string') {
                     setDataEntryOperator(bundle.dataEntryOperator);
                     safeStorage.setItem('dataEntryOperator', bundle.dataEntryOperator);
                 }
