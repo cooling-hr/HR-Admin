@@ -3047,7 +3047,9 @@
                 const days = isAuto ? getAutoWaterAttendanceDays(groupKey, monthStr) : manualDays;
                 const rate = getWaterSeasonalRate(monthStr);
                 const bottles = headcount * days * rate;
-                const sets = Math.round(bottles / 12);
+                // نُقل نفس الإصلاح من index.html: التقريب لأقرب نصف سيت لا سيت كامل، حتى لا
+                // يُرفَع نصف سيت بالضبط إلى سيت كامل (انظر التعليق المقابل هناك)
+                const sets = Math.round(bottles / 6) / 2;
                 const cost = sets * 1000;
                 return { headcount, days, rate, bottles, sets, cost, isAuto };
             };
@@ -3094,16 +3096,21 @@
                 }
                 return parts.join(' و');
             };
-            // المبلغ هنا دائماً عدد سيتات × 1000 — نحوّل عدد السيتات فقط إلى كلمات ونلحقه بـ"ألف"
+            // نُقل نفس الإصلاح من index.html: التعامل مع نصف سيت متبقٍ (= 500 د.ع بالضبط) بدل
+            // تقريبه صمتاً إلى الألف الكاملة (انظر التعليق المقابل هناك)
             const amountToArabicWords = (amount) => {
-                const sets = Math.round(amount / 1000);
-                if (sets <= 0) return 'لا يوجد مبلغ';
-                let thousandsWord;
-                if (sets === 1) thousandsWord = 'ألف';
-                else if (sets === 2) thousandsWord = 'ألفان';
-                else if (sets <= 10) thousandsWord = numberChunkToArabicWords(sets) + ' آلاف';
-                else thousandsWord = numberChunkToArabicWords(sets) + ' ألف';
-                return thousandsWord + ' دينار عراقي فقط';
+                const wholeThousands = Math.floor(amount / 1000);
+                const hasHalfSetRemainder = (amount - wholeThousands * 1000) >= 500;
+                if (wholeThousands <= 0 && !hasHalfSetRemainder) return 'لا يوجد مبلغ';
+                let thousandsWord = '';
+                if (wholeThousands === 1) thousandsWord = 'ألف';
+                else if (wholeThousands === 2) thousandsWord = 'ألفان';
+                else if (wholeThousands > 2 && wholeThousands <= 10) thousandsWord = numberChunkToArabicWords(wholeThousands) + ' آلاف';
+                else if (wholeThousands > 10) thousandsWord = numberChunkToArabicWords(wholeThousands) + ' ألف';
+                const parts = [];
+                if (thousandsWord) parts.push(thousandsWord);
+                if (hasHalfSetRemainder) parts.push(thousandsWord ? 'وخمسمائة' : 'خمسمائة');
+                return parts.join(' ') + ' دينار عراقي فقط';
             };
 
             const setEmployeeDailyStatusOverride = (empId, dateStr, status) => {
