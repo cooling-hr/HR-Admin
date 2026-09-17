@@ -2092,8 +2092,10 @@
                                 const localTime = lastCloudTimeRef.current ? new Date(lastCloudTimeRef.current).getTime() : 0;
                                 // تحديث الحالة فقط إذا كانت البيانات السحابية أحدث من آخر تعديل محلي
                                 if (!lastCloudTimeRef.current || cloudTime > localTime) {
-                                    lastCloudTimeRef.current = cloudData.lastCloudUpdate;
+                                    // الختم يتقدّم فقط مع تطبيق ناجح فعلي — لا مجرد رؤيته (نُقل نفس
+                                    // الإصلاح من index.html؛ انظر التعليق المقابل هناك)
                                     if (cloudData.staffData && Array.isArray(cloudData.staffData) && cloudData.staffData.length > 0) {
+                                        lastCloudTimeRef.current = cloudData.lastCloudUpdate;
                                         applyDataBundleToState(cloudData);
                                     }
                                 }
@@ -2286,6 +2288,16 @@
                 fetchCloudData();
                 const interval = setInterval(fetchCloudData, 5000);
                 return () => clearInterval(interval);
+            }, []);
+
+            // استطلاع فوري عند عودة التبويب للظهور بعد إبطاء المتصفح لمؤقتاته في الخلفية
+            // (نُقل نفس الإصلاح من index.html؛ انظر التعليق المقابل هناك)
+            React.useEffect(() => {
+                const onVisible = () => {
+                    if (document.visibilityState === 'visible') fetchCloudData();
+                };
+                document.addEventListener('visibilitychange', onVisible);
+                return () => document.removeEventListener('visibilitychange', onVisible);
             }, []);
             const serverVersionRef = React.useRef(0);
             const isSyncingRef = React.useRef(false);

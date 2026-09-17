@@ -2686,11 +2686,28 @@
                             if (cloudData.lastCloudUpdate) {
                                 const cloudTime = new Date(cloudData.lastCloudUpdate).getTime();
                                 const localTime = lastCloudTimeRef.current ? new Date(lastCloudTimeRef.current).getTime() : 0;
-                                // تحديث الحالة فقط إذا كانت البيانات السحابية أحدث من آخر تعديل محلي
-                                if (!lastCloudTimeRef.current || cloudTime > localTime) {
-                                    lastCloudTimeRef.current = cloudData.lastCloudUpdate;
+                                // ختم غير صالح (تلف بيانات، أو حقل بصيغة غير متوقعة) يُنتج NaN —
+                                // وNaN لا يقارَن أكبر من شيء أبداً، فبلا هذا الفحص يُخزَّن ختماً
+                                // فاسداً يُجمِّد المزامنة نهائياً (كل مقارنة لاحقة تفشل بصمت، ملاحظة Codex)
+                                if (Number.isFinite(cloudTime) && (!lastCloudTimeRef.current || cloudTime > localTime)) {
+                                    // الختم يتقدّم فقط حين تُطبَّق اللقطة فعلاً بنجاح — لا مجرد رؤيتها
+                                    // ولا قبل التأكد من نجاح التطبيق. كان يتقدّم دائماً هنا حتى لو
+                                    // جاءت staffData فارغة أو غائبة (قراءة عابرة وقت كتابة جهاز آخر
+                                    // لحزمته الكاملة، أو عطل شبكة جزئي)، فيَظن الجهاز أنه استوعب
+                                    // أحدث نسخة بينما حالته المحلية (staff، systemUsers،
+                                    // dailyStatusOverrides...) بقيت كما هي — ثم يُبثّ هذا القِدَم
+                                    // لاحقاً عند أي حفظ تالٍ من هذا الجهاز فيمحو بصمت ما لا يملكه
+                                    // محلياً (هكذا اختفى حسابا مستخدمين فعلياً — ليس حذفاً متعمَّداً
+                                    // بل لقطة قديمة أُعيد بثّها). الآن: لا يتقدّم الختم إلا بعد
+                                    // applyDataBundleToState فعلاً بلا استثناء، فتُعاد المحاولة
+                                    // تلقائياً في الاستطلاع التالي (كل 5 ثوانٍ) حتى تصل لقطة سليمة
                                     if (cloudData.staffData && Array.isArray(cloudData.staffData) && cloudData.staffData.length > 0) {
-                                        applyDataBundleToState(cloudData);
+                                        try {
+                                            applyDataBundleToState(cloudData);
+                                            lastCloudTimeRef.current = cloudData.lastCloudUpdate;
+                                        } catch (applyErr) {
+                                            console.warn('applyDataBundleToState failed — watermark not advanced, will retry next poll:', applyErr);
+                                        }
                                     }
                                 }
                             }
@@ -2748,6 +2765,11 @@
                         lastCloudUpdate: nowIso,
                         pendingDeletionRequest: pendingDeletionRequest
                     };
+                    // عقدة القفل writeClaim ليست حقلاً من حزمة البيانات (لا تدخل بصمة التكرار
+                    // أدناه)، لكن هذه الكتابة الكاملة تستبدل الجذر بأكمله — فبلا إدراجها هنا
+                    // صراحة كانت ستُمحى من كل حفظة ناجحة. تُدرَج بنفس ختم هذه الحفظة تحديداً حتى
+                    // تبقى العقدة موجودة لقراءة إيتاغ الحفظة التالية عليها
+                    dataPayload.writeClaim = nowIso;
 
                     // لا نُعيد بثّ ما استقبلناه للتو من جهاز آخر: لو كانت الحمولة مطابقة تماماً
                     // لآخر ما نعلم أنه على الخادم فليس فيها ما يُحفظ، وبثّها يُنتج قيد تدقيق ولقطة
@@ -2760,11 +2782,8 @@
 
                     // قراءة تسبق الحفظ: هل كتب زميل شيئاً بعد آخر ما رآه هذا الجهاز؟ وتعذّرها يوقف
                     // الحفظ الآن — لا يسمح به صامتاً كما كان، فتعذّر التحقق ليس دليل أمان
-                    let claimEtag = null;
                     try {
-                        const stampRes = await cloudFetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now(), {
-                            headers: { 'X-Firebase-ETag': 'true' }
-                        });
+                        const stampRes = await cloudFetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now());
                         if (!stampRes.ok) {
                             setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: `تعذّر التحقق من حالة السحابة قبل الحفظ (رمز ${stampRes.status}). لم يصل آخر تعديل — أعد المحاولة.` });
                             return;
@@ -2773,17 +2792,32 @@
                         if (serverStamp && knownServerUpdateRef.current && serverStamp > knownServerUpdateRef.current) {
                             setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false, error: 'حفظ مستخدم آخر تعديلات بعد آخر تحديث لديك. أعد تحميل الصفحة قبل الحفظ.' }));
                             alert('⚠️ حفظ مستخدم آخر تعديلات بعد آخر تحديث وصل إلى جهازك.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
-                            // (جُرِّب هنا سابقاً سحب تصحيحي فوري/مؤجَّل لتصحيح الشاشة بلا انتظار
-                            // الاستطلاع الدوري — رفضته مراجعة Codex مرتين: كتابة الجهاز الآخر
-                            // خطوتان منفصلتان (مطالبة بالختم ثم الحزمة الكاملة)، وأي سحب بينهما
-                            // يتبنّى ختماً جديداً ببيانات قديمة فيتجاهل التحديث الحقيقي لاحقاً
-                            // نهائياً (ختمه يصل بنفس القيمة لا أكبر). التنبيه أعلاه كافٍ فعلاً —
-                            // يُخبر المستخدم صراحة أن حفظه لم يصل، فلا داعي لسحب إضافي يخاطر
-                            // بعطل صامت أدهى. الاستطلاع الدوري كل 5 ثوانٍ يُصحِّح الشاشة كما كان)
                             return;
                         }
-                        // إيتاغ الخادم لحالة الختم الحالية: أساس المطالبة الذرّية أدناه (C1)
-                        claimEtag = stampRes.headers.get('ETag');
+                    } catch (e) {
+                        setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الاتصال بالسحابة قبل الحفظ. لم يصل آخر تعديل — أعد المحاولة عند عودة الاتصال.' });
+                        return;
+                    }
+
+                    // مطالبة ذرّية بعقدة قفل مستقلة (writeClaim) — لا بـ lastCloudUpdate نفسها
+                    // كما كان سابقاً. السبب (ملاحظة Codex بعد حادثة فعلية: اختفاء حسابي مستخدمين):
+                    // الكتابة على lastCloudUpdate مباشرة هنا كانت تُقدِّم ختمها خطوة كاملة قبل
+                    // وصول الحزمة الكاملة (المكتوبة لاحقاً أدناه بطلب منفصل) — فأي جهاز يسحب في
+                    // هذه الثغرة الزمنية الضيقة يرى ختماً جديداً مع staffData/systemUsersList
+                    // القديمين معاً، ويظنّ أنه استوعب أحدث نسخة فيتوقف عن إعادة السحب لاحقاً رغم
+                    // أن ما لديه فعلياً قديم — ثم يُعاد بثّ هذا القِدَم عند أول تعديل تالٍ من ذلك
+                    // الجهاز فيمحو صمتاً ما لا يملكه محلياً. عقدة writeClaim لا يقرأها أحد لغرض
+                    // التحديث، فتغيّرها المؤقت بمعزل عن باقي الحزمة لا يضرّ أحداً؛ lastCloudUpdate
+                    // نفسها لا تتغيّر الآن إلا مع الحزمة الكاملة في كتابة واحدة أدناه.
+                    let claimEtag = null;
+                    try {
+                        const claimStampRes = await cloudFetch(FIREBASE_DB_URL.replace('.json', '/writeClaim.json') + '?t=' + Date.now(), {
+                            headers: { 'X-Firebase-ETag': 'true' }
+                        });
+                        if (claimStampRes.ok) {
+                            // إيتاغ عقدة القفل الحالية: أساس المطالبة الذرّية أدناه (C1)
+                            claimEtag = claimStampRes.headers.get('ETag');
+                        }
                         // تشخيص مقصور على المدير: هل يُظهر المتصفح فعلاً ترويسة ETag عبر CORS، أم يحجبها
                         // ويستأنف الكود الفحص القديم وحده صامتاً؟ سؤال لم يحسمه بحث نظري — يحسمه أول حفظ حقيقي.
                         if (window.__IS_ADMIN_DEV_UNLOCKED) {
@@ -2792,17 +2826,16 @@
                                 : '[حارس الحفظ] لا إيتاغ من الخادم (المتصفح يحجبه أو الخادم لا يُرسله) — يُستأنف الفحص وحده بلا حماية ذرّية.');
                         }
                     } catch (e) {
-                        setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الاتصال بالسحابة قبل الحفظ. لم يصل آخر تعديل — أعد المحاولة عند عودة الاتصال.' });
+                        setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الاتصال بالسحابة أثناء المطالبة بالحفظ. لم يصل آخر تعديل — أعد المحاولة عند عودة الاتصال.' });
                         return;
                     }
 
-                    // مطالبة ذرّية بختم السحابة قبل كتابة الحزمة كلها: القراءة أعلاه لا تكفي وحدها،
-                    // فدفعتان متزامنتان تقرآن الختم نفسه معاً وتمرّان معاً. الكتابة الشرطية (if-match)
-                    // تجعل الخادم نفسه يقبل واحدة ويرفض الأخرى (412) — لا فحصنا من طرف واحد.
-                    // خادم لا يُرجع إيتاغ: يُتجاوَز هذا الجزء ويُستأنف بالفحص وحده كما كان سابقاً.
+                    // كتابة شرطية (if-match) على عقدة القفل وحدها: الخادم نفسه يقبل واحدة من
+                    // دفعتين متزامنتين ويرفض الأخرى (412) — لا فحصنا من طرف واحد. خادم لا يُرجع
+                    // إيتاغ: يُتجاوَز هذا الجزء ويُستأنف بالفحص وحده كما كان سابقاً.
                     if (claimEtag) {
                         try {
-                            const claimRes = await cloudFetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json'), {
+                            const claimRes = await cloudFetch(FIREBASE_DB_URL.replace('.json', '/writeClaim.json'), {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json', 'if-match': claimEtag },
                                 body: JSON.stringify(nowIso)
@@ -2810,7 +2843,6 @@
                             if (claimRes.status === 412) {
                                 setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false, error: 'حفظ مستخدم آخر تعديلات في اللحظة نفسها. أعد تحميل الصفحة قبل الحفظ.' }));
                                 alert('⚠️ حفظ مستخدم آخر تعديلات في اللحظة نفسها بالضبط.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
-                                // انظر التعليق أعلاه على فرع التعارض الأول — نفس السبب لعدم السحب هنا أيضاً
                                 return;
                             }
                             if (!claimRes.ok) {
@@ -2998,6 +3030,19 @@
                 fetchCloudData();
                 const interval = setInterval(fetchCloudData, 5000);
                 return () => clearInterval(interval);
+            }, []);
+
+            // المتصفحات تُبطئ مؤقتات التبويب المتوقف في الخلفية (أحياناً لدقيقة كاملة أو أكثر) —
+            // تبويب تُرك مفتوحاً في الخلفية طويلاً يحمل حالة محلية قديمة (قد لا تشمل مستخدماً أو
+            // موقفاً أُضيف من جهاز آخر أثناء غيابه)، وأول تعديل عليه فور العودة إليه يُبثّ بحزمة
+            // كاملة مبنية على هذه الحالة القديمة، فيمحو بصمت ما لا يملكه محلياً. استطلاع فوري عند
+            // عودة التبويب للظهور يُقلّص هذه الفجوة قبل أن يتاح للمستخدم فرصة التعديل
+            React.useEffect(() => {
+                const onVisible = () => {
+                    if (document.visibilityState === 'visible') fetchCloudData();
+                };
+                document.addEventListener('visibilitychange', onVisible);
+                return () => document.removeEventListener('visibilitychange', onVisible);
             }, []);
             const [showSyncModal, setShowSyncModal] = useState(false);
             const serverVersionRef = React.useRef(0);
