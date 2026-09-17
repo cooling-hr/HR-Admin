@@ -3835,10 +3835,9 @@
                 const days = isAuto ? getAutoWaterAttendanceDays(groupKey, monthStr) : manualDays;
                 const rate = getWaterSeasonalRate(monthStr);
                 const bottles = headcount * days * rate;
-                // التقريب لأقرب سيت كامل كان يرفع نصف سيت بالضبط (000.5) إلى سيت كامل —
-                // Math.round(0.5) في جافاسكربت يقرّب للأعلى دائماً لا للأقرب زوجياً. التقريب
-                // لأقرب نصف سيت (لا سيت كامل) يحافظ على النصف كنصف كما هو متوقَّع فعلياً
-                const sets = Math.round(bottles / 6) / 2;
+                // توضيح لاحق من المستخدم: نصف سيت يُقرَّب دائماً للسيت الأقل (318.5 → 318)،
+                // لا يبقى كسراً ولا يُرفع لسيت كامل — لا يُطلَب سيت جزئي من المورّد أصلاً
+                const sets = Math.floor(bottles / 12);
                 const cost = sets * 1000;
                 return { headcount, days, rate, bottles, sets, cost, isAuto };
             };
@@ -3885,22 +3884,17 @@
                 }
                 return parts.join(' و');
             };
-            // المبلغ هنا عدد سيتات (قد يشمل نصفاً الآن بعد إصلاح التقريب أعلاه) × 1000 — الآلاف
-            // الصحيحة تتحوّل لكلمات كالسابق، ونصف السيت المتبقي (= 500 د.ع بالضبط دائماً، لأن
-            // سعر السيت الواحد ثابت 1000) يُضاف كـ"خمسمائة" بدل أن يُقرَّب للألف الكاملة صمتاً
+            // المبلغ هنا دائماً عدد سيتات (أعداد صحيحة بعد التقريب للأقل أعلاه) × 1000 — نحوّل
+            // عدد السيتات فقط إلى كلمات ونلحقه بـ"ألف"
             const amountToArabicWords = (amount) => {
-                const wholeThousands = Math.floor(amount / 1000);
-                const hasHalfSetRemainder = (amount - wholeThousands * 1000) >= 500;
-                if (wholeThousands <= 0 && !hasHalfSetRemainder) return 'لا يوجد مبلغ';
-                let thousandsWord = '';
-                if (wholeThousands === 1) thousandsWord = 'ألف';
-                else if (wholeThousands === 2) thousandsWord = 'ألفان';
-                else if (wholeThousands > 2 && wholeThousands <= 10) thousandsWord = numberChunkToArabicWords(wholeThousands) + ' آلاف';
-                else if (wholeThousands > 10) thousandsWord = numberChunkToArabicWords(wholeThousands) + ' ألف';
-                const parts = [];
-                if (thousandsWord) parts.push(thousandsWord);
-                if (hasHalfSetRemainder) parts.push(thousandsWord ? 'وخمسمائة' : 'خمسمائة');
-                return parts.join(' ') + ' دينار عراقي فقط';
+                const sets = Math.round(amount / 1000);
+                if (sets <= 0) return 'لا يوجد مبلغ';
+                let thousandsWord;
+                if (sets === 1) thousandsWord = 'ألف';
+                else if (sets === 2) thousandsWord = 'ألفان';
+                else if (sets <= 10) thousandsWord = numberChunkToArabicWords(sets) + ' آلاف';
+                else thousandsWord = numberChunkToArabicWords(sets) + ' ألف';
+                return thousandsWord + ' دينار عراقي فقط';
             };
 
             const setEmployeeDailyStatusOverride = (empId, dateStr, status) => {
