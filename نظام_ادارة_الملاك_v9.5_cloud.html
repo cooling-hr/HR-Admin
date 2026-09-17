@@ -321,13 +321,21 @@
             }
             
             /* فواصل المواقع المدمجة */
-            .location-separator { 
-                background: #cbd5e1 !important; 
-                color: black !important; 
-                font-weight: 900 !important; 
+            .location-separator {
+                background: #cbd5e1 !important;
+                color: black !important;
+                font-weight: 900 !important;
                 font-size: 8pt !important;
                 padding: 2px 4px !important;
                 page-break-after: avoid !important;
+            }
+
+            /* فاصل صفحة صريح بين مجموعات القائمة (صباحي/ثلاثية/ثنائية) — يُضاف كصنف على الصف
+               الحقيقي التالي مباشرة لعلامة {type:'page_break'} في البيانات (لا صف اصطناعي
+               منفصل قد يطبع فارغاً بحدوده وحشوه الخاصين)، فيدفعه فعلياً لصفحة جديدة عند الطباعة */
+            tr.print-page-break {
+                page-break-before: always !important;
+                break-before: page !important;
             }
             
             .merged-cell {
@@ -7586,7 +7594,9 @@
                     // ورقة 2: مناوبي الثلاثية - نهر بن عمر (تسلسل جديد من 1)
                     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                     if (shiftThreeDay.length > 0) {
-                        displayData.push({ type: 'page_break' }); // صفحة جديدة
+                        // فاصل الصفحة فقط إن كان قبله محتوى فعلي — وإلا (صباحي فارغ مثلاً)
+                        // يصبح أول صف في الجدول فيُنتج صفحة أولى فارغة عند الطباعة (ملاحظة Codex)
+                        if (displayData.length > 0) displayData.push({ type: 'page_break' });
                         displayData.push({ type: 'separator', content: '━━━ مناوبي الثلاثية - نهر بن عمر ━━━' });
                         let counter = 1; // تسلسل جديد
                         shiftThreeDay.forEach(s => {
@@ -7606,7 +7616,7 @@
                     // ورقة 3: مناوبي الثنائي - بقية الوحدات (تسلسل جديد من 1)
                     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                     if (shiftTwoDay.length > 0) {
-                        displayData.push({ type: 'page_break' }); // صفحة جديدة
+                        if (displayData.length > 0) displayData.push({ type: 'page_break' });
                         displayData.push({ type: 'separator', content: '━━━ مناوبي الثنائي - باب الزبير، المركز الثقافي، المكينة ━━━' });
                         let counter = 1; // تسلسل جديد
                         shiftTwoDay.forEach(s => {
@@ -13172,17 +13182,22 @@ return (
                                         </thead>
                                         <tbody>
                                             {previewData.map((row, idx) => {
+                                                if (row.type === 'page_break') return null; // ليس صفاً فعلياً — مجرد علامة يقرأها الصف التالي أدناه
+                                                // الصف التالي مباشرة لعلامة فاصل صفحة يحمل صنف الطباعة
+                                                // (لا صف فارغ منفصل — ملاحظة Codex: صف فارغ فعلي قد يطبع
+                                                // بحدوده وحشوه الخاصين فيُنتج فجوة أو صفاً فارغاً ظاهراً)
+                                                const needsPageBreak = idx > 0 && previewData[idx - 1].type === 'page_break';
                                                 if (row.type === 'separator') {
                                                     return (
-                                                        <tr key={idx}>
+                                                        <tr key={idx} className={needsPageBreak ? 'print-page-break' : ''}>
                                                             <td colSpan={getColSpan()} className="location-separator">{row.content}</td>
                                                         </tr>
                                                     );
                                                 }
                                                 const isFirstInLocation = row.isFirst && view === 'shift';
-                                                
+
                                                 return (
-                                                    <tr key={idx}>
+                                                    <tr key={idx} className={needsPageBreak ? 'print-page-break' : ''}>
                                                         {Object.entries(row)
                                                             .filter(([k]) => !['type', 'isFirst', 'location', 'locationSize', 'startRow', 'endRow', 'rowIndex'].includes(k) &&
                                                                              (!isCustomizable || ['ت', 'الاسم الكامل', 'الأسم الكامل', 'الأسم الثلاثي', 'الاسم'].includes(k) || visiblePreviewColumns.includes(k)))
