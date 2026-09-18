@@ -14870,7 +14870,12 @@ return (
                     ev.stopPropagation();
                     const mm = String(selMonth + 1).padStart(2, '0');
                     const dd = String(d).padStart(2, '0');
-                    inp.value = `${selYear}-${mm}-${dd}`;
+                    // كتابة inp.value مباشرة لا تُنبّه تتبّع React الداخلي لحقل متحكَّم به (controlled)،
+                    // فيعود React ويمحو القيمة عند أي إعادة رسم تالية (كنبضة المزامنة كل 5 ثوانٍ) —
+                    // هذا بالضبط ما جعل التاريخ "يختفي بعد ثانية أو ثانيتين". الضابط الأصلي للمتصفح
+                    // يتجاوز هذا التتبع فيصل حدث input إلى معالج onChange في React بشكل صحيح.
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeInputValueSetter.call(inp, `${selYear}-${mm}-${dd}`);
                     inp.dispatchEvent(new Event('input', { bubbles: true }));
                     inp.dispatchEvent(new Event('change', { bubbles: true }));
                     closeAllPickers();
