@@ -2412,12 +2412,16 @@
                     }
                     alert('✅ أُنشئ حساب الدخول بنجاح:' + String.fromCharCode(10,10) + 'البريد: ' + autoEmail + String.fromCharCode(10) + 'كلمة المرور: (كما أدخلتها الآن)' + String.fromCharCode(10,10) + 'سلّم هذين للمستخدم — لن يظهر البريد مرة أخرى تلقائياً.');
                 }
-                if (!targetUid) {
+                // UID مطلوب فقط عند إنشاء حساب جديد (والحساب الجديد يحصل عليه تلقائياً أعلاه
+                // عبر التسجيل، أو يُلصَق يدوياً). تعديل حساب قائم لم يُربَط بـUID من قبل
+                // (حسابات PIN فقط — الوضع المعتاد لمعظم حسابات النظام) يبقى ممكناً بلا UID،
+                // كما كان يعمل دائماً قبل إضافة ميزة الربط (ملاحظة المستخدم 2026-09-18).
+                if (!editingUserId && !targetUid) {
                     alert('⚠️ يرجى إدخال معرّف حساب Firebase (UID) الخاص بهذا المستخدم! تنسخه من Firebase Console ← Authentication ← Users.');
                     return;
                 }
 
-                const existingWithUid = systemUsers.find(u => String(u.uid || '').trim() === targetUid && u.id !== editingUserId);
+                const existingWithUid = targetUid && systemUsers.find(u => String(u.uid || '').trim() === targetUid && u.id !== editingUserId);
                 if (existingWithUid) {
                     alert(`⚠️ هذا المعرّف (UID) مسند بالفعل للمستخدم (${existingWithUid.name})! كل حساب Firebase يُسند لمستخدم واحد فقط.`);
                     return;
