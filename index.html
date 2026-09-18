@@ -6260,7 +6260,7 @@
                     const nonContracts = result.filter(s => !isContractEmployee(s));
                     return [...nonContracts, ...contracts];
                 }
-            }, [staff, filtered, search, view, waterMonth, excludedWaterIds]);
+            }, [staff, filtered, search, view, waterMonth, excludedWaterIds, showDueSafetyOnly]);
             
             const loadFile = (e) => {
                 const file = e.target.files[0];
