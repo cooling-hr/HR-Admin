@@ -1166,6 +1166,7 @@
             //   • يُنزع الصنف فور انتهاء الحركة، فلا يبقى العنصر سياق تكديس بعدها.
             // كسرَ إغفالُ هذا تسجيلَ الدخول كلياً قبل أن يلتقطه اختبار المتصفح.
             const mainContentRef = React.useRef(null);
+            const tableWrapperRef = React.useRef(null);
             const isFirstViewRenderRef = React.useRef(true);
             // طبقة تمرير منفصلة بـuseLayoutEffect لا useEffect: التمرير نافذة (window) لا حاوية
             // داخلية، والتبديل بين التبويبات لم يكن يُعيده للأعلى تلقائياً — فمن كان قد مرّر لأسفل
@@ -11767,7 +11768,12 @@ return (
                                                 {view === 'safety' && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => setShowDueSafetyOnly(!showDueSafetyOnly)}
+                                                        onClick={() => {
+                                                            setShowDueSafetyOnly(!showDueSafetyOnly);
+                                                            // الزر يبدّل حالة فلتر بلا أي إشارة قرب نفسه، والنتيجة أسفل الصفحة —
+                                                            // فيحتاج المستخدم للنزول يدوياً ليرى أثره. تمرير الجدول للعرض تلقائياً بدل ذلك.
+                                                            tableWrapperRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                        }}
                                                         aria-pressed={showDueSafetyOnly}
                                                         className={`px-5 py-2.5 rounded-lg font-bold shadow-sm transition active:scale-95 flex items-center gap-1.5 border ${
                                                             showDueSafetyOnly
@@ -12187,7 +12193,7 @@ return (
                                         </div>
                                     )}
 
-                                    <div className="overflow-x-auto">
+                                    <div className="overflow-x-auto" ref={tableWrapperRef}>
                                         {view === 'safety' ? (
                                             // جدول خاص لتجهيزات السلامة - 8 أعمدة مطور بالكامل للـ V5 - 8 أعمدة مطور بالكامل للـ V5
                                             <table className="w-full">
