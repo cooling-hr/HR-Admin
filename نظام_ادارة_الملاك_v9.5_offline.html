@@ -804,6 +804,10 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
+            // يمنع المتصفح من إعادة موضع التمرير القديم عند إقلاع النظام (فتح الملف أو تحديث
+            // الصفحة) — بلا هذا، إعادة تحميل الصفحة وأنت في وسط الجدول تُبقيك هناك بدل بداية الصفحة.
+            try { if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'; } catch (e) {}
+
             // آمن لبيئة أندرويد و content:// URI لمنع الشاشة البيضاء عند حظر localStorage
             const memoryStorage = {};
             const safeStorage = {
@@ -1155,6 +1159,15 @@
             // كسرَ إغفالُ هذا تسجيلَ الدخول كلياً قبل أن يلتقطه اختبار المتصفح.
             const mainContentRef = React.useRef(null);
             const isFirstViewRenderRef = React.useRef(true);
+            // طبقة تمرير منفصلة بـuseLayoutEffect لا useEffect: التمرير نافذة (window) لا حاوية
+            // داخلية، والتبديل بين التبويبات لم يكن يُعيده للأعلى تلقائياً — فمن كان قد مرّر لأسفل
+            // في تبويب يرى التالي يبدأ من منتصفه أو نهايته. useEffect العادي ينفّذ بعد الرسم على
+            // الشاشة فيظهر القفز للأعلى كوميض ملحوظ؛ useLayoutEffect ينفّذه قبل الرسم فلا وميض.
+            // بلا حراسة أول رسم أو نافذة مفتوحة (خلافاً لتأثير حركة التبويب تحته): التمرير للأعلى
+            // غير ضارّ في الحالتين، ولا يمسّ تمرير أي حاوية داخلية فرعية بتمريرها الخاص.
+            React.useLayoutEffect(() => {
+                window.scrollTo({ top: 0, behavior: 'auto' });
+            }, [view]);
             React.useEffect(() => {
                 const el = mainContentRef.current;
                 if (!el) return;
