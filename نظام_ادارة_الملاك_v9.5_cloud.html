@@ -320,6 +320,22 @@
                 background: #f8fafc !important;
             }
             
+            /* تذييل توقيع نهاية كل مجموعة (صباحي/ثلاثية/ثنائية) داخل الجدول — صف بلا حدود ولا
+               خلفية متناوبة كخلايا البيانات العادية، وبارتفاع يتّسع لمحتواه الفعلي لا 26px الثابتة */
+            .preview-table tr.signature-footer-row {
+                height: auto !important;
+                page-break-inside: avoid !important;
+                /* تجنّب فصل التذييل عن آخر أسماء مجموعته قدر استطاعة المتصفح — تلميح لا ضمان
+                   (ملاحظة Codex: لا يمنع كلياً بقاء التذييل وحيداً أعلى صفحة جديدة في كل الحالات
+                   والمتصفحات، لكنه يقلّل احتماله دون تعقيد إضافي) */
+                page-break-before: avoid !important;
+            }
+            .signature-footer-cell {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+            }
+
             /* فواصل المواقع المدمجة */
             .location-separator {
                 background: #cbd5e1 !important;
@@ -7588,6 +7604,7 @@
                                 'ملاحظات': ''
                             });
                         });
+                        displayData.push({ type: 'signature_footer' });
                     }
                     
                     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -7610,6 +7627,7 @@
                                 'ملاحظات': ''
                             });
                         });
+                        displayData.push({ type: 'signature_footer' });
                     }
                     
                     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -7630,6 +7648,7 @@
                                 'ملاحظات': ''
                             });
                         });
+                        displayData.push({ type: 'signature_footer' });
                     }
                 } else if (view === 'units') {
                     // جدول الوحدات - مجموع حسب الوحدة
@@ -13187,6 +13206,26 @@ return (
                                                 // (لا صف فارغ منفصل — ملاحظة Codex: صف فارغ فعلي قد يطبع
                                                 // بحدوده وحشوه الخاصين فيُنتج فجوة أو صفاً فارغاً ظاهراً)
                                                 const needsPageBreak = idx > 0 && previewData[idx - 1].type === 'page_break';
+                                                if (row.type === 'signature_footer') {
+                                                    // تذييل توقيع مستقل بنهاية كل مجموعة (صباحي/ثلاثية/
+                                                    // ثنائية) في قائمة الماء الموحّدة — نفس محتوى تذييل
+                                                    // الصفحة الواحد أدناه، مكرَّر هنا داخل الجدول ليظهر
+                                                    // في نهاية صفحة كل مجموعة تحديداً لا نهاية المستند فقط
+                                                    return (
+                                                        <tr key={idx} className={`signature-footer-row ${needsPageBreak ? 'print-page-break' : ''}`}>
+                                                            <td colSpan={getColSpan()} className="signature-footer-cell">
+                                                                <div className="flex justify-between items-center text-slate-950 font-black text-sm md:text-base px-8 pt-10 pb-3">
+                                                                    <p className="font-black text-base md:text-lg text-slate-950">مسؤول الإدارة</p>
+                                                                    <p className="font-black text-base md:text-lg text-slate-950">مسؤول الشعبة</p>
+                                                                </div>
+                                                                <div className="pt-2 border-t border-slate-300 flex justify-between items-center text-[10px] text-slate-700 font-bold px-2">
+                                                                    <span>منظم الموقف: <strong className="text-slate-950 font-black">{dataEntryOperator || '....................'}</strong></span>
+                                                                    <span>تاريخ الطباعة والتنظيم: <strong className="text-slate-950 font-black font-mono">{new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })}</strong> ({new Date().toISOString().split('T')[0]})</span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                }
                                                 if (row.type === 'separator') {
                                                     return (
                                                         <tr key={idx} className={needsPageBreak ? 'print-page-break' : ''}>
@@ -13227,7 +13266,11 @@ return (
                                         </tbody>
                                     </table>
 
-                                    {/* قسم عناوين التوقيعات النظيفة نُزلت لأسفل بمقدار خليتين إضافيتين (إجمالي 6 خلايا تحت الجدول) */}
+                                    {/* قسم عناوين التوقيعات النظيفة — يُخفى إن كان كل مجموعة تحمل تذييلها
+                                        الخاص بنهايتها داخل الجدول بالفعل (previewData بها signature_footer)،
+                                        وإلا لظهر تذييل مكرَّر عديم الفائدة بعد تذييل آخر مجموعة مباشرة */}
+                                    {!previewData.some(d => d.type === 'signature_footer') && (
+                                    <>
                                     <div className="preview-signatures-row mt-52 mb-14 px-12 flex justify-between items-center text-slate-950 font-black text-sm md:text-base">
                                         <div className="text-right">
                                             <p className="font-black text-base md:text-lg text-slate-950">مسؤول الإدارة</p>
@@ -13242,6 +13285,8 @@ return (
                                         <span>منظم الموقف: <strong className="text-slate-950 font-black">{dataEntryOperator || '....................'}</strong></span>
                                         <span>تاريخ الطباعة والتنظيم: <strong className="text-slate-950 font-black font-mono">{new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })}</strong> ({new Date().toISOString().split('T')[0]})</span>
                                     </div>
+                                    </>
+                                    )}
                                 </div>
                                 
                                 <div className="preview-footer">
