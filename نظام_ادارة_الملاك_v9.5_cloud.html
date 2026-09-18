@@ -330,7 +330,11 @@
                    والمتصفحات، لكنه يقلّل احتماله دون تعقيد إضافي) */
                 page-break-before: avoid !important;
             }
-            .signature-footer-cell {
+            /* التخصيص .preview-table td.signature-footer-cell لا .signature-footer-cell وحدها:
+               قاعدة .preview-table td { border: 1px solid ... !important } أعلاه أكثر تخصيصاً
+               (صنف + وسم) من صنف مفرد، فكانت تتغلّب رغم !important في كلتيهما — الأولوية بينهما
+               تُحسم بالتخصيص لا بالترتيب عندما يحمل الطرفان !important معاً */
+            .preview-table td.signature-footer-cell {
                 border: none !important;
                 background: transparent !important;
                 padding: 0 !important;
