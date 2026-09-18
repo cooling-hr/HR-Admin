@@ -2270,7 +2270,10 @@
                 try {
                     const bundle = snapshot.bundle;
                     applyDataBundleToState(bundle);
-                    await pushDataToCloud({ ...bundle, lastCloudUpdate: new Date().toISOString() });
+                    // اللقطات القديمة (قبل إصلاح 2026-09-18) لا تحوي حسابات المستخدمين أصلاً؛
+                    // بثّ bundle كما هو كان يمحو حسابات النظام الحية سحابياً. الحسابات الحالية
+                    // تبقى كما هي دائماً هنا — الاستعادة تخص بيانات الملاك والمواقف لا الحسابات.
+                    await pushDataToCloud({ ...bundle, systemUsersList: systemUsers, lastCloudUpdate: new Date().toISOString() });
                     alert(`✅ تم بنجاح استعادة وتثبيت نسخة يوم [${snapshot.date}] وتعميمها على السحابة!`);
                     setShowRestoreCenterModal(false);
                 } catch (err) {
@@ -3237,6 +3240,7 @@
                     if (nextOverrides) {
                         pushDataToCloud({
                             staffData: staff,
+                            systemUsersList: systemUsers,
                             officialHolidaysList: officialHolidays,
                             hourlyLeaveRecords: hourlyLeaveRecords,
                             overtimeHoursRecords: overtimeHoursRecords,
@@ -6191,6 +6195,7 @@
                 // بث مباشر وفوري للسحابة فور الضغط على حفظ
                 pushDataToCloud({
                     staffData: sortedStaff,
+                    systemUsersList: systemUsers,
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     overtimeHoursRecords: overtimeHoursRecords,
@@ -6306,6 +6311,7 @@
                     safeStorage.setItem('pendingDeletionRequest', JSON.stringify(newRequest));
                     pushDataToCloud({
                         staffData: staff,
+                        systemUsersList: systemUsers,
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         overtimeHoursRecords: overtimeHoursRecords,
@@ -6345,6 +6351,7 @@
                 safeStorage.removeItem('pendingDeletionRequest');
                 pushDataToCloud({
                     staffData: [],
+                    systemUsersList: systemUsers,
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: {},
                     overtimeHoursRecords: {},
@@ -6367,6 +6374,7 @@
                 safeStorage.removeItem('pendingDeletionRequest');
                 pushDataToCloud({
                     staffData: staff,
+                    systemUsersList: systemUsers,
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     overtimeHoursRecords: overtimeHoursRecords,
