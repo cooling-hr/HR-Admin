@@ -66,6 +66,8 @@
     <meta name="description" content="نظام إدارة الملاك والموقف اليومي - شعبة تبريد المركز ومحطة عزل نهر بن عمر - شركة نفط البصرة">
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>❄️</text></svg>">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon.svg">
     <title>نظام إدارة الملاك - الإصدار v9.5 Enterprise Cloud Edition ☁️</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -13772,6 +13774,15 @@ return (
         });
 
         ReactDOM.render(<StaffSystem />, document.getElementById('root'));
+    </script>
+    <script>
+        // تسجيل Service Worker لتفعيل التثبيت كتطبيق هاتف — فقط على الرابط المنشور فعلياً؛
+        // لا معنى له ولا تسجّله المتصفحات أصلاً عند فتح الملف محلياً (file://).
+        if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./sw.js').catch(function() {});
+            });
+        }
     </script>
 </body>
 </html>
