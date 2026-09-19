@@ -2772,6 +2772,31 @@
                 }
             };
 
+            // حزمة المزامنة مبنيّة بدالة لا مقروءة داخل pushDataToCloud مباشرة: الدفع يُستدعى في
+            // نفس معالِج الحدث بعد setStaff، وإغلاق ذلك العرض يحمل الحالة «قبل» التعديل — فكانت
+            // الحمولة الضمنية تحمل الملاك القديم وتُعيده إلى السحابة، فيظهر التعديل على الشاشة ثم
+            // يعود الموقف القديم عند أول مزامنة تالية. كل موضع يعدّل الملاك يمرّر الجديد صراحةً.
+            const buildCloudBundle = (overrides = {}) => ({
+                staffData: staff,
+                systemUsersList: systemUsers,
+                officialHolidaysList: officialHolidays,
+                hourlyLeaveRecords: hourlyLeaveRecords,
+                overtimeHoursRecords: overtimeHoursRecords,
+                dailyStatusOverrides: dailyStatusOverrides,
+                shiftAnchorDate: anchorDate,
+                threeShiftAnchorSquad: threeShiftAnchorSquad,
+                twoShiftAnchorSquad: twoShiftAnchorSquad,
+                dataEntryOperator: dataEntryOperator,
+                overtimeSelectedIds: overtimeIds,
+                pendingDeletionRequest: pendingDeletionRequest,
+                ...overrides
+            });
+            // إغلاق آخر عرض «مُثبَّت»: الدفعة المؤجَّلة (أثناء انشغال دفعة أخرى) تُنفَّذ بعد أن
+            // يطبّق React التحديث، فتُبنى حمولتها من حالة ما بعده لا من إغلاق الدفعة التي أجّلتها.
+            // التحديث داخل useEffect لا أثناء الرسم: الرسم قد يُلغى فلا تُبثّ حالة لم تُثبَّت أصلاً
+            const buildCloudBundleRef = React.useRef(null);
+            React.useEffect(() => { buildCloudBundleRef.current = buildCloudBundle; });
+
             // بث التعديلات مباشرة إلى السحابة الحية لتنعكس لدى الجميع في نفس اللحظة
             const pushDataToCloud = async (bundle = null) => {
                 // 1. حظر تام وقاطع لأي مزامنة سحابية إذا كان الملف يعمل كـ أوفلاين محلي (file://) أو تم إلغاء رابط السحابة
@@ -2791,28 +2816,17 @@
                 // أقدم من التعديل الذي استدعى هذه الدفعة أصلاً.
                 if (isPushingRef.current) {
                     pendingPushRef.current = true;
-                    if (bundle) pendingBundleRef.current = bundle;
+                    // آخر نداء هو الأحدث نيّةً: دفعة ضمنية تالية تمسح حزمةً صريحة مؤجَّلة قبلها
+                    // (وإلا أُعيد بثّ لقطتها الأقدم فوق تعديل أحدث منها)، وتُعاد البناء من حالة
+                    // ما بعد التثبيت عند التنفيذ
+                    pendingBundleRef.current = bundle;
                     return;
                 }
                 isPushingRef.current = true;
                 try {
                     setCloudSyncStatus(prev => ({ ...prev, syncing: true }));
                     const nowIso = (bundle && bundle.lastCloudUpdate) ? bundle.lastCloudUpdate : new Date().toISOString();
-                    const dataPayload = bundle ? { ...bundle, lastCloudUpdate: nowIso } : {
-                        staffData: staff,
-                        systemUsersList: systemUsers,
-                        officialHolidaysList: officialHolidays,
-                        hourlyLeaveRecords: hourlyLeaveRecords,
-                        overtimeHoursRecords: overtimeHoursRecords,
-                        dailyStatusOverrides: dailyStatusOverrides,
-                        shiftAnchorDate: anchorDate,
-                        threeShiftAnchorSquad: threeShiftAnchorSquad,
-                        twoShiftAnchorSquad: twoShiftAnchorSquad,
-                        dataEntryOperator: dataEntryOperator,
-                        overtimeSelectedIds: overtimeIds,
-                        lastCloudUpdate: nowIso,
-                        pendingDeletionRequest: pendingDeletionRequest
-                    };
+                    const dataPayload = { ...(bundle || (buildCloudBundleRef.current || buildCloudBundle)()), lastCloudUpdate: nowIso };
                     // عقدة القفل writeClaim ليست حقلاً من حزمة البيانات (لا تدخل بصمة التكرار
                     // أدناه)، لكن هذه الكتابة الكاملة تستبدل الجذر بأكمله — فبلا إدراجها هنا
                     // صراحة كانت ستُمحى من كل حفظة ناجحة. تُدرَج بنفس ختم هذه الحفظة تحديداً حتى
@@ -3603,7 +3617,7 @@
                 });
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
-                pushDataToCloud();
+                pushDataToCloud(buildCloudBundle({ staffData: updated }));
                 logAuditEvent((didResume ? 'confirm_return:' : 'no_return:') + (emp.jobNumber || emp.id), currentUserName);
                 setDismissedReturnIds(prev => [...prev, period.id]);
             };
@@ -7344,7 +7358,7 @@
                         const updated = staff.map(s => s.id === id ? { ...s, status: 'نشط' } : s);
                         setStaff(updated);
                         safeStorage.setItem('staffData', JSON.stringify(updated));
-                        pushDataToCloud();
+                        pushDataToCloud(buildCloudBundle({ staffData: updated }));
                         logAuditEvent('change_status:نشط:' + (emp.jobNumber || emp.id), currentUserName);
                         return;
                     }
@@ -7358,7 +7372,7 @@
                     const updated = staff.map(s => s.id === id ? { ...s, statusPeriods: updatedPeriods, status: 'نشط' } : s);
                     setStaff(updated);
                     safeStorage.setItem('staffData', JSON.stringify(updated));
-                    pushDataToCloud();
+                    pushDataToCloud(buildCloudBundle({ staffData: updated }));
                     logAuditEvent('end_period:' + active.type + ':' + (emp.jobNumber || emp.id), currentUserName);
                     return;
                 }
@@ -7435,7 +7449,7 @@
                 const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: rest, status: (activeNow && !activeNow.legacy) ? activeNow.type : 'نشط' } : s);
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
-                pushDataToCloud();
+                pushDataToCloud(buildCloudBundle({ staffData: updated }));
                 if (typeof logAuditEvent === 'function') logAuditEvent('delete_period:' + p.type + ':' + (emp.jobNumber || emp.id), currentUserName);
             };
 
@@ -7543,21 +7557,10 @@
                 const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: updatedPeriods, status: (activeToday && !activeToday.legacy) ? activeToday.type : 'نشط' } : s);
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
-                pushDataToCloud(clearedOverrides ? {
+                pushDataToCloud(buildCloudBundle({
                     staffData: updated,
-                    systemUsersList: systemUsers,
-                    officialHolidaysList: officialHolidays,
-                    hourlyLeaveRecords: hourlyLeaveRecords,
-                    overtimeHoursRecords: overtimeHoursRecords,
-                    dailyStatusOverrides: clearedOverrides,
-                    shiftAnchorDate: anchorDate,
-                    threeShiftAnchorSquad: threeShiftAnchorSquad,
-                    twoShiftAnchorSquad: twoShiftAnchorSquad,
-                    dataEntryOperator: dataEntryOperator,
-                    overtimeSelectedIds: overtimeIds,
-                    lastCloudUpdate: new Date().toISOString(),
-                    pendingDeletionRequest: pendingDeletionRequest
-                } : null);
+                    ...(clearedOverrides ? { dailyStatusOverrides: clearedOverrides } : {})
+                }));
                 logAuditEvent((conflicts.length > 0 ? 'replace_period:' : 'add_period:') + periodType + ':' + (emp.jobNumber || emp.id), currentUserName);
                 setQuickPeriod(null);
             };
