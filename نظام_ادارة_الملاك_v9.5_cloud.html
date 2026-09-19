@@ -1225,6 +1225,8 @@
             const [selectedUnit, setSelectedUnit] = useState(null);
             const [selectedSafetyIds, setSelectedSafetyIds] = useState([]);
             const [bulkSafetyDate, setBulkSafetyDate] = useState('');
+            // آخر تحديث جماعي لتاريخ التجهيز، للتراجع عنه: { prev: {id: التاريخ السابق}, applied, count }
+            const [safetyUndo, setSafetyUndo] = useState(null);
             const [overtimeIds, setOvertimeIds] = useState(() => {
                 const saved = safeStorage.getItem('overtimeSelectedIds');
                 return saved ? JSON.parse(saved) : [];
@@ -4648,6 +4650,47 @@
             const safetyFilterGroup = (s) => {
                 const type = getSafetyStatus(s.lastSafetyDelivery).type;
                 return type === 'ok' ? 'ok' : type === 'due-never' ? 'never' : 'renewal';
+            };
+
+            // تطبيق تاريخ تجهيز (أو مسحه بقيمة فارغة) على المحددين، مع حفظ تواريخهم السابقة للتراجع
+            const applySafetyDate = (ids, dateVal) => {
+                const idSet = new Set(ids);
+                const prev = {};
+                const nowIso = new Date().toISOString();
+                const updatedStaff = staff.map(emp => {
+                    if (!idSet.has(emp.id)) return emp;
+                    prev[emp.id] = emp.lastSafetyDelivery || '';
+                    return { ...emp, lastSafetyDelivery: dateVal, lastModified: nowIso };
+                });
+                setStaff(updatedStaff);
+                safeStorage.setItem('staffData', JSON.stringify(updatedStaff));
+                setSafetyUndo({ prev, applied: dateVal, count: Object.keys(prev).length });
+            };
+
+            const undoSafetyDate = () => {
+                if (!safetyUndo) return;
+                if (!canEdit('safety')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات وتجهيزات السلامة المهنية!');
+                    return;
+                }
+                // من تغيّر تاريخه بعد التطبيق (تعديل لاحق أو من جهاز آخر عبر المزامنة) لا يُعاد، كي لا يُمحى تعديل أحدث
+                let restored = 0;
+                const nowIso = new Date().toISOString();
+                const updatedStaff = staff.map(emp => {
+                    if (!Object.prototype.hasOwnProperty.call(safetyUndo.prev, emp.id)) return emp;
+                    if ((emp.lastSafetyDelivery || '') !== safetyUndo.applied) return emp;
+                    restored++;
+                    return { ...emp, lastSafetyDelivery: safetyUndo.prev[emp.id], lastModified: nowIso };
+                });
+                setSafetyUndo(null);
+                if (restored === 0) {
+                    alert('ℹ️ لا شيء للتراجع عنه: تواريخ هؤلاء الموظفين تغيّرت بعد التطبيق.');
+                    return;
+                }
+                setStaff(updatedStaff);
+                safeStorage.setItem('staffData', JSON.stringify(updatedStaff));
+                const skipped = safetyUndo.count - restored;
+                alert(`↩️ أُعيدت التواريخ السابقة لـ (${restored}) موظف${skipped > 0 ? `\nولم يُعَد (${skipped}) لأن تاريخهم تغيّر بعد التطبيق.` : ''}`);
             };
             
             const showBackupWarning = useMemo(() => {
@@ -12155,10 +12198,7 @@ return (
                                                         className="w-32 outline-none font-bold text-slate-800 text-sm bg-transparent"
                                                     />
                                                     <button 
-                                                        onClick={() => {
-                                                            const today = new Date().toISOString().split('T')[0];
-                                                            setBulkSafetyDate(today);
-                                                        }}
+                                                        onClick={() => setBulkSafetyDate(localDateStr())}
                                                         className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded text-xs transition"
                                                     >
                                                         اليوم
@@ -12179,33 +12219,70 @@ return (
                                                             alert('⚠️ يرجى إدخال أو اختيار تاريخ التجهيز أولاً!');
                                                             return;
                                                         }
-                                                        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+                                                        // الصيغة وحدها تقبل تاريخاً مستحيلاً مثل 2025-02-31 — يُتحقَّق أنه يوم حقيقي في التقويم
+                                                        const [dy, dm, dd] = dateVal.split('-').map(Number);
+                                                        const asDate = new Date(dy, dm - 1, dd);
+                                                        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateVal) || asDate.getFullYear() !== dy || asDate.getMonth() !== dm - 1 || asDate.getDate() !== dd) {
                                                             alert('⚠️ يرجى إدخال التاريخ بالصيغة الصحيحة (السنة-الشهر-اليوم) مثل: 2024-08-26');
                                                             return;
                                                         }
                                                         
                                                         if (confirm(`❓ هل أنت متأكد من تحديث تاريخ التجهيز لـ (${selectedSafetyIds.length}) موظف محدد إلى: ${dateVal}؟`)) {
-                                                            const updatedStaff = staff.map(emp => {
-                                                                if (selectedSafetyIds.includes(emp.id)) {
-                                                                    return {
-                                                                        ...emp,
-                                                                        lastSafetyDelivery: dateVal,
-                                                                        lastModified: new Date().toISOString()
-                                                                    };
-                                                                }
-                                                                return emp;
-                                                            });
-                                                            setStaff(updatedStaff);
-                                                            safeStorage.setItem('staffData', JSON.stringify(updatedStaff));
+                                                            applySafetyDate(selectedSafetyIds, dateVal);
                                                             setSelectedSafetyIds([]);
-                                                            alert('✅ تم تحديث تاريخ التجهيز للموظفين المحددين بنجاح!');
+                                                            alert('✅ تم تحديث تاريخ التجهيز للموظفين المحددين بنجاح!\nيمكنك التراجع عنه من زر «تراجع» في هذا الشريط.');
                                                         }
                                                     }}
                                                     className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold rounded-lg text-sm transition shadow-md flex items-center gap-1.5"
                                                 >
-                                                    <span>⚙️ تطبيق على (${selectedSafetyIds.length}) موظف</span>
+                                                    <span>⚙️ تطبيق على ({selectedSafetyIds.length}) موظف</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!canEdit('safety')) {
+                                                            alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات وتجهيزات السلامة المهنية!');
+                                                            return;
+                                                        }
+                                                        if (selectedSafetyIds.length === 0) {
+                                                            alert('⚠️ يرجى تحديد موظف واحد على الأقل من الجدول أولاً!');
+                                                            return;
+                                                        }
+                                                        if (confirm(`❓ مسح تاريخ التجهيز لـ (${selectedSafetyIds.length}) موظف محدد؟\nسيعودون إلى «غير مجهز سابقاً».`)) {
+                                                            applySafetyDate(selectedSafetyIds, '');
+                                                            setSelectedSafetyIds([]);
+                                                        }
+                                                    }}
+                                                    title="إلغاء تاريخ التجهيز المسجَّل للموظفين المحددين"
+                                                    className="px-4 py-2 bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 font-bold rounded-lg text-sm transition flex items-center gap-1.5"
+                                                >
+                                                    <span>🗑️ مسح التاريخ</span>
                                                 </button>
                                             </div>
+                                            {safetyUndo && (
+                                                <div className="w-full flex flex-wrap items-center justify-between gap-2 bg-white border border-amber-300 rounded-lg px-3 py-2 text-sm">
+                                                    <span className="font-bold text-amber-800">
+                                                        آخر تعديل: {safetyUndo.applied ? `تاريخ التجهيز ${safetyUndo.applied}` : 'مسح تاريخ التجهيز'} لـ ({safetyUndo.count}) موظف
+                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={undoSafetyDate}
+                                                            className="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded text-xs transition"
+                                                        >
+                                                            ↩️ تراجع
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSafetyUndo(null)}
+                                                            aria-label="إخفاء"
+                                                            className="px-2 py-1 text-gray-500 hover:text-gray-700 text-xs"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
