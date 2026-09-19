@@ -4600,7 +4600,7 @@
             
             // ===== المزامنة والنسخ الاحتياطي ومؤشرات الأمان =====
             const [lastBackupDate, setLastBackupDate] = useState(() => safeStorage.getItem('lastBackupDate'));
-            const [showDueSafetyOnly, setShowDueSafetyOnly] = useState(false);
+            const [safetyFilter, setSafetyFilter] = useState('all'); // 'all' | 'renewal' | 'never'
             const [showSizeDetails, setShowSizeDetails] = useState(false);
             const [showMergeModal, setShowMergeModal] = useState(false);
             const [incomingStaff, setIncomingStaff] = useState([]);
@@ -4641,6 +4641,13 @@
                     const shoesRemaining = 24 - diffMonths;
                     return { label: `✅ مجهز ومحمي (بدلة متبقي ${uniformRemaining} شهر | حذاء متبقي ${shoesRemaining} شهر)`, type: 'ok', color: 'bg-green-50 text-green-700 border-green-200 font-bold' };
                 }
+            };
+            const isInSafetyRoster = (s) => s.gender === 'ذكر' && s.status === 'نشط' && s.jobNumber !== '811645'; // استثناء فلاح مهدي (إداري)
+            // «مستحق التجديد» من جُهِّز سابقاً وحان تجديده أو اقترب؛ من لم يُجهَّز قط فئة مستقلة.
+            // كانا فلتراً واحداً، وحين يكون أغلب الملاك بلا تاريخ تجهيز يبقى الجدول كما هو تقريباً فيبدو الزر معطلاً
+            const safetyFilterGroup = (s) => {
+                const type = getSafetyStatus(s.lastSafetyDelivery).type;
+                return type === 'ok' ? 'ok' : type === 'due-never' ? 'never' : 'renewal';
             };
             
             const showBackupWarning = useMemo(() => {
@@ -6211,13 +6218,9 @@
             }
                 else if (view === 'contract') result = data.filter(s => isContractEmployee(s));
                 else if (view === 'safety') {
-                    result = data.filter(s => 
-                        s.gender === 'ذكر' && 
-                        s.status === 'نشط' && 
-                        s.jobNumber !== '811645' // استثناء فلاح مهدي (إداري)
-                    );
-                    if (showDueSafetyOnly) {
-                        result = result.filter(s => getSafetyStatus(s.lastSafetyDelivery).type !== 'ok');
+                    result = data.filter(isInSafetyRoster);
+                    if (safetyFilter !== 'all') {
+                        result = result.filter(s => safetyFilterGroup(s) === safetyFilter);
                     }
                     result = sortByJobNumber(result); // ترتيب حسب الأرقام الوظيفية، العقود في النهاية
                 }
@@ -6288,7 +6291,20 @@
                     const nonContracts = result.filter(s => !isContractEmployee(s));
                     return [...nonContracts, ...contracts];
                 }
-            }, [staff, filtered, search, view, waterMonth, excludedWaterIds, showDueSafetyOnly]);
+            }, [staff, filtered, search, view, waterMonth, excludedWaterIds, safetyFilter]);
+
+            // أعداد خيارات فلتر السلامة من نفس القائمة التي يُصفّيها (بعد البحث، قبل الفلتر)
+            const safetyGroupCounts = useMemo(() => {
+                const counts = { all: 0, renewal: 0, never: 0 };
+                if (view !== 'safety') return counts;
+                (search ? filtered : staff).forEach(s => {
+                    if (!isInSafetyRoster(s)) return;
+                    counts.all++;
+                    const group = safetyFilterGroup(s);
+                    if (group !== 'ok') counts[group]++;
+                });
+                return counts;
+            }, [staff, filtered, search, view]);
             
             const loadFile = (e) => {
                 const file = e.target.files[0];
@@ -11769,24 +11785,21 @@ return (
                                         actions={
                                             <>
                                                 {view === 'safety' && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setShowDueSafetyOnly(!showDueSafetyOnly);
-                                                            // الزر يبدّل حالة فلتر بلا أي إشارة قرب نفسه، والنتيجة أسفل الصفحة —
-                                                            // فيحتاج المستخدم للنزول يدوياً ليرى أثره. تمرير الجدول للعرض تلقائياً بدل ذلك.
+                                                    <Segmented
+                                                        ariaLabel="فلتر حالة التجهيز"
+                                                        stackBelow="all"
+                                                        value={safetyFilter}
+                                                        onChange={(next) => {
+                                                            setSafetyFilter(next);
+                                                            // الفلتر هنا والنتيجة أسفل الصفحة — تمرير الجدول للعرض تلقائياً بدل النزول يدوياً
                                                             tableWrapperRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                                         }}
-                                                        aria-pressed={showDueSafetyOnly}
-                                                        className={`px-5 py-2.5 rounded-lg font-bold shadow-sm transition active:scale-95 flex items-center gap-1.5 border ${
-                                                            showDueSafetyOnly
-                                                                ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-500'
-                                                                : 'bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-[color:var(--ink)] border-[color:var(--border-strong)]'
-                                                        }`}
-                                                    >
-                                                        <Icon name="filter" className="w-4 h-4" />
-                                                        <span>{showDueSafetyOnly ? 'عرض كل المجهزين' : 'عرض مستحقي التجديد فقط'}</span>
-                                                    </button>
+                                                        options={[
+                                                            { value: 'all', label: `الكل (${safetyGroupCounts.all})` },
+                                                            { value: 'renewal', label: `مستحقو التجديد (${safetyGroupCounts.renewal})`, title: 'جُهِّزوا سابقاً وحان تجديد البدلة أو الحذاء أو اقترب' },
+                                                            { value: 'never', label: `غير مجهزين سابقاً (${safetyGroupCounts.never})`, title: 'لا تاريخ تجهيز مسجَّل لهم' }
+                                                        ]}
+                                                    />
                                                 )}
                                                 <button type="button" onClick={preparePreview} className="bg-[var(--action)] hover:bg-[var(--action-hover)] text-white px-6 py-3 rounded-lg font-bold shadow-sm transition flex items-center gap-2">
                                                     <Icon name="eye" className="w-4 h-4" /> <span>معاينة وتصدير</span>
