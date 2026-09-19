@@ -69,14 +69,9 @@
     <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="./icon.svg">
     <title>نظام إدارة الملاك - الإصدار v9.5 Enterprise Cloud Edition ☁️</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone@7.26.2/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <style>
         /* ---------------------------------------------------- */
         /* منتقي التاريخ المخصص المتطور (Custom DatePicker) */
@@ -811,7 +806,7 @@
 </head>
 <body>
     <div id="root"></div>
-    <script type="text/babel">
+    <script type="text/x-hr-app" id="hr-app-source">
             // يمنع المتصفح من إعادة موضع التمرير القديم عند إقلاع النظام (فتح الملف أو تحديث
             // الصفحة) — بلا هذا، إعادة تحميل الصفحة وأنت في وسط الجدول تُبقيك هناك بدل بداية الصفحة.
             try { if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'; } catch (e) {}
@@ -1027,6 +1022,43 @@
         // (grid-flow-col + auto-cols-fr) عرضُ كلٍّ منها بقدر أطول الخيارات، والمسار بعرضها لا بعرض
         // الشريط (sm:w-fit) — ممتدّاً كان يُقرأ زراً واحداً (المواصفة §14.2). يتكدّس تحت `sm`.
         // الفاصل بين الخيارات ولون التحويم في CSS تحت «.seg-opt».
+        // مكتبات الاستيراد والتصدير (نحو 2.4MB) تُحمَّل عند أول حاجة إليها لا مع فتح التطبيق: كانت
+        // تُنزَّل وتُحلَّل قبل ظهور أي شيء في كل فتح — وهو ما يُبطئ الهاتف تحديداً — وأغلب مرات الفتح
+        // لا تصدير فيها. بعد أول تحميل تبقى في ذاكرة المتصفح (روابط بإصدار ثابت، مخزَّنة سنة كاملة).
+        const LAZY_LIBS = {
+            xlsx: { global: 'XLSX', src: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js' },
+            exceljs: { global: 'ExcelJS', src: 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js' },
+            docx: { global: 'docx', src: 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js' },
+            fileSaver: { global: 'saveAs', src: 'https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js' }
+        };
+        const lazyLibPromises = {};
+        const loadLazyLib = (name) => {
+            const lib = LAZY_LIBS[name];
+            if (window[lib.global]) return Promise.resolve(window[lib.global]);
+            if (!lazyLibPromises[name]) {
+                lazyLibPromises[name] = new Promise((resolve, reject) => {
+                    const el = document.createElement('script');
+                    el.src = lib.src;
+                    el.async = true;
+                    // الفشل يمسح الوعد والوسم، فتُعاد المحاولة من الصفر عند الضغطة التالية (بعد عودة الاتصال مثلاً)
+                    const fail = () => { delete lazyLibPromises[name]; el.remove(); reject(new Error(name)); };
+                    el.onload = () => (window[lib.global] ? resolve(window[lib.global]) : fail());
+                    el.onerror = fail;
+                    document.head.appendChild(el);
+                });
+            }
+            return lazyLibPromises[name];
+        };
+        const ensureLibs = async (...names) => {
+            try {
+                await Promise.all(names.map(loadLazyLib));
+                return true;
+            } catch (e) {
+                alert('⚠️ تعذّر تحميل مكتبة الاستيراد/التصدير — تحقّق من الاتصال بالإنترنت ثم أعد المحاولة.');
+                return false;
+            }
+        };
+
         const Segmented = ({ options, value, onChange, ariaLabel, stackBelow = 'sm' }) => {
             const stackClass = stackBelow === 'sm'
                 ? 'grid-cols-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr'
@@ -6399,8 +6431,8 @@
                 loadExcel(file);
             };
             
-            const loadExcel = (file) => {
-                
+            const loadExcel = async (file) => {
+                if (!(await ensureLibs('xlsx'))) return;
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     try {
@@ -6681,7 +6713,8 @@
             };
 
             // دالة تصدير جدول قياسي (Excel)
-            const exportStandardExcel = () => {
+            const exportStandardExcel = async () => {
+                if (!(await ensureLibs('xlsx'))) return;
                 try {
                     // ترتيب الموظفين حسب الوحدات
                     const unitOrder = ['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'];
@@ -6790,7 +6823,8 @@
             };
             
             // دالة تصدير تجهيزات السلامة
-            const exportSafetyEquipment = () => {
+            const exportSafetyEquipment = async () => {
+                if (!(await ensureLibs('xlsx'))) return;
                 try {
                     // فلترة الموظفين (ذكور نشطين، مع العقود، استثناء الإداريين)
                     let safetyStaff = staff.filter(s => 
@@ -7290,9 +7324,10 @@
             };
             
             // دالة تحديث القياسات من ملف Excel
-            const updateMeasurementsFromFile = (event) => {
+            const updateMeasurementsFromFile = async (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
+                if (!(await ensureLibs('xlsx'))) return;
                 
                 const reader = new FileReader();
                 reader.onload = (evt) => {
@@ -7920,7 +7955,8 @@
                 window.print();
             };
             
-            const exportExcel = () => {
+            const exportExcel = async () => {
+                if (!(await ensureLibs('xlsx'))) return;
                 const names = {all: 'الملاك', shift: 'المناوبين', morning: 'الصباحي', contract: 'العقود', maaMorning: 'الماء-صباحي', maaShift: 'الماء-مناوبين', evaluation: 'التقييم', safety: 'تجهيزات-السلامة', units: 'الوحدات', dailyReport: 'الموقف-اليومي'};
                 const fileName = view && names[view] ? names[view] : 'نتائج-البحث';
                 const wb = XLSX.utils.book_new();
@@ -7955,7 +7991,8 @@
             };
 
             // دالة تصدير خاصة لتبويب الوحدات
-            const exportUnits = () => {
+            const exportUnits = async () => {
+                if (!(await ensureLibs('xlsx'))) return;
                 try {
                     const wb = XLSX.utils.book_new();
                     const exportData = [];
@@ -8027,6 +8064,7 @@
             };
 
             const exportWord = async () => {
+                if (!(await ensureLibs('docx', 'fileSaver'))) return;
                 try {
                     const names = {all: 'الملاك', shift: 'المناوبين', morning: 'الصباحي', contract: 'العقود', maaMorning: 'الماء-صباحي', maaShift: 'الماء-مناوبين', evaluation: 'التقييم'};
                 const fileName = view && names[view] ? names[view] : 'نتائج-البحث';
@@ -8131,6 +8169,7 @@
             };
 
             const exportProfessional = async () => {
+                if (!(await ensureLibs('exceljs'))) return;
                 setExporting(true);
                 try {
                     const ExcelJS = window.ExcelJS;
@@ -15119,6 +15158,123 @@ return (
         });
 
         ReactDOM.render(<StaffSystem />, document.getElementById('root'));
+    </script>
+    <script>
+        // مُشغِّل التطبيق. كود الواجهة مكتوب بـJSX ويُترجَم داخل المتصفح (بلا خطوة بناء)، وبإعدادات
+        // Babel الافتراضية لوسوم text/babel حرفياً (react + env) تستغرق الترجمة عشرات الثواني على
+        // الهاتف — وكانت تتكرر مع كل فتح. الآن تُترجَم مرة واحدة لكل نسخة من الكود ويُحفظ الناتج في
+        // IndexedDB مع بصمة الكود: أي تعديل يغيّر البصمة فيفرض ترجمة جديدة تلقائياً. أي خلل في
+        // التخزين (تصفّح خاص، امتلاء، منع) يعود بصمت إلى الترجمة في كل فتح كما كان.
+        (function () {
+            var BABEL_VERSION = '7.26.2';
+            var BABEL_SRC = 'https://unpkg.com/@babel/standalone@' + BABEL_VERSION + '/babel.min.js';
+            var DB_NAME = 'hr-admin-compiled';
+            var STORE = 'app';
+            // خانة لكل ملف: النسخة السحابية والأوفلاين على سطح المكتب تشتركان في أصل file:// نفسه
+            var SLOT = location.pathname.replace(/index\.html$/, '');
+            var source = document.getElementById('hr-app-source').textContent;
+
+            // بصمتا FNV-1a بـ32 بت بمُضاعِفين مختلفين، مع الطول
+            function fingerprint(s) {
+                var h1 = 0x811c9dc5, h2 = 0x811c9dc5;
+                for (var i = 0; i < s.length; i++) {
+                    var c = s.charCodeAt(i);
+                    h1 = Math.imul(h1 ^ c, 0x01000193);
+                    h2 = Math.imul(h2 ^ c, 0x5bd1e995);
+                }
+                return (h1 >>> 0).toString(16) + '.' + (h2 >>> 0).toString(16) + '.' + s.length;
+            }
+            // الإعدادات مطابقة حرفياً لما كان Babel يفعله بوسم text/babel (عدا خريطة المصدر المضمَّنة)،
+            // وهي جزء من المفتاح: تغييرها وحدها بلا تغيير الكود يفرض ترجمة جديدة أيضاً
+            var BABEL_OPTIONS = {
+                filename: 'Inline Babel script',
+                presets: ['react', 'env'],
+                plugins: ['transform-class-properties', 'transform-object-rest-spread', 'transform-flow-strip-types']
+            };
+            var key = BABEL_VERSION + ':' + fingerprint(JSON.stringify(BABEL_OPTIONS)) + ':' + fingerprint(source);
+
+            function run(code) {
+                var el = document.createElement('script');
+                el.text = code + '\n//# sourceURL=hr-admin-app.js';
+                document.head.appendChild(el);
+            }
+
+            function openDb() {
+                return new Promise(function (resolve) {
+                    try {
+                        var req = indexedDB.open(DB_NAME, 1);
+                        req.onupgradeneeded = function () { req.result.createObjectStore(STORE); };
+                        req.onsuccess = function () { resolve(req.result); };
+                        req.onerror = req.onblocked = function () { resolve(null); };
+                    } catch (e) { resolve(null); }
+                });
+            }
+            function readCached(db) {
+                return new Promise(function (resolve) {
+                    if (!db) return resolve(null);
+                    try {
+                        var req = db.transaction(STORE, 'readonly').objectStore(STORE).get(SLOT);
+                        req.onsuccess = function () { resolve(req.result || null); };
+                        req.onerror = function () { resolve(null); };
+                    } catch (e) { resolve(null); }
+                });
+            }
+            function writeCached(db, code) {
+                if (!db) return;
+                try {
+                    db.transaction(STORE, 'readwrite').objectStore(STORE)
+                        .put({ key: key, code: code, check: fingerprint(code) }, SLOT);
+                } catch (e) {}
+            }
+            function loadBabel() {
+                return new Promise(function (resolve, reject) {
+                    if (window.Babel) return resolve();
+                    var el = document.createElement('script');
+                    el.src = BABEL_SRC;
+                    el.onload = function () { window.Babel ? resolve() : reject(new Error('Babel')); };
+                    el.onerror = function () { reject(new Error('Babel')); };
+                    document.head.appendChild(el);
+                });
+            }
+            function compile() {
+                return window.Babel.transform(source, BABEL_OPTIONS).code;
+            }
+            // ReactDOM.render (الوضع القديم) يرسم بشكل متزامن، فالجذر الفارغ بعد التشغيل مباشرة
+            // يعني أن الكود لم يعمل — خطأ التنفيذ في وسم مُضاف لا يصل إلى هنا كاستثناء
+            function rendered() {
+                var root = document.getElementById('root');
+                return !!(root && root.hasChildNodes());
+            }
+            function dropCached(db) {
+                if (!db) return;
+                try { db.transaction(STORE, 'readwrite').objectStore(STORE).delete(SLOT); } catch (e) {}
+            }
+            function showBootError() {
+                var root = document.getElementById('root');
+                if (root && !root.hasChildNodes()) {
+                    root.innerHTML = '<div dir="rtl" style="font-family:sans-serif;padding:2rem;text-align:center;color:#334155">' +
+                        'تعذّر تشغيل النظام — أعد تحميل الصفحة، وإن تكرّر ذلك فتحقّق من الاتصال بالإنترنت.</div>';
+                }
+            }
+
+            openDb().then(function (db) {
+                return readCached(db).then(function (hit) {
+                    if (hit && hit.key === key && typeof hit.code === 'string' && hit.check === fingerprint(hit.code)) {
+                        var ok = false;
+                        try { run(hit.code); ok = rendered(); } catch (e) {}
+                        // لا إعادة تشغيل في نفس الفتح (الكود نُفِّذ جزئياً)، بل حذفٌ لتُترجَم نسخة جديدة في الفتح التالي
+                        if (!ok) { dropCached(db); showBootError(); }
+                        return;
+                    }
+                    return loadBabel().then(function () {
+                        var code = compile();
+                        run(code);
+                        // يُحفظ فقط ما ثبت أنه رسم التطبيق فعلاً
+                        if (rendered()) writeCached(db, code); else showBootError();
+                    });
+                });
+            }).catch(showBootError);
+        })();
     </script>
     <script>
         // تسجيل Service Worker لتفعيل التثبيت كتطبيق هاتف — فقط على الرابط المنشور فعلياً؛

@@ -9,7 +9,7 @@ const target = process.argv[2];
 if (!target) { console.error('usage: node scratch/check_babel_block.js <file.html>'); process.exit(2); }
 
 const html = fs.readFileSync(target, 'utf8');
-const blocks = [...html.matchAll(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+const blocks = [...html.matchAll(/<script type="text\/(?:babel|x-hr-app)"[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 if (!blocks.length) { console.error('no babel block found in ' + target); process.exit(2); }
 const jsx = blocks.reduce((a, b) => (b.length > a.length ? b : a), '');
 

@@ -11,7 +11,7 @@ if (!target) { console.error('usage: node scratch/smoke_render.js <file.html>');
 
 const here = __dirname;
 const html = fs.readFileSync(target, 'utf8');
-const blocks = [...html.matchAll(/<script type="text\/babel"[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+const blocks = [...html.matchAll(/<script type="text\/(?:babel|x-hr-app)"[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 if (!blocks.length) { console.error('no babel block found in ' + target); process.exit(2); }
 const jsx = blocks.reduce((a, b) => (b.length > a.length ? b : a), '');
 
