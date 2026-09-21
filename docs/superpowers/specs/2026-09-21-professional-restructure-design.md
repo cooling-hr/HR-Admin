@@ -51,7 +51,7 @@ app/
 
 **النسختان:** الفرق الوحيد طبقة `data` (Firebase مقابل PIN محلي + localStorage). `vite.config.ts` يحدد بمتغير `VITE_EDITION` أي تنفيذ يدخل البناء؛ تنفيذ Firebase لا يُستورد في بناء الأوفلاين. بعد البناء يفحص `check-isolation.mjs` الملف الناتج ويوقف البناء عند أي إشارة ممنوعة.
 
-**المخرجات:** ملف HTML واحد لكل نسخة عبر `vite-plugin-singlefile`. Tailwind يُبنى وقت البناء (بدل CDN). Babel يُزال من المتصفح، فيُلغى مُحمِّل IndexedDB للشيفرة المحوَّلة.
+**المخرجات:** ملف HTML واحد لكل نسخة عبر `vite-plugin-singlefile`. Tailwind يبقى من CDN في المرحلة 0 (82 سطراً تركّب أصناف `className` بقوالب نصية، والبناء المسبق يفوته ما يُركَّب وقت التشغيل)، ثم يُنقل لوقت البناء كخطوة مستقلة بعد إقرارها. Babel يُزال من المتصفح، فيُلغى مُحمِّل IndexedDB للشيفرة المحوَّلة.
 
 **الأوامر:** `npm run dev` · `typecheck` · `build:offline` · `build:cloud` · `build`.
 
