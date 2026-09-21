@@ -6658,7 +6658,7 @@ return (
                                     </div>
                                 ) : (
                                     <form
-                                        onSubmit={(e) => { e.preventDefault(); if (pinInput.length === 4) handlePinLogin(activeLock.uid); }}
+                                        onSubmit={(e) => { e.preventDefault(); if (pinInput.length === 4 && !pendingTakeover) handlePinLogin(activeLock.uid); }}
                                         className="p-6 space-y-4 overflow-y-auto min-h-0 flex-1"
                                     >
                                         <input
@@ -6676,11 +6676,41 @@ return (
                                                 {pinError}
                                             </div>
                                         )}
+                                        {/* سؤال الاستبدال كان يُرسَم في نافذة الدخول بالبريد وحدها: الدخول بالرمز يحجب الحساب
+                                            المفتوح في جلسة أخرى ثم لا يظهر أي سؤال، فيعود الزر كأن شيئاً لم يحدث */}
+                                        {pendingTakeover && (
+                                            <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-xl text-right shadow-sm space-y-3">
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-xl leading-none">⚠️</span>
+                                                    <div className="text-xs font-bold text-amber-900 leading-relaxed">
+                                                        <div className="font-black text-sm mb-1">هذا الحساب مفتوح على جهاز آخر</div>
+                                                        <div>آخر نشاط على ذلك الجهاز قبل {pendingTakeover.otherDeviceSeconds} ثانية.</div>
+                                                        <div className="mt-1">إن تابعت، سيُسجَّل خروج ذلك الجهاز تلقائياً وتظهر له رسالة توضّح السبب.</div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={confirmSessionTakeover}
+                                                        className="flex-1 py-2.5 bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 text-white font-black rounded-xl text-xs shadow transition active:scale-95 cursor-pointer"
+                                                    >
+                                                        متابعة وإنهاء الجلسة الأخرى
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={cancelSessionTakeover}
+                                                        className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl text-xs transition cursor-pointer"
+                                                    >
+                                                        إلغاء
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                         <button
                                             type="submit"
-                                            disabled={pinInput.length !== 4 || isCheckingLogin}
+                                            disabled={pinInput.length !== 4 || isCheckingLogin || !!pendingTakeover}
                                             className={`w-full py-3.5 text-white font-bold rounded-xl text-sm shadow-lg transition transform active:scale-95 ${
-                                                pinInput.length !== 4 || isCheckingLogin
+                                                pinInput.length !== 4 || isCheckingLogin || pendingTakeover
                                                     ? 'bg-slate-400 cursor-not-allowed'
                                                     : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-700 hover:from-green-700 hover:to-teal-800 cursor-pointer'
                                             }`}
