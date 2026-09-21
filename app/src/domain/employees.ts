@@ -1,14 +1,15 @@
 import { normalizeArabicText } from '../core/arabic.js';
+import type { Employee } from './types.js';
 
 // موظفو العقود على صنفين: "عقد 315" و"عقد المحافظة" — والسجلات القديمة بعنوان "عقد" وحده
 // لا تزال قائمة. لذا يُعرَّف العقد بورود كلمة "عقد" في العنوان لا بمطابقتها حرفياً،
 // وإلا خرج كل عقد مصنَّف من تبويب العقود ومن الإحصاءات وعُدّ موظفاً اعتيادياً.
-export const CONTRACT_TITLES = ['عقد 315', 'عقد المحافظة'];
+export const CONTRACT_TITLES: string[] = ['عقد 315', 'عقد المحافظة'];
 
-export const isContractEmployee = (s) => normalizeArabicText(s && s.jobTitle).includes('عقد');
+export const isContractEmployee = (s?: Employee | null): boolean => normalizeArabicText(s && s.jobTitle).includes('عقد');
 
 // نوع العقد كما يُعرض ويُعدّ؛ العقود القديمة غير المصنَّفة تُجمَع تحت "غير مصنّف"
-export const contractTypeOf = (s) => {
+export const contractTypeOf = (s: Employee): string | null => {
     if (!isContractEmployee(s)) return null;
     const t = normalizeArabicText(s.jobTitle);
     if (t.includes('315')) return 'عقد 315';
@@ -16,8 +17,8 @@ export const contractTypeOf = (s) => {
     return 'غير مصنّف';
 };
 
-export const getMissingFields = (emp) => {
-    const missing = [];
+export const getMissingFields = (emp: Employee): string[] => {
+    const missing: string[] = [];
     if (!emp.jobNumber || !emp.jobNumber.trim()) missing.push('الرقم الوظيفي');
     if (!emp.jobTitle || !emp.jobTitle.trim()) missing.push('العنوان الوظيفي');
     if (!emp.birthDate || !emp.birthDate.trim()) missing.push('التولد');

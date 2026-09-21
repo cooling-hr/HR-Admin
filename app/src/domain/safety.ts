@@ -1,10 +1,14 @@
-export const getSafetyStatus = (deliveryDate) => {
+import type { Employee, SafetyStatus } from './types.js';
+
+export const getSafetyStatus = (deliveryDate?: string | null): SafetyStatus => {
     if (!deliveryDate) return { label: '❌ غير مجهز سابقاً', type: 'due-never', color: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
     const delivery = new Date(deliveryDate + 'T00:00:00');
     if (isNaN(delivery.getTime())) return { label: '❌ غير مجهز سابقاً', type: 'due-never', color: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
     
     const now = new Date();
-    const diffTime = Math.abs(now - delivery);
+    // التأكيدان يُمحيان عند الترجمة فالناتج Math.abs(now - delivery) حرفياً؛ TypeScript وحدها
+    // ترفض طرح تاريخين، وتحويل التعبير إلى getTime() تغيير في النص لا داعي له هنا.
+    const diffTime = Math.abs((now as unknown as number) - (delivery as unknown as number));
     const diffMonths = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30.4375));
     
     // البدلة: سنة واحدة (12 شهر) والإنذار المبكر قبل شهرين (10 أشهر)
@@ -33,11 +37,11 @@ export const getSafetyStatus = (deliveryDate) => {
     }
 };
 
-export const isInSafetyRoster = (s) => s.gender === 'ذكر' && s.status === 'نشط' && s.jobNumber !== '811645';
+export const isInSafetyRoster = (s: Employee): boolean => s.gender === 'ذكر' && s.status === 'نشط' && s.jobNumber !== '811645';
 
 // «مستحق التجديد» من جُهِّز سابقاً وحان تجديده أو اقترب؛ من لم يُجهَّز قط فئة مستقلة.
 // كانا فلتراً واحداً، وحين يكون أغلب الملاك بلا تاريخ تجهيز يبقى الجدول كما هو تقريباً فيبدو الزر معطلاً
-export const safetyFilterGroup = (s) => {
+export const safetyFilterGroup = (s: Employee): 'ok' | 'never' | 'renewal' => {
     const type = getSafetyStatus(s.lastSafetyDelivery).type;
     return type === 'ok' ? 'ok' : type === 'due-never' ? 'never' : 'renewal';
 };

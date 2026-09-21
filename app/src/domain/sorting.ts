@@ -1,8 +1,9 @@
 import { normalizeArabicText } from '../core/arabic.js';
 import { isContractEmployee } from './employees.js';
+import type { Employee } from './types.js';
 
 // دالة حساب الرتبة الوظيفية — مستقلة لإمكانية استخدامها في أي مكان
-export const getJobRank = (jobTitle) => {
+export const getJobRank = (jobTitle?: string | null): number => {
     const title = normalizeArabicText(jobTitle || '');
     let mainCategory = 0;
     if (title.includes('مهندس') || title.includes('هندس') ||
@@ -43,12 +44,12 @@ export const getJobRank = (jobTitle) => {
     return mainCategory + rank;
 };
 
-export const sortByJobNumber = (arr) => {
+export const sortByJobNumber = (arr: Employee[]): Employee[] => {
     // أسامة ووسام دائماً في البداية (حسب الرقم الوظيفي)
     const priorityNumbers = ['49158', '79944'];  // أسامة، وسام
     
     // تنظيف الرقم الوظيفي (إزالة المسافات والأحرف غير الرقمية)
-    const cleanJobNumber = (num) => String(num || '').trim().replace(/\D/g, '');
+    const cleanJobNumber = (num?: unknown): string => String(num || '').trim().replace(/\D/g, '');
     
     const priorityItems = arr.filter(s => 
         priorityNumbers.includes(cleanJobNumber(s.jobNumber))
@@ -89,12 +90,12 @@ export const sortByJobNumber = (arr) => {
 };
 
 // دالة الترتيب الهرمي حسب العنوان الوظيفي (للوحدات)
-export const sortByJobTitleHierarchy = (arr, unitName = '') => {
+export const sortByJobTitleHierarchy = (arr: Employee[], unitName: string = ''): Employee[] => {
     const priorityNumbers = ['49158', '79944'];
-    const cleanJobNumber = (num) => String(num || '').trim().replace(/\D/g, '');
+    const cleanJobNumber = (num?: unknown): string => String(num || '').trim().replace(/\D/g, '');
     
     // أولويات خاصة حسب الوحدة (المسؤولين في كل موقع)
-    const unitPriorities = {
+    const unitPriorities: Record<string, string[]> = {
         'تبريد باب الزبير': ['نورس', 'حسين صالح', 'اسامه عباس', 'اسيل'],
         'ورشة التبريد': ['756873', '656698', '722609'], // أمين، سرى، نهلة (بالأرقام)
         'تبريد المركز الثقافي': ['حازم', 'سناء', 'حسن'],
@@ -113,7 +114,7 @@ export const sortByJobTitleHierarchy = (arr, unitName = '') => {
     });
     
     // فصل أولويات الوحدة (المسؤولين)
-    let unitPriorityItems = [];
+    let unitPriorityItems: Employee[] = [];
     if (unitName && unitPriorities[unitName]) {
         const priorityNames = unitPriorities[unitName];
         
@@ -150,7 +151,7 @@ export const sortByJobTitleHierarchy = (arr, unitName = '') => {
         );
     }
     
-    const getJobRank = (jobTitle) => {
+    const getJobRank = (jobTitle?: string | null): number => {
         const title = normalizeArabicText(jobTitle);
         let mainCategory = 0;
         
@@ -253,10 +254,11 @@ export const sortByJobTitleHierarchy = (arr, unitName = '') => {
 
 // دالة الترتيب حسب الوحدات (لتبويبة "الكل")
 // دالة لضمان أن أسامة (49158) ووسام (79944) يكونون في البداية دائماً
-export const ensureTopTwo = (arr) => {
-    const topJobNumbers = ['49158', '79944'];
-    const topEmployees = [];
-    const otherEmployees = [];
+export const ensureTopTwo = (arr: Employee[]): Employee[] => {
+    // النوع يحتمل undefined لأن البحث يجري بقيمة emp.jobNumber الخام وقد تكون غائبة — تعريف نوع لا تغيير منطق
+    const topJobNumbers: (string | undefined)[] = ['49158', '79944'];
+    const topEmployees: Employee[] = [];
+    const otherEmployees: Employee[] = [];
     
     arr.forEach(emp => {
         if (topJobNumbers.includes(emp.jobNumber)) {
@@ -274,7 +276,7 @@ export const ensureTopTwo = (arr) => {
     return [...topEmployees, ...otherEmployees];
 };
 
-export const sortByUnit = (arr) => {
+export const sortByUnit = (arr: Employee[]): Employee[] => {
     // ترتيب الوحدات المطلوب
     const unitOrder = [
         'مقر الشعبة',
@@ -286,7 +288,7 @@ export const sortByUnit = (arr) => {
     ];
     
     // تجميع الموظفين حسب الوحدة
-    const byUnit = {};
+    const byUnit: Record<string, Employee[]> = {};
     unitOrder.forEach(unit => { byUnit[unit] = []; });
     
     arr.forEach(employee => {
@@ -300,7 +302,7 @@ export const sortByUnit = (arr) => {
     });
     
     // ترتيب الموظفين داخل كل وحدة حسب الهرمية والمسؤولية
-    const result = [];
+    const result: Employee[] = [];
     unitOrder.forEach(unit => {
         if (byUnit[unit] && byUnit[unit].length > 0) {
             const sorted = sortByJobTitleHierarchy(byUnit[unit], unit);

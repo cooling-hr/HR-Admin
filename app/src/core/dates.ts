@@ -1,7 +1,7 @@
 // التاريخ المحلي بصيغة YYYY-MM-DD. لا تستعمل toISOString هنا: هي تعطي
 // تاريخ UTC، وبغداد +3 — فبين منتصف الليل والثالثة فجراً يكون تاريخ
 // UTC هو تاريخ الأمس، فتُصنَّف فترة انتهت أمس على أنها «توشك أن تنتهي».
-export const localDateStr = (input) => {
+export const localDateStr = (input?: string | number | Date | null): string => {
     const d = (input === undefined || input === null) ? new Date() : new Date(input);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -12,12 +12,12 @@ export const localDateStr = (input) => {
 // ما يلي يُبنى فوق getEmployeeDailyStatus/getEmployeeDefaultNaturalStatus أعلاه، لذا
 // يُصرَّح بعدهما — استدعاء أيٍّ منهما من useMemo قبل تعريفه يُنفَّذ أثناء الرسم مباشرة
 // (لا بعده كما في معالِج حدث)، فيفشل بصمت رغم نجاح بوابتي التحقق سابقاً على بيانات فارغة.
-export const daysInMonth = (monthStr) => {
+export const daysInMonth = (monthStr: string): number => {
     const [y, m] = monthStr.split('-').map(Number);
     return new Date(y, m, 0).getDate();
 };
 
-export const getDaysBetweenDates = (d1Str, d2Str) => {
+export const getDaysBetweenDates = (d1Str?: string | null, d2Str?: string | null): number => {
     if (!d1Str || !d2Str) return 0;
     const p1 = d1Str.split('-');
     const p2 = d2Str.split('-');
@@ -26,7 +26,7 @@ export const getDaysBetweenDates = (d1Str, d2Str) => {
     return Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-export const getArabicDayName = (dateStr) => {
+export const getArabicDayName = (dateStr?: string | null): string => {
     if (!dateStr) return '';
     try {
         const p = dateStr.split('-');
@@ -38,14 +38,14 @@ export const getArabicDayName = (dateStr) => {
     }
 };
 
-export const ARABIC_MONTH_NAMES = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
+export const ARABIC_MONTH_NAMES: string[] = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
 
-export const getArabicMonthLabel = (monthStr) => {
+export const getArabicMonthLabel = (monthStr: string): string => {
     const [y, m] = monthStr.split('-').map(Number);
     return ARABIC_MONTH_NAMES[m - 1] + ' / ' + y;
 };
 
-export const addMonthsClamped = (dateStr, months) => {
+export const addMonthsClamped = (dateStr: string, months: number): string => {
     const parts = dateStr.split('-').map(Number);
     const target = new Date(parts[0], parts[1] - 1 + months, 1);
     const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
@@ -54,7 +54,7 @@ export const addMonthsClamped = (dateStr, months) => {
 };
 
 // formatDateToString الآن غير مطلوب لأن parseExcelDate يرجع نص مباشرة
-export const formatDateToString = (dateStr) => {
+export const formatDateToString = (dateStr: unknown): string => {
     // إذا كان نص بالفعل، نرجعه كما هو
     if (typeof dateStr === 'string') return dateStr;
     // إذا كان null أو undefined
@@ -63,7 +63,7 @@ export const formatDateToString = (dateStr) => {
 };
 
 // تحويل تاريخ Excel إلى JavaScript Date
-export const parseExcelDate = (excelDate) => {
+export const parseExcelDate = (excelDate: unknown): string | null => {
     if (!excelDate) return null;
     
     // نتوقع نص من Excel
@@ -103,11 +103,11 @@ export const parseExcelDate = (excelDate) => {
 };
 
 // حساب سنوات الخدمة بدقة
-export const calculateYearsOfService = (hireDate) => {
+export const calculateYearsOfService = (hireDate?: string | number | Date | null): number => {
     if (!hireDate) return 0;
     
     // تحويل التاريخ: إذا كان string بتنسيق YYYY-MM-DD، نحوله لـ Date
-    let hire;
+    let hire: Date;
     if (typeof hireDate === 'string') {
         // إذا كان بتنسيق YYYY-MM-DD
         if (/^\d{4}-\d{2}-\d{2}$/.test(hireDate)) {
@@ -146,4 +146,4 @@ export const calculateYearsOfService = (hireDate) => {
 // الافتراض: ما في الملف وليس لديك مؤشَّر؛ ما لديك بقيمة أخرى بلا تأشير؛ ويوم تغطيه فترة مؤرخة لديك بنوع آخر
 // بلا تأشير مع تنبيه — فالموقف اليومي يتقدّم على الفترة في العرض. العطل تُضاف ولا تُحذف، والإعدادات العامة
 // بلا تأشير. لا يُحذف شيء لديك. المعرّفات والتواريخ القادمة من الملف لا تُستعمل مفاتيح في كائن عادي.
-export const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+export const ISO_DAY: RegExp = /^\d{4}-\d{2}-\d{2}$/;

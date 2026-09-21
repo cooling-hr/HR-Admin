@@ -1,9 +1,14 @@
 import { getActivePeriod, periodEndOf, periodIdentityOf, periodMergeKeyOf, periodsOf, periodsOverlap, samePeriodDates, samePeriodExtras } from './periods.js';
 import { normalizeArabicText, normalizeJobNumber } from '../core/arabic.js';
 import { ISO_DAY } from '../core/dates.js';
+import type {
+    Employee, LocalAttendanceState, MergeAttendanceItem, MergeAttendanceResult,
+    MergeContradictingDay, MergeFieldChange, MergeLocalOnlyPeriod, MergePeriodItem,
+    MergePeriodsResult, MergeResult, MergeUpdatedEmployee, OverridesMap, StatusPeriod, Tombstones,
+} from './types.js';
 
 // ===== دوال الدمج الذكي والطباعة الفردية والدورات =====
-export const FIELD_NAMES_AR = {
+export const FIELD_NAMES_AR: Record<string, string> = {
     name: 'الاسم الكامل',
     jobTitle: 'العنوان الوظيفي',
     department: 'القسم',
@@ -38,21 +43,27 @@ export const FIELD_NAMES_AR = {
 // ومربّعات الاختيار تحتاج تحليلاً ثابتاً تُبنى عليه.
 // وموضعه بعد normalizeArabicText مقصود — analyzeMerge صارت تستدعيه للمقارنة،
 // وقيمة useMemo تُنفَّذ أثناء الرسم فتقرأه قبل تعريفه لو وُضع أعلاه (TDZ).
-export const mergeKeyOf = (jobNumber, field) => `${jobNumber}::${field}`;
+export const mergeKeyOf = (jobNumber: string, field: string): string => `${jobNumber}::${field}`;
 
-export const ownKey = (obj, k) => !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, k);
+export const ownKey = (obj: unknown, k: PropertyKey): boolean => !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, k);
 
-export const ATTENDANCE_PARTS = [['status', 'dailyStatusOverrides'], ['hourly', 'hourlyLeaveRecords'], ['overtime', 'overtimeHoursRecords']];
+export const ATTENDANCE_PARTS: [string, string][] = [['status', 'dailyStatusOverrides'], ['hourly', 'hourlyLeaveRecords'], ['overtime', 'overtimeHoursRecords']];
 
 // قيمة صالحة: الموقف نصّ غير فارغ؛ والساعات عدد موجب لا يتجاوز 24 — ملف مشوَّه لا يُكتب في بيانات الحضور
-export const isValidAttendanceValue = (part, value) => part === 'status'
+export const isValidAttendanceValue = (part: string, value: unknown): boolean => part === 'status'
     ? (typeof value === 'string' && value.trim() !== '' && value.length <= 60)
     : ((typeof value === 'number' || (typeof value === 'string' && /^\d+(\.\d+)?$/.test(value.trim()))) && Number(value) > 0 && Number(value) <= 24);
 
-export const analyzeMergePeriods = (inc, existing, jobNumber, overrides, deletedPeriods = null) => {
-    const valid = (p) => p && p.type && p.from;
+export const analyzeMergePeriods = (
+    inc: Employee,
+    existing: Employee,
+    jobNumber: string,
+    overrides?: OverridesMap | null,
+    deletedPeriods: Record<string, unknown> | null = null,
+): MergePeriodsResult => {
+    const valid = (p?: StatusPeriod | null) => p && p.type && p.from;
     // نسخة مكرّرة حرفياً داخل الملف نفسه تُعرض وتُطبَّق مرة واحدة
-    const seenInFile = {};
+    const seenInFile: Record<string, boolean> = {};
     const incList = (Array.isArray(inc.statusPeriods) ? inc.statusPeriods : []).filter(valid).filter(p => {
         const fingerprint = JSON.stringify([periodIdentityOf(p), p.type, p.from, p.to || '', p.note || '', !!p.confirmedReturn]);
         if (seenInFile[fingerprint]) return false;
@@ -63,21 +74,23 @@ export const analyzeMergePeriods = (inc, existing, jobNumber, overrides, deleted
     // حالة قديمة بلا فترات تغطي كل التواريخ: أول فترة تُضاف تُسقط الرجوع إليها في getActivePeriod
     const legacy = (periodsOf(existing).length === 0 && existing.status && existing.status !== 'نشط') ? existing.status : null;
     // أيام مثبَّتة يدوياً لهذا الموظف داخل الفترة بقيمة غير نوعها: التثبيت اليومي يسبق الفترة في العرض
-    const contradictingDays = (p) => Object.keys(overrides || {})
-        .filter(d => d >= p.from && d <= periodEndOf(p) && overrides[d] && overrides[d][existing.id] && overrides[d][existing.id] !== p.type)
+    // ! على overrides: الحراسة قائمة في Object.keys(overrides || {}) أعلاه، وTypeScript لا
+    // تنقل هذا التضييق إلى داخل الاستدعاءات — والعلامة تُمحى عند الترجمة فلا يتغيّر الناتج.
+    const contradictingDays = (p: StatusPeriod): MergeContradictingDay[] => Object.keys(overrides || {})
+        .filter(d => d >= p.from && d <= periodEndOf(p) && overrides![d] && overrides![d][existing.id] && overrides![d][existing.id] !== p.type)
         .sort()
-        .map(d => ({ date: d, value: overrides[d][existing.id] }));
+        .map(d => ({ date: d, value: overrides![d][existing.id] }));
     // مفتاح فريد لكل سطر: ملف مشوَّه قد يحمل معرّفاً واحداً لفترتين مختلفتين
     const uniqueKeyMaker = () => {
-        const used = {};
-        return (p) => {
+        const used: Record<string, number> = {};
+        return (p: StatusPeriod): string => {
             const k = periodMergeKeyOf(jobNumber, p);
             used[k] = (used[k] || 0) + 1;
             return used[k] === 1 ? k : `${k}#${used[k]}`;
         };
     };
     const itemKeyOf = uniqueKeyMaker();
-    const items = [];
+    const items: MergePeriodItem[] = [];
     incList.forEach(ip => {
         // النظير المحلي: المعرّف نفسه، أو النوع والتواريخ نفسها بمعرّف آخر (الفترة نفسها أُدخلت في الجهازين)
         const twin = (ip.id && locList.find(lp => lp.id === ip.id)) || locList.find(lp => samePeriodDates(lp, ip)) || null;
@@ -113,24 +126,32 @@ export const analyzeMergePeriods = (inc, existing, jobNumber, overrides, deleted
     return { items, localOnly };
 };
 
-export const analyzeMergeAttendance = (bundle, incomingList, currentStaff, local) => {
-    const result = { items: [], holidays: [], settings: [], orphans: 0, ambiguous: 0, invalid: 0, forNewEmployees: 0 };
+// bundle نوعه Record<string, any>: حزمة JSON واردة من ملف خارجي تُقرأ بمفاتيح متغيّرة
+// (ATTENDANCE_PARTS) وبمستويين من الفهرسة الديناميكية؛ unknown تستلزم تضييقاً في كل
+// موضع وهو تعديل منطق، فأُعلنت any صريحة واحدة هنا.
+export const analyzeMergeAttendance = (
+    bundle: Record<string, any> | null | undefined,
+    incomingList: Employee[],
+    currentStaff: Employee[],
+    local: LocalAttendanceState,
+): MergeAttendanceResult => {
+    const result: MergeAttendanceResult = { items: [], holidays: [], settings: [], orphans: 0, ambiguous: 0, invalid: 0, forNewEmployees: 0 };
     if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return result;
     // موظفو الحزمة نفسها أولاً: مفاتيح قيمها معرّفاتهم
     const staffList = Array.isArray(bundle.staff) ? bundle.staff : Array.isArray(bundle.staffData) ? bundle.staffData : incomingList;
-    const jobByIncomingId = new Map();
+    const jobByIncomingId: Map<string, string> = new Map();
     (Array.isArray(staffList) ? staffList : []).forEach(e => {
         if (e && e.id !== undefined && e.id !== null) jobByIncomingId.set(String(e.id), normalizeJobNumber(e.jobNumber));
     });
     // رقم وظيفي مكرر لدى الجهاز: لا يُعرف لمن تذهب القيمة، فلا تُعرض ولا تُطبَّق
-    const localByJob = new Map();
-    const ambiguousJobs = new Set();
+    const localByJob: Map<string, Employee> = new Map();
+    const ambiguousJobs: Set<string> = new Set();
     currentStaff.forEach(e => {
         const k = normalizeJobNumber(e.jobNumber);
         if (!k) return;
         if (localByJob.has(k)) ambiguousJobs.add(k); else localByJob.set(k, e);
     });
-    const byKey = new Map();
+    const byKey: Map<string, MergeAttendanceItem> = new Map();
     ATTENDANCE_PARTS.forEach(([part, bundleKey]) => {
         const records = bundle[bundleKey];
         if (!records || typeof records !== 'object' || Array.isArray(records)) return;
@@ -149,11 +170,13 @@ export const analyzeMergeAttendance = (bundle, incomingList, currentStaff, local
                 if (!emp) { result.forNewEmployees++; return; }
                 const key = `${date}::${job}`;
                 if (!byKey.has(key)) byKey.set(key, { key, date, jobNumber: job, empId: emp.id, name: emp.name, emp, incoming: {}, local: {} });
-                byKey.get(key).incoming[part] = value;
+                // ! لأن السطر السابق يضمن وجود المفتاح؛ العلامة تُمحى عند الترجمة
+                byKey.get(key)!.incoming[part] = value;
             });
         });
     });
-    const localRecords = { status: local.overrides, hourly: local.hourly, overtime: local.overtime };
+    // any صريحة ثانية: الكائن يُفهرَس بـ part المتغيّر ثم بتاريخ ثم بمعرّف موظف
+    const localRecords: Record<string, any> = { status: local.overrides, hourly: local.hourly, overtime: local.overtime };
     byKey.forEach(item => {
         let differs = false;
         let allSame = true;
@@ -177,15 +200,15 @@ export const analyzeMergeAttendance = (bundle, incomingList, currentStaff, local
     });
     result.items.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
     const localHolidays = new Set(Array.isArray(local.holidays) ? local.holidays : []);
-    const seenHolidays = new Set();
+    const seenHolidays: Set<string> = new Set();
     (Array.isArray(bundle.officialHolidaysList) ? bundle.officialHolidaysList : []).forEach(d => {
         if (typeof d !== 'string' || !ISO_DAY.test(d) || localHolidays.has(d) || seenHolidays.has(d)) return;
         seenHolidays.add(d);
         result.holidays.push({ key: `holiday::${d}`, date: d });
     });
     result.holidays.sort((a, b) => a.date < b.date ? -1 : 1);
-    const localAnchor = { shiftAnchorDate: local.anchorDate || '', threeShiftAnchorSquad: local.threeShiftAnchorSquad || '', twoShiftAnchorSquad: local.twoShiftAnchorSquad || '' };
-    const anchorValues = {};
+    const localAnchor: Record<string, string> = { shiftAnchorDate: local.anchorDate || '', threeShiftAnchorSquad: local.threeShiftAnchorSquad || '', twoShiftAnchorSquad: local.twoShiftAnchorSquad || '' };
+    const anchorValues: Record<string, string> = {};
     Object.keys(localAnchor).forEach(k => {
         if (typeof bundle[k] === 'string' && bundle[k] && bundle[k] !== localAnchor[k]) anchorValues[k] = bundle[k];
     });
@@ -199,27 +222,33 @@ export const analyzeMergeAttendance = (bundle, incomingList, currentStaff, local
     return result;
 };
 
-export const analyzeMerge = (incoming, currentStaff, overrides = {}, tombstones = null, incomingTombstones = null) => {
+export const analyzeMerge = (
+    incoming: Employee[],
+    currentStaff: Employee[],
+    overrides: OverridesMap = {},
+    tombstones: Tombstones | null = null,
+    incomingTombstones: Tombstones | null = null,
+): MergeResult => {
     // رقم وظيفي يحمله أكثر من موظف لديك: لا يُعرف أيّهم المقصود، فلا يُقارَن ولا يُعدّ جديداً — تُنبّه إليه النافذة.
     // والفهرس بلا نموذج أولي: رقم مثل «constructor» لا يطابق خاصية موروثة
     const currentMap = Object.create(null);
-    const ambiguousJobs = new Set();
+    const ambiguousJobs: Set<string> = new Set();
     currentStaff.forEach(s => {
         const key = normalizeJobNumber(s.jobNumber);
         if (!key) return;
         if (key in currentMap) ambiguousJobs.add(key); else currentMap[key] = s;
     });
 
-    const added = [];
-    const updated = [];
-    const periodItems = [];
-    const localOnlyPeriods = [];
+    const added: Employee[] = [];
+    const updated: MergeUpdatedEmployee[] = [];
+    const periodItems: MergePeriodItem[] = [];
+    const localOnlyPeriods: MergeLocalOnlyPeriod[] = [];
     const fieldsToCompare = Object.keys(FIELD_NAMES_AR);
     // الحذف اتجاهان: ما حُذف على الجهاز الآخر وما زال لديك، وما حذفتَه أنت وما زال الملف يحمله
-    const tombEmployeesOf = (t) => (t && typeof t === 'object' && t.employees && typeof t.employees === 'object') ? t.employees : {};
+    const tombEmployeesOf = (t?: Tombstones | null): Record<string, { name?: string; at?: string } | undefined> => (t && typeof t === 'object' && t.employees && typeof t.employees === 'object') ? t.employees : {};
     const incTombEmployees = tombEmployeesOf(incomingTombstones);
     const localTombEmployees = tombEmployeesOf(tombstones);
-    const incomingJobs = new Set();
+    const incomingJobs: Set<string> = new Set();
     const previouslyDeleted = Object.create(null);
 
     incoming.forEach(inc => {
@@ -234,7 +263,7 @@ export const analyzeMerge = (incoming, currentStaff, overrides = {}, tombstones 
             // موظف حذفتَه أنت والملف ما زال يحمله: يُعرض موسوماً وبلا تأشير، لا كإضافة عادية
             if (localTombEmployees[key]) previouslyDeleted[key] = localTombEmployees[key];
         } else {
-            const employeeChanges = [];
+            const employeeChanges: MergeFieldChange[] = [];
             fieldsToCompare.forEach(field => {
                 const incVal = String(inc[field] || '').trim();
                 const extVal = String(existing[field] || '').trim();
