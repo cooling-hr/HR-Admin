@@ -1,0 +1,23 @@
+{
+  "name": "hr-admin-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --mode offline --open /hr-offline.html",
+    "typecheck": "tsc --noEmit",
+    "build:offline": "vite build --mode offline && node scripts/check-shell.mjs dist/offline/hr-offline.html offline",
+    "build:cloud": "vite build --mode cloud && node scripts/check-shell.mjs dist/cloud/hr-cloud.html cloud",
+    "build": "npm run build:offline && npm run build:cloud"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.0",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
