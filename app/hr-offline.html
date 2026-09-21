@@ -1,3 +1,812 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>stub</title></head>
-<body><div id="root"></div><script type="module" src="./src/editions/offline/main.jsx"></script></body></html>
+<html lang="ar" dir="rtl">
+<head>
+    <!-- درع الحماية الذكي: محظور على العامة وشاشة القفل، ومفتوح تلقائياً لمدير النظام (Admin) للتشخيص والتطوير -->
+    <script>
+        window.__IS_ADMIN_DEV_UNLOCKED = false;
+        (function() {
+            function blockAction(e) {
+                // إذا كان المستخدم مسجلاً كـ مدير نظام (Admin) أو قام بفتح قفل المطورين: يُسمح له بـ F12 والتفتيش فوراً!
+                if (window.__IS_ADMIN_DEV_UNLOCKED === true) {
+                    return true;
+                }
+
+                e = e || window.event;
+                if (!e) return true;
+                
+                // Block F12 (code 123)
+                if (e.key === 'F12' || e.keyCode === 123 || e.which === 123) {
+                    if (e.preventDefault) e.preventDefault();
+                    if (e.stopPropagation) e.stopPropagation();
+                    e.returnValue = false;
+                    return false;
+                }
+                // Block Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+Shift+K
+                if (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67 || e.keyCode === 75 || ['I','i','J','j','C','c','K','k'].includes(e.key))) {
+                    if (e.preventDefault) e.preventDefault();
+                    if (e.stopPropagation) e.stopPropagation();
+                    e.returnValue = false;
+                    return false;
+                }
+                // Block Ctrl+U (View Source)
+                if (e.ctrlKey && (e.keyCode === 85 || e.key === 'u' || e.key === 'U')) {
+                    if (e.preventDefault) e.preventDefault();
+                    if (e.stopPropagation) e.stopPropagation();
+                    e.returnValue = false;
+                    return false;
+                }
+            }
+
+            // Bind to all capture stages immediately
+            window.addEventListener('keydown', blockAction, true);
+            document.addEventListener('keydown', blockAction, true);
+            window.onkeydown = blockAction;
+            document.onkeydown = blockAction;
+
+            // Block Context Menu (Right Click) for non-admins
+            function blockContext(e) {
+                if (window.__IS_ADMIN_DEV_UNLOCKED === true) return true;
+                if (e && e.preventDefault) e.preventDefault();
+                return false;
+            }
+            window.addEventListener('contextmenu', blockContext, true);
+            document.addEventListener('contextmenu', blockContext, true);
+            window.oncontextmenu = blockContext;
+            document.oncontextmenu = blockContext;
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="hr-app-shell" id="hr-app-source" content="1">
+    <meta name="theme-color" content="#1e1b4b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="نظام إدارة الملاك والموقف اليومي - شعبة تبريد المركز ومحطة عزل نهر بن عمر - شركة نفط البصرة">
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20120%20120%22%3E%3Crect%20width=%22120%22%20height=%22120%22%20rx=%2226%22%20fill=%22%231e1b4b%22/%3E%3Cpolyline%20points=%2260.00,40.00%2060.00,30.00%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%223.4%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2255.00,29.50%2060.00,35.00%2065.00,29.50%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%222.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2277.32,50.00%2085.98,45.00%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%223.4%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2283.91,40.42%2081.65,47.50%2088.91,49.08%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%222.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2277.32,70.00%2085.98,75.00%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%223.4%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2288.91,70.92%2081.65,72.50%2083.91,79.58%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%222.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2260.00,80.00%2060.00,90.00%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%223.4%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2265.00,90.50%2060.00,85.00%2055.00,90.50%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%222.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2242.68,70.00%2034.02,75.00%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%223.4%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2236.09,79.58%2038.35,72.50%2031.09,70.92%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%222.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2242.68,50.00%2034.02,45.00%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%223.4%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2231.09,49.08%2038.35,47.50%2036.09,40.42%22%20fill=%22none%22%20stroke=%22%23bae6fd%22%20stroke-width=%222.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Ccircle%20cx=%2260%22%20cy=%2260%22%20r=%2219%22%20fill=%22%231e1b4b%22%20stroke=%22%23ffffff%22%20stroke-width=%223%22/%3E%3Cpolyline%20points=%2248.52,53.00%2048.52,67.00%22%20fill=%22none%22%20stroke=%22%23fbbf24%22%20stroke-width=%223.0%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2258.32,53.00%2058.32,67.00%22%20fill=%22none%22%20stroke=%22%23fbbf24%22%20stroke-width=%223.0%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2248.52,60.00%2058.32,60.00%22%20fill=%22none%22%20stroke=%22%23fbbf24%22%20stroke-width=%223.0%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2261.68,67.00%2061.68,53.00%2067.84,53.00%2068.78,53.12%2069.66,53.49%2070.41,54.07%2070.99,54.82%2071.36,55.70%2071.48,56.64%2071.36,57.58%2070.99,58.46%2070.41,59.21%2069.66,59.79%2068.78,60.16%2067.84,60.28%2061.68,60.28%22%20fill=%22none%22%20stroke=%22%23fbbf24%22%20stroke-width=%223.0%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Cpolyline%20points=%2267.84,60.28%2071.48,67.00%22%20fill=%22none%22%20stroke=%22%23fbbf24%22%20stroke-width=%223.0%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3Ccircle%20cx=%2260.00%22%20cy=%2219.00%22%20r=%2210%22%20fill=%22%231e1b4b%22/%3E%3Ccircle%20cx=%2260.00%22%20cy=%2214.50%22%20r=%224.3%22%20fill=%22%23bae6fd%22/%3E%3Cpolygon%20points=%2252.50,27.00%2052.50,24.00%2052.62,23.18%2052.97,22.47%2053.55,21.87%2054.38,21.38%2055.43,20.99%2056.72,20.72%2058.24,20.55%2060.00,20.50%2061.76,20.55%2063.28,20.72%2064.57,20.99%2065.62,21.38%2066.45,21.87%2067.03,22.47%2067.38,23.18%2067.50,24.00%2067.50,27.00%22%20fill=%22%23bae6fd%22/%3E%3Ccircle%20cx=%2295.51%22%20cy=%2239.50%22%20r=%2210%22%20fill=%22%231e1b4b%22/%3E%3Ccircle%20cx=%2295.51%22%20cy=%2235.00%22%20r=%224.3%22%20fill=%22%23bae6fd%22/%3E%3Cpolygon%20points=%2288.01,47.50%2088.01,44.50%2088.12,43.68%2088.48,42.97%2089.06,42.37%2089.88,41.88%2090.94,41.49%2092.23,41.22%2093.75,41.05%2095.51,41.00%2097.26,41.05%2098.79,41.22%20100.08,41.49%20101.13,41.88%20101.95,42.37%20102.54,42.97%20102.89,43.68%20103.01,44.50%20103.01,47.50%22%20fill=%22%23bae6fd%22/%3E%3Ccircle%20cx=%2295.51%22%20cy=%2280.50%22%20r=%2210%22%20fill=%22%231e1b4b%22/%3E%3Ccircle%20cx=%2295.51%22%20cy=%2276.00%22%20r=%224.3%22%20fill=%22%23bae6fd%22/%3E%3Cpolygon%20points=%2288.01,88.50%2088.01,85.50%2088.12,84.68%2088.48,83.97%2089.06,83.37%2089.88,82.88%2090.94,82.49%2092.23,82.22%2093.75,82.05%2095.51,82.00%2097.26,82.05%2098.79,82.22%20100.08,82.49%20101.13,82.88%20101.95,83.37%20102.54,83.97%20102.89,84.68%20103.01,85.50%20103.01,88.50%22%20fill=%22%23bae6fd%22/%3E%3Ccircle%20cx=%2260.00%22%20cy=%22101.00%22%20r=%2210%22%20fill=%22%231e1b4b%22/%3E%3Ccircle%20cx=%2260.00%22%20cy=%2296.50%22%20r=%224.3%22%20fill=%22%23bae6fd%22/%3E%3Cpolygon%20points=%2252.50,109.00%2052.50,106.00%2052.62,105.18%2052.97,104.47%2053.55,103.87%2054.38,103.38%2055.43,102.99%2056.72,102.72%2058.24,102.55%2060.00,102.50%2061.76,102.55%2063.28,102.72%2064.57,102.99%2065.62,103.38%2066.45,103.87%2067.03,104.47%2067.38,105.18%2067.50,106.00%2067.50,109.00%22%20fill=%22%23bae6fd%22/%3E%3Ccircle%20cx=%2224.49%22%20cy=%2280.50%22%20r=%2210%22%20fill=%22%231e1b4b%22/%3E%3Ccircle%20cx=%2224.49%22%20cy=%2276.00%22%20r=%224.3%22%20fill=%22%23bae6fd%22/%3E%3Cpolygon%20points=%2216.99,88.50%2016.99,85.50%2017.11,84.68%2017.46,83.97%2018.05,83.37%2018.87,82.88%2019.92,82.49%2021.21,82.22%2022.74,82.05%2024.49,82.00%2026.25,82.05%2027.77,82.22%2029.06,82.49%2030.12,82.88%2030.94,83.37%2031.52,83.97%2031.88,84.68%2031.99,85.50%2031.99,88.50%22%20fill=%22%23bae6fd%22/%3E%3Ccircle%20cx=%2224.49%22%20cy=%2239.50%22%20r=%2210%22%20fill=%22%231e1b4b%22/%3E%3Ccircle%20cx=%2224.49%22%20cy=%2235.00%22%20r=%224.3%22%20fill=%22%23bae6fd%22/%3E%3Cpolygon%20points=%2216.99,47.50%2016.99,44.50%2017.11,43.68%2017.46,42.97%2018.05,42.37%2018.87,41.88%2019.92,41.49%2021.21,41.22%2022.74,41.05%2024.49,41.00%2026.25,41.05%2027.77,41.22%2029.06,41.49%2030.12,41.88%2030.94,42.37%2031.52,42.97%2031.88,43.68%2031.99,44.50%2031.99,47.50%22%20fill=%22%23bae6fd%22/%3E%3C/svg%3E">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./icon-180.png">
+    <title>نظام إدارة الملاك - الإصدار v9.5 Enterprise Cloud Edition ☁️</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <style>
+        /* ---------------------------------------------------- */
+        /* منتقي التاريخ المخصص المتطور (Custom DatePicker) */
+        /* ---------------------------------------------------- */
+        .custom-datepicker {
+          position: absolute;
+          z-index: 10000;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          padding: 14px;
+          width: 280px;
+          direction: rtl;
+          font-family: inherit;
+          user-select: none;
+        }
+        .custom-datepicker-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+          border-bottom: 1px solid #f1f5f9;
+          padding-bottom: 8px;
+        }
+        .custom-datepicker-header-btn {
+          cursor: pointer;
+          padding: 4px 10px;
+          font-size: 13px;
+          font-weight: 700;
+          border-radius: 6px;
+          color: #1e3a8a;
+          transition: all 0.15s;
+        }
+        .custom-datepicker-header-btn:hover {
+          background: #eff6ff;
+          color: #1d4ed8;
+        }
+        .custom-datepicker-content {
+          max-height: 200px;
+          overflow-y: auto;
+        }
+        .custom-datepicker-grid-years {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 6px;
+          max-height: 180px;
+          overflow-y: auto;
+          padding-right: 2px;
+        }
+        .custom-datepicker-grid-years::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-datepicker-grid-years::-webkit-scrollbar-track {
+          background: none;
+        }
+        .custom-datepicker-grid-years::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 2px;
+        }
+        .custom-datepicker-grid-months {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+        }
+        .custom-datepicker-grid-days {
+          display: grid;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          gap: 4px;
+        }
+        .custom-datepicker-weekdays {
+          display: grid;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          text-align: center;
+          font-weight: 700;
+          font-size: 11px;
+          color: #64748b;
+          margin-bottom: 8px;
+          border-bottom: 1px solid #f1f5f9;
+          padding-bottom: 6px;
+        }
+        .custom-datepicker-item {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 32px;
+          font-size: 12px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.1s;
+          color: #334155;
+        }
+        .custom-datepicker-item:hover:not(.cdp-empty) {
+          background: #f1f5f9;
+          color: #0f172a;
+        }
+        .custom-datepicker-item.selected {
+          background: #3b82f6 !important;
+          color: #ffffff !important;
+          font-weight: 700;
+          box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
+        }
+        .custom-datepicker-item.cdp-empty {
+          cursor: default;
+        }
+        .stat-card { transition: all 0.3s; cursor: pointer; }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+        .sticky-search { position: sticky; top: 60px; z-index: 20; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .upload-zone { border: 3px dashed #cbd5e0; transition: all 0.3s; cursor: pointer; }
+        .upload-zone:hover { border-color: #4299e1; background: #ebf8ff; }
+        .preview-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; }
+        .preview-container { background: white; border-radius: 16px; max-width: 95vw; max-height: 90vh; overflow: hidden; box-shadow: 0 25px 70px rgba(0,0,0,0.4); display: flex; flex-direction: column; }
+        .preview-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .preview-header h2 { margin: 0; padding: 0; line-height: 1.2; }
+        .preview-header p { margin: 0; padding: 0; }
+        .preview-body { overflow: auto; flex: 1; min-height: 0; padding: 16px 24px; }
+        .preview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .preview-table thead { background: #2d3748; color: white; position: sticky; top: 0; z-index: 10; }
+        .preview-table th { padding: 14px 12px; text-align: right; font-weight: bold; border: 1px solid #4a5568; white-space: nowrap; }
+        .preview-table td { padding: 10px 12px; border: 1px solid #e2e8f0; }
+        .preview-table tbody tr:nth-child(even) { background: #f7fafc; }
+        .preview-table tbody tr:hover { background: #edf2f7; }
+        .location-separator { background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%) !important; color: white !important; font-weight: bold; text-align: center !important; padding: 12px !important; }
+        .merged-cell { background: #fef3c7 !important; vertical-align: top !important; }
+        .vertical-text { 
+            writing-mode: vertical-rl; 
+            text-orientation: mixed;
+            white-space: nowrap;
+            padding: 8px !important;
+            font-size: 11px;
+            line-height: 1.3;
+            vertical-align: middle !important;
+        }
+        .editable-cell { width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 4px; background: transparent; font-size: 13px; }
+        .editable-cell:focus { outline: none; border-color: #4299e1; background: #ebf8ff; }
+        .preview-footer { padding: 20px 24px; background: #f7fafc; border-top: 2px solid #e2e8f0; display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
+        
+        /* تنسيق الطباعة عالي الكثافة (توفير الورق وتقليص الصفحات من 6 إلى 2-3 صفحات) */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 6mm 5mm 6mm 5mm;
+            }
+            body { background: white !important; margin: 0 !important; padding: 0 !important; font-size: 7.5pt !important; }
+            
+            /* إخفاء كل شيء ما عدا المعاينة */
+            header, nav, main, footer, .no-print, button { display: none !important; }
+            
+            /* إظهار المعاينة فقط */
+            .preview-overlay { 
+                background: white !important; 
+                position: static !important; 
+                display: block !important; 
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            
+            .preview-container { 
+                box-shadow: none !important; 
+                max-width: 100% !important; 
+                max-height: none !important;
+                border-radius: 0 !important;
+                border: none !important;
+            }
+            
+            /* العنوان المصغر والأنيق */
+            .preview-header { 
+                background: white !important; 
+                color: black !important; 
+                border-bottom: 2px solid #000 !important; 
+                page-break-after: avoid !important;
+                padding: 4px 5px !important;
+                margin-bottom: 6px !important;
+                display: block !important;
+                text-align: center !important;
+            }
+            .preview-header button, .preview-header p { 
+                display: none !important; 
+            }
+            .preview-header div {
+                display: block !important;
+                width: 100% !important;
+                text-align: center !important;
+            }
+            .preview-header h2 { 
+                display: block !important; 
+                color: black !important; 
+                font-size: 13pt !important; 
+                font-weight: 900 !important; 
+                margin: 0 auto !important; 
+                padding: 2px 0 !important; 
+                text-align: center !important; 
+            }
+            
+            .preview-footer { display: none !important; }
+            
+            /* محتوى الجدول فائق التكثيف */
+            .preview-body { 
+                max-height: none !important; 
+                overflow: visible !important; 
+                padding: 0 !important; 
+            }
+            
+            /* حجم الخط رُفع من 7.5pt إلى 10pt بطلب الموظفين — كان صغيراً جداً للقراءة المطبوعة.
+               ارتفاع الصف والحشو ارتفعا بما يناسب، فيقلّ عدد الأسماء في الصفحة تلقائياً (كان ~50) */
+            .preview-table { 
+                font-size: 10pt !important; 
+                page-break-inside: auto;
+                width: 100% !important;
+                border-collapse: collapse !important;
+                line-height: 1.25 !important;
+            }
+            
+            .preview-table thead { 
+                display: table-header-group;
+                background: #e2e8f0 !important;
+            }
+            
+            .preview-table tr { 
+                page-break-inside: avoid; 
+                page-break-after: auto; 
+                height: 26px !important;
+            }
+            
+            .preview-table th { 
+                background: #f1f5f9 !important; 
+                color: black !important; 
+                border: 1px solid #1e293b !important; 
+                padding: 3.5px 4px !important; 
+                font-weight: 900 !important;
+                font-size: 10pt !important;
+            }
+            
+            .preview-table td { 
+                border: 1px solid #64748b !important; 
+                padding: 3px 4px !important; 
+                color: black !important; 
+                background: white !important;
+                font-size: 10pt !important;
+            }
+            
+            .preview-table tbody tr:nth-child(even) td {
+                background: #f8fafc !important;
+            }
+
+            /* نُقل نفس الإصلاح من index.html — انظر التعليق المقابل هناك */
+            .preview-table tr.signature-footer-row {
+                height: auto !important;
+                page-break-inside: avoid !important;
+                page-break-before: avoid !important;
+            }
+            /* نُقل نفس الإصلاح من index.html (تخصيص أعلى من .preview-table td) — انظر التعليق
+               المقابل هناك */
+            .preview-table td.signature-footer-cell {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+            }
+
+            /* فواصل المواقع المدمجة */
+            .location-separator {
+                background: #cbd5e1 !important;
+                color: black !important;
+                font-weight: 900 !important;
+                font-size: 8pt !important;
+                padding: 2px 4px !important;
+                page-break-after: avoid !important;
+            }
+
+            /* نُقل نفس الإصلاح من index.html — انظر التعليق المقابل هناك */
+            tr.print-page-break {
+                page-break-before: always !important;
+                break-before: page !important;
+            }
+
+            .merged-cell {
+                background: #fffbeb !important;
+                vertical-align: top !important;
+            }
+            
+            .editable-cell { 
+                border: none !important; 
+                padding: 0 !important; 
+                font-size: 10pt !important;
+                background: transparent !important;
+            }
+            
+            input { border: none !important; background: transparent !important; }
+            
+            /* تذييل وتوقيعات: مسافة مريحة بمقدار 4 حقول تحت الجدول */
+            .preview-signatures-row {
+                margin-top: 75px !important;
+                margin-bottom: 25px !important;
+                padding: 0 25px !important;
+                page-break-inside: avoid !important;
+            }
+            .preview-signatures-row p {
+                font-size: 9.5pt !important;
+                font-weight: 900 !important;
+            }
+            .preview-page-footer {
+                margin-top: 20px !important;
+                padding-top: 6px !important;
+                font-size: 7.5pt !important;
+                page-break-inside: avoid !important;
+            }
+        }
+        
+        /* طباعة مصفوفة الأيام: أفقية إلزاماً — ثلاثون عموداً لا تسع في صفحة عمودية */
+        @media print {
+            body.printing-matrix { background: white !important; }
+            /* visibility لا display: القالب مُدرَج داخل غلاف التطبيق نفسه، فإخفاء الغلاف
+               بـdisplay:none يُخفيه معه مهما فعلنا. أما visibility فتتوارث ويمكن نقضها
+               على الفرع المطلوب وحده — وهي الطريقة الوحيدة التي تعمل مع هذه البنية. */
+            body.printing-matrix #root > * { visibility: hidden !important; }
+            body.printing-matrix .matrix-print-only,
+            body.printing-matrix .matrix-print-only * { visibility: visible !important; }
+            body.printing-matrix .matrix-print-only {
+                display: block !important;
+                position: absolute !important;
+                top: 0 !important; right: 0 !important; left: 0 !important;
+                background: white !important;
+                color: black !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            body.printing-matrix .matrix-print-only table { width: 100% !important; border-collapse: collapse !important; }
+            body.printing-matrix .matrix-print-only th,
+            body.printing-matrix .matrix-print-only td {
+                border: 1px solid #94a3b8 !important;
+                padding: 2px 1px !important;
+                text-align: center !important;
+                /* الألوان تُطبع كما هي: الرمز وحده يكفي أبيض وأسود، لكن اللون يسرّع القراءة */
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            body.printing-matrix .matrix-print-only tr { page-break-inside: avoid !important; }
+        }
+
+        /* طباعة بطاقة المنتسب من نافذة المعاينة (زرّ «طباعة بطاقة المنتسب A4»).
+           النافذة مرسومة عبر ReactDOM.createPortal مباشرة تحت body، خارج #root —
+           فيُخفى كل ما سواها من أبناء body بـdisplay:none، وتبقى البطاقة وحدها على الورق.
+
+           تاريخ ما قبله يستحق الذكر، لأن الحلّين السابقين يبدوان معقولين:
+           1) كانت النافذة داخل main، وقاعدة الطباعة العامة تُخفي main بـdisplay:none،
+              ولا يلغي حفيدٌ display:none على سلفه ⇒ صفحة بيضاء (مقيس: شاشة 1400×900، ورق 0×0).
+           2) عزلٌ بـvisibility كطباعة المصفوفة أظهرها، لكن المحتوى المخفي بقي شاغلاً مساحته
+              فأخرج ورقة ثانية بيضاء. وإلغاء ارتفاع الغلاف أسقطها، غير أنه اعتمد على شرط خفيّ
+              (ألّا يكون بين الغلاف والبطاقة سلفٌ مُموضَع أو محوَّل) يكسره تعديل قادم بصمت.
+              نبّهت إليه مراجعة Codex، فحلّ الـportal محلّ الحلّين من الجذر. */
+        @media print {
+            /* كل أبناء body المباشرين لا #root وحدها: ما تُلحقه شيفرات أخرى بـbody (منتقي
+               التاريخ مثلاً) كان سيُطبع مع البطاقة — نبّهت إليه مراجعة Codex. والبطاقة ابن
+               مباشر لـbody (portal)، وقاعدتها أدناه أعلى تحديداً (0,2,1 مقابل 0,1,1) فتبقى. */
+            body.printing-card > * { display: none !important; }
+            body.printing-card .card-print-root {
+                display: block !important;
+                position: static !important;
+                background: white !important;
+                backdrop-filter: none !important;
+                padding: 0 !important;
+            }
+            /* النافذة على الشاشة محدودة الارتفاع وقابلة للتمرير؛ على الورق تُفرَد كاملة */
+            body.printing-card .card-print-root,
+            body.printing-card .card-print-root * {
+                overflow: visible !important;
+                max-height: none !important;
+            }
+        }
+
+        /* تأثير الظهور التدريجي للإحصاء الإضافي */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* ================================================================= */
+        /* حركة فتح التبويبات                                                 */
+        /*                                                                   */
+        /* على حاوية المحتوى وحدها لا على صفوف الجدول: عند 144 موظفاً تكون    */
+        /* الحركة على كل صف تعثّراً لا زينة. opacity وtransform فقط — الاثنان  */
+        /* يُنفَّذان على المعالج الرسومي بلا إعادة تخطيط (layout).             */
+        /*                                                                   */
+        /* داخل @media screen عمداً: الطباعة لا ترى حركة ولا شفافية جزئية،    */
+        /* فلا تخرج كشوفات باهتة لو طُبعت أثناء الحركة.                       */
+        /* ================================================================= */
+        @media screen {
+            @keyframes tabEnter {
+                from { opacity: 0; transform: translateY(6px); }
+                to   { opacity: 1; transform: none; }
+            }
+            /* both يُبقي الحالة النهائية (transform: none) فلا يبقى محوَّلاً بعد
+               انتهائها — عنصر محوَّل يصير مرجعاً للعناصر ذات position: fixed. */
+            .tab-enter {
+                animation: tabEnter 170ms cubic-bezier(0.16, 1, 0.3, 1) both;
+            }
+        }
+
+        /* من يضبط نظامه على «تقليل الحركة» (دوار الحركة، حساسية بصرية) يراها فوراً بلا انتقال */
+        @media (prefers-reduced-motion: reduce) {
+            .tab-enter { animation: none !important; }
+        }
+
+        :root {
+            --surface: #ffffff;
+            --surface-muted: #f1f5f9;
+            --surface-raised: #ffffff;
+            --border: #e2e8f0;
+            --border-strong: #cbd5e1;
+            --ink: #0f172a;
+            --ink-2: #64748b;
+            --action: #4f46e5;
+            --action-hover: #4338ca;
+            --action-ink: #4338ca;
+            --action-tint: #eef2ff;
+            --ok: #047857;
+            --ok-tint: #ecfdf5;
+            --warn: #b45309;
+            --warn-tint: #fffbeb;
+            --danger: #b91c1c;
+            --danger-tint: #fef2f2;
+            --danger-border: #fecaca;
+        }
+    </style>
+
+    <!-- ================================================================= -->
+    <!-- الوضع الليلي (Dark Mode)                                          -->
+    <!--                                                                   -->
+    <!-- طبقة CSS مستقلة تماماً: لا تمسّ أي className في شجرة React.        -->
+    <!-- تُعيد تعريف الأصناف البنيوية المستعملة فعلاً تحت data-theme="dark". -->
+    <!--                                                                   -->
+    <!-- كل القواعد داخل @media screen عمداً: فيتصرّف محرّك الطباعة كأن       -->
+    <!-- الوضع الليلي غير موجود، وتخرج الكشوفات الرسمية بيضاء دائماً.       -->
+    <!-- ================================================================= -->
+    <script>
+        // يُطبَّق قبل أول رسم لتفادي وميض أبيض عند فتح الصفحة
+        (function () {
+            try {
+                var saved = localStorage.getItem('hrTheme');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                if (saved === 'dark' || (!saved && prefersDark)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) { /* بعض المتصفحات تحظر التخزين — نتجاهل ونبقى على الوضع النهاري */ }
+        })();
+        window.__toggleHrTheme = function () {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            if (isDark) {
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+            try { localStorage.setItem('hrTheme', isDark ? 'light' : 'dark'); } catch (e) {}
+            return !isDark;
+        };
+    </script>
+
+    <style>
+    @media screen {
+        html[data-theme="dark"] {
+            /* الخطوط العربية تبدو أثقل وتتوهّج على الخلفيات الداكنة — التنعيم يعالج ذلك */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            color-scheme: dark;
+            /* رموز التصميم (design tokens) — القيم مأخوذة من لوحة الوضع الليلي القائمة نفسها،
+               فلا يتغيّر إحساس الوضع الليلي الحالي. كل مكوّن جديد يستهلك هذه المتغيرات فقط،
+               لا فئة لونية صريحة — الفئات الصريحة الجديدة لا مدخل لها في القائمة المعدَّدة أدناه. */
+            --surface: #131c2b;
+            --surface-muted: #1a2536;
+            --surface-raised: #2b3a52;
+            --border: #2b3a52;
+            --border-strong: #3a4c68;
+            --ink: #e6edf5;
+            --ink-2: #94a3b8;
+            --action: #6366f1;
+            --action-hover: #818cf8;
+            --action-ink: #a5b4fc;
+            --action-tint: #16233f;
+            --ok: #6ee7b7;
+            --ok-tint: #0b2f24;
+            --warn: #fcd34d;
+            --warn-tint: #3b2a09;
+            --danger: #fca5a5;
+            --danger-tint: #3b1518;
+            --danger-border: #6b2b31;
+        }
+        html[data-theme="dark"] body { background: #0b1220; }
+
+        /* ---- الأسطح البنيوية ---- */
+        html[data-theme="dark"] .bg-white          { background-color: #131c2b !important; }
+        /* الأوراق الرسمية المعروضة للطباعة (مذكرة الماء، استمارة الموظف) تبقى ورقة بيضاء بألوانها
+           النهارية في الوضع الليلي — وإلا صار نصّها الأسود فوق خلفية داكنة غير مقروء */
+        html[data-theme="dark"] .paper-sheet,
+        html[data-theme="dark"] .paper-sheet .bg-white { background-color: #ffffff !important; color: #000000 !important; }
+        html[data-theme="dark"] .paper-sheet .bg-slate-100 { background-color: #f1f5f9 !important; }
+        html[data-theme="dark"] .paper-sheet .bg-slate-200 { background-color: #e2e8f0 !important; }
+        html[data-theme="dark"] .paper-sheet .bg-blue-50 { background-color: #eff6ff !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-800 { color: #1f2937 !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-700 { color: #374151 !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-600 { color: #4b5563 !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-400 { color: #9ca3af !important; }
+        html[data-theme="dark"] .paper-sheet .text-gray-300 { color: #d1d5db !important; }
+        html[data-theme="dark"] .paper-sheet .text-blue-900 { color: #1e3a8a !important; }
+        html[data-theme="dark"] .paper-sheet .border-gray-400 { border-color: #9ca3af !important; }
+        html[data-theme="dark"] .bg-slate-50,
+        html[data-theme="dark"] .bg-gray-50,
+        html[data-theme="dark"] .bg-slate-100,
+        html[data-theme="dark"] .bg-gray-100       { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-200      { background-color: #24324a !important; }
+
+        /* ---- النصوص: لا أبيض خالص، فالتباين المفرط يُنزف التشكيل داخل الحروف ---- */
+        html[data-theme="dark"] .text-slate-900,
+        html[data-theme="dark"] .text-gray-900,
+        html[data-theme="dark"] .text-slate-800,
+        html[data-theme="dark"] .text-gray-800     { color: #e6edf5 !important; }
+        html[data-theme="dark"] .text-slate-700,
+        html[data-theme="dark"] .text-gray-700     { color: #cbd5e1 !important; }
+        html[data-theme="dark"] .text-slate-600,
+        html[data-theme="dark"] .text-gray-600,
+        html[data-theme="dark"] .text-slate-500,
+        html[data-theme="dark"] .text-gray-500     { color: #94a3b8 !important; }
+        html[data-theme="dark"] .text-slate-400    { color: #7d8ba1 !important; }
+
+        /* ---- الحدود ---- */
+        html[data-theme="dark"] .border-slate-100,
+        html[data-theme="dark"] .border-gray-100,
+        html[data-theme="dark"] .border-slate-200,
+        html[data-theme="dark"] .border-gray-200   { border-color: #2b3a52 !important; }
+        html[data-theme="dark"] .border-slate-300,
+        html[data-theme="dark"] .border-gray-300   { border-color: #3a4c68 !important; }
+        /* حدّ الشريحة النشطة في شريط التنقّل — أُضيف مع الشرائح ولولاه لبقي
+           بلونه النهاري الفاتح فوق سطح داكن، بصمت وبلا خطأ في وحدة التحكم */
+        html[data-theme="dark"] .border-indigo-300 { border-color: #4c5f9e !important; }
+        /* شارات سجل الفترات وأزراره — أُضيفت مع السجل */
+        html[data-theme="dark"] .border-indigo-200 { border-color: #3d4d80 !important; }
+        html[data-theme="dark"] .border-emerald-300 { border-color: #2b6b53 !important; }
+        html[data-theme="dark"] .border-sky-300 { border-color: #2f5b86 !important; }
+        html[data-theme="dark"] .border-rose-200 { border-color: #6b2b31 !important; }
+
+        /* ---- حقول الإدخال ---- */
+        html[data-theme="dark"] input,
+        html[data-theme="dark"] select,
+        html[data-theme="dark"] textarea {
+            background-color: #1a2536 !important;
+            color: #e6edf5 !important;
+            border-color: #3a4c68 !important;
+        }
+        html[data-theme="dark"] input::placeholder,
+        html[data-theme="dark"] textarea::placeholder { color: #6b7a91 !important; }
+        html[data-theme="dark"] option { background-color: #1a2536; color: #e6edf5; }
+
+        /* ---- الألوان الدلالية: نُبقي الصبغة ونخفض الإضاءة فقط ---- */
+        /* الأحمر = غياب · الكهرماني = تنبيه · الأخضر = حضور · النيلي = إجراء */
+        html[data-theme="dark"] .bg-red-50      { background-color: #3b1518 !important; }
+        html[data-theme="dark"] .text-red-800,
+        html[data-theme="dark"] .text-rose-800,
+        html[data-theme="dark"] .text-red-700   { color: #fca5a5 !important; }
+        html[data-theme="dark"] .bg-rose-50     { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .text-rose-700  { color: #fda4af !important; }
+        html[data-theme="dark"] .bg-amber-50    { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .text-amber-900,
+        html[data-theme="dark"] .text-amber-800 { color: #fcd34d !important; }
+        html[data-theme="dark"] .bg-emerald-50,
+        html[data-theme="dark"] .bg-green-50    { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .text-emerald-800,
+        html[data-theme="dark"] .text-green-800 { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .bg-indigo-50,
+        html[data-theme="dark"] .bg-blue-50     { background-color: #16233f !important; }
+        html[data-theme="dark"] .text-indigo-900,
+        html[data-theme="dark"] .text-blue-900,
+        html[data-theme="dark"] .text-indigo-800 { color: #a5b4fc !important; }
+        html[data-theme="dark"] .bg-teal-50     { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .text-teal-900  { color: #5eead4 !important; }
+        html[data-theme="dark"] .bg-purple-50   { background-color: #251640 !important; }
+        html[data-theme="dark"] .text-purple-700 { color: #c4b5fd !important; }
+
+        /* ---- درجات نصية إضافية تظهر داخل الشارات ---- */
+        html[data-theme="dark"] .text-indigo-700,
+        html[data-theme="dark"] .text-blue-700     { color: #a5b4fc !important; }
+        html[data-theme="dark"] .text-emerald-700,
+        html[data-theme="dark"] .text-green-700    { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .text-amber-700    { color: #fcd34d !important; }
+        html[data-theme="dark"] .text-teal-700     { color: #5eead4 !important; }
+
+        /* ---- خلفيات فاتحة تحمل معدِّل شفافية ---- */
+        /* تُركت أولاً ظناً أنها كلها فوق ترويسات داكنة، فظهر صف «قيد التعديل» */
+        /* (bg-amber-100/80) وترويسة جدول المستخدمين (bg-slate-100/90) بنص فاتح */
+        /* فوق أرضية فاتحة. المحدِّدات مهروبة لأن Tailwind يكتب «/» كـ «\/». */
+        html[data-theme="dark"] .bg-indigo-50\/80 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-slate-100\/90 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-amber-100\/80 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-slate-50\/80 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-teal-50\/80 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-teal-50\/40 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-teal-50\/20 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-slate-100\/80 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/50 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/90 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-200\/80 { background-color: #24324a !important; }
+        html[data-theme="dark"] .bg-slate-100\/70 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/70 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-slate-50\/60 { background-color: #1a2536 !important; }
+        html[data-theme="dark"] .bg-amber-50\/90 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/50 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-emerald-100\/40 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-100\/70 { background-color: #3b2a09 !important; }
+        /* تظليل التحويم على صفوف الجداول (الملاك، الوحدات، الموقف اليومي) — لم يكن معرَّفاً
+           إطلاقاً، فيبقى بلونه النهاري شبه الأبيض فوق نص أُعيد تلوينه لليلي، فيصبح غير مقروء تماماً */
+        html[data-theme="dark"] .hover\:bg-gray-50:hover,
+        html[data-theme="dark"] .hover\:bg-slate-50:hover { background-color: #24324a !important; }
+        html[data-theme="dark"] .hover\:bg-slate-50\/70:hover,
+        html[data-theme="dark"] .hover\:bg-slate-50\/80:hover { background-color: #24324a !important; }
+        html[data-theme="dark"] .hover\:bg-indigo-50\/30:hover,
+        html[data-theme="dark"] .hover\:bg-indigo-50\/40:hover { background-color: #232a4a !important; }
+        html[data-theme="dark"] .hover\:bg-teal-50\/40:hover { background-color: #123330 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/40 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-indigo-50\/60 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-emerald-50\/30 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/40 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-50\/60 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-blue-50\/35 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-rose-50\/50 { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .bg-emerald-50\/35 { background-color: #0b2f24 !important; }
+        html[data-theme="dark"] .bg-amber-50\/50 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/30 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-rose-50\/20 { background-color: #3b1520 !important; }
+        html[data-theme="dark"] .bg-indigo-50\/10 { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-teal-50\/30 { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-amber-50\/10 { background-color: #3b2a09 !important; }
+        html[data-theme="dark"] .bg-white\/85 { background-color: #131c2b !important; }
+        html[data-theme="dark"] .bg-white\/80 { background-color: #131c2b !important; }
+        /* نمط الشرائح الموحّد (seg-track): الحبّة النشطة bg-white تُعتَّم إلى #131c2b فتصير أغمق
+           من مسارها (#1a2536) كأنها ثقب لا حبّة مرفوعة — فتُرفَع هنا فوقه. وتحويم الأزرار
+           (hover:bg-slate-200 / hover:text-slate-700) لم يكن معرَّفاً قط، فكان يومض بلونه
+           النهاري: خلفية فاتحة تحت نص فاتح في الأقسام، ونص داكن فوق مسار داكن في الشرائح. */
+        html[data-theme="dark"] .seg-track .bg-white { background-color: #2b3a52 !important; }
+        html[data-theme="dark"] .hover\:bg-slate-200:hover { background-color: #24324a !important; }
+        html[data-theme="dark"] .hover\:text-slate-700:hover { color: #e6edf5 !important; }
+        /* شرائح seg-track (المواصفة §14.2): على شاشة عريضة كان كل خيار يمتد نحو 600px بلا فاصل،
+           فيُقرأ الشريط زراً واحداً طويلاً. صار المسار بعرض أطول خياراته لا بعرض الشريط، وبين
+           الخيارات فاصل رفيع يختفي بجوار الخيار النشط أو المُحوَّم، وللتحويم لون خفيف يُظهر حدود
+           كل خيار. الفاصل من 640px فقط: تحتها تتكدّس الخيارات صفوفاً فلا معنى لفاصل عمودي.
+           هنا لا في JSX لأن الفاصل عنصر ::before يتبع aria-pressed، ولونه من المتغيرات فيتبع الليلي. */
+        .seg-opt { position: relative; }
+        .seg-opt[aria-pressed="false"]:hover { background-color: rgb(255 255 255 / 0.6); }
+        html[data-theme="dark"] .seg-opt[aria-pressed="false"]:hover { background-color: rgb(255 255 255 / 0.06) !important; }
+        @media (min-width: 640px) {
+            .seg-opt + .seg-opt::before {
+                content: ''; position: absolute; inset-inline-start: calc(-0.125rem - 0.5px);
+                top: 25%; bottom: 25%; width: 1px; background-color: var(--border-strong);
+                transition: opacity 150ms;
+            }
+            .seg-opt[aria-pressed="true"]::before,
+            .seg-opt[aria-pressed="true"] + .seg-opt::before,
+            .seg-opt:hover::before,
+            .seg-opt:hover + .seg-opt::before { opacity: 0; }
+        }
+
+        /* ---- بقية الدرجات الفاتحة (100 و200) المستعملة في الشارات ---- */
+        html[data-theme="dark"] .bg-gray-200      { background-color: #24324a !important; }
+        html[data-theme="dark"] .bg-amber-200     { background-color: #4a360b !important; }
+        html[data-theme="dark"] .bg-blue-100,
+        html[data-theme="dark"] .bg-indigo-100    { background-color: #16233f !important; }
+        html[data-theme="dark"] .bg-blue-200      { background-color: #1e2f52 !important; }
+        html[data-theme="dark"] .bg-emerald-100,
+        html[data-theme="dark"] .bg-emerald-200,
+        html[data-theme="dark"] .bg-green-100     { background-color: #0e3b2c !important; }
+        html[data-theme="dark"] .bg-purple-100    { background-color: #251640 !important; }
+        html[data-theme="dark"] .bg-purple-200    { background-color: #2f1c52 !important; }
+        html[data-theme="dark"] .bg-red-100,
+        html[data-theme="dark"] .bg-rose-100      { background-color: #3b1518 !important; }
+        html[data-theme="dark"] .bg-red-200,
+        html[data-theme="dark"] .bg-rose-200      { background-color: #4a1a1e !important; }
+        html[data-theme="dark"] .bg-teal-100      { background-color: #0c2f31 !important; }
+        html[data-theme="dark"] .bg-sky-100       { background-color: #102a40 !important; }
+
+        /* ---- كل نص داكن (درجة 600 فأعلى) مستعمل في الواجهة ---- */
+        /* هذه الدرجات مصمَّمة لخلفيات فاتحة، فتصبح غير مقروءة بعد تعتيم الأسطح. */
+        /* الدرجات 500 فما دون تُترك عمداً: هي أصلاً فاتحة وتجلس فوق ترويسات داكنة. */
+        html[data-theme="dark"] .text-blue-600,
+        html[data-theme="dark"] .text-blue-800,
+        html[data-theme="dark"] .text-sky-800,
+        html[data-theme="dark"] .text-blue-950
+            { color: #93c5fd !important; }
+        html[data-theme="dark"] .text-orange-600,
+        html[data-theme="dark"] .text-orange-700,
+        html[data-theme="dark"] .text-orange-800
+            { color: #fdba74 !important; }
+        html[data-theme="dark"] .text-teal-600,
+        html[data-theme="dark"] .text-teal-800,
+        html[data-theme="dark"] .text-teal-950
+            { color: #5eead4 !important; }
+        html[data-theme="dark"] .text-amber-600,
+        html[data-theme="dark"] .text-amber-950
+            { color: #fcd34d !important; }
+        html[data-theme="dark"] .text-emerald-600,
+        html[data-theme="dark"] .text-green-600
+            { color: #6ee7b7 !important; }
+        html[data-theme="dark"] .text-indigo-600,
+        html[data-theme="dark"] .text-indigo-950
+            { color: #a5b4fc !important; }
+        html[data-theme="dark"] .text-purple-600,
+        html[data-theme="dark"] .text-purple-800
+            { color: #c4b5fd !important; }
+        html[data-theme="dark"] .text-rose-600,
+        html[data-theme="dark"] .text-rose-900
+            { color: #fda4af !important; }
+        html[data-theme="dark"] .text-cyan-800
+            { color: #67e8f9 !important; }
+        html[data-theme="dark"] .text-red-600
+            { color: #fca5a5 !important; }
+        html[data-theme="dark"] .text-slate-950
+            { color: #e6edf5 !important; }
+
+        /* الأزرار الممتلئة والتدرّجات تبقى كما هي: هي أصلاً داكنة ومقروءة. */
+        /* وأصناف bg-white/10..30 تبقى كذلك: هي بريق فوق ترويسات داكنة. */
+    }
+    </style>
+
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="./src/editions/offline/main.jsx"></script>
+    
+    <script>
+        // تسجيل Service Worker لتفعيل التثبيت كتطبيق هاتف — فقط على الرابط المنشور فعلياً؛
+        // لا معنى له ولا تسجّله المتصفحات أصلاً عند فتح الملف محلياً (file://).
+        if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./sw.js').catch(function() {});
+            });
+        }
+    </script>
+</body>
+</html>
