@@ -1,5 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../../core/arabic';
+import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../../core/dates';
 
             // يمنع المتصفح من إعادة موضع التمرير القديم عند إقلاع النظام (فتح الملف أو تحديث
             // الصفحة) — بلا هذا، إعادة تحميل الصفحة وأنت في وسط الجدول تُبقيك هناك بدل بداية الصفحة.
@@ -64,62 +66,11 @@ import ReactDOM from 'react-dom';
         const LOCATION_ORDER = ['نهر بن عمر', 'باب الزبير', 'المركز الثقافي النفطي', 'المكينة'];
         const INITIAL_DATA = [];
 
-        // دالة توحيد الأحرف العربية (الهمزات والحركات)
-        const normalizeArabic = (text) => {
-            if (!text) return '';
-            return String(text)
-                .normalize('NFKC')
-                .replace(/[\u200B-\u200D\u200E\u200F\uFEFF\u061C]/g, '')
-                .replace(/[\u064B-\u0652]/g, '')
-                .replace(/\u0640/g, '')
-                .replace(/[أإآءئؤ]/g, 'ا')
-                .replace(/ة/g, 'ه')
-                .replace(/ى/g, 'ي')
-                .toLowerCase()
-                .trim();
-        };
 
-        const normalizeArabicForSearch = (text) => {
-            return normalizeArabic(text).replace(/\s+/g, '');
-        };
 
-        // توحيد الأرقام العربية-الهندية والفارسية الممتدة إلى لاتينية عند أي مقارنة أو تخزين للرقم
-        // الوظيفي — نفس الرقم بخط أرقام مختلف كان يُعامَل كموظفَين مختلفين في كل مطابقة (دمج، حذف، إكسل)
-        const ARABIC_INDIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
-        const EXTENDED_ARABIC_INDIC_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
-        const normalizeJobNumber = (v) => String(v || '').trim()
-            .replace(/[٠-٩]/g, (d) => String(ARABIC_INDIC_DIGITS.indexOf(d)))
-            .replace(/[۰-۹]/g, (d) => String(EXTENDED_ARABIC_INDIC_DIGITS.indexOf(d)));
         
-        // دالة التخمين الذكي للجنس من الاسم
-        const guessGender = (name) => {
-            if (!name) return 'ذكر';
-            const normalizedName = normalizeArabic(name.trim().split(/\s+/)[0]);
-            const femaleNames = ['فاطمه', 'زينب', 'مريم', 'ساره', 'نور', 'سناء', 'اسيل', 'نهله', 'ايار', 'ذكاء', 'رغد', 'شهد', 'ريم', 'دعاء', 'الاء', 'اسراء', 'سجي', 'هبه', 'ندي', 'لمي', 'ايمان', 'خديجه', 'عائشه', 'حفصه', 'رقيه', 'سكينه'];
-            if (femaleNames.some(n => normalizedName.includes(normalizeArabic(n)))) return 'أنثى';
-            if (normalizedName.endsWith('ه') || normalizedName.endsWith('اء') || normalizedName.endsWith('ي')) return 'أنثى';
-            return 'ذكر';
-        };
         
-        // دالة توحيد قيم الجنس من Excel
-        const normalizeGender = (genderValue) => {
-            if (!genderValue) return '';
-            const normalized = normalizeArabic(genderValue.trim());
-            
-            // توحيد الإناث: إناث، انثى، أنثى → أنثى
-            if (normalized.includes('انث')) return 'أنثى';
-            
-            // توحيد الذكور: ذكور، ذكر → ذكر
-            if (normalized.includes('ذكر')) return 'ذكر';
-            
-            return genderValue.trim(); // إرجاع القيمة الأصلية إذا لم تطابق
-        };
         
-        // دالة استخراج الاسم الثلاثي
-        const getThreeName = (fullName) => {
-            const parts = (fullName || '').trim().split(' ').filter(p => p);
-            return parts.slice(0, 3).join(' ');
-        };
 
         // مكون رسم الدوائر الإحصائية التفاعلية للبحث (إصدار V5.1)
         const SearchCircularProgress = ({ percent, label, color = "text-sky-300", size = 76, strokeWidth = 7 }) => {
@@ -2563,18 +2514,6 @@ import ReactDOM from 'react-dom';
                 if (!selectedEmployeeCard) document.body.classList.remove('printing-card');
             }, [selectedEmployeeCard]);
             
-            // دالة تنسيق رقم الهاتف النقال لتسهيل القراءة (مثل: 0420 329 0770)
-            const formatMobileNumber = (phoneStr) => {
-                if (!phoneStr || phoneStr === 'غير مسجل') return 'غير مسجل';
-                const digits = String(phoneStr).replace(/\D/g, '');
-                if (digits.length === 11) {
-                    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
-                }
-                if (digits.length === 10) {
-                    return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-                }
-                return phoneStr;
-            };
     
             const [cardFieldsVisibility, setCardFieldsVisibility] = useState({
                 mobile: true,
@@ -2647,14 +2586,6 @@ import ReactDOM from 'react-dom';
             const fileInputRef = useRef(null);
             const isCustomizable = ['all', 'units', 'dashboard'].includes(view);
 
-            const getDaysBetweenDates = (d1Str, d2Str) => {
-                if (!d1Str || !d2Str) return 0;
-                const p1 = d1Str.split('-');
-                const p2 = d2Str.split('-');
-                const d1 = new Date(parseInt(p1[0]), parseInt(p1[1]) - 1, parseInt(p1[2]));
-                const d2 = new Date(parseInt(p2[0]), parseInt(p2[1]) - 1, parseInt(p2[2]));
-                return Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
-            };
 
             // الوجبات المستلمة في يوم ما من دورة المناوبة المعتمدة وحدها — بلا إجازات ولا تعديلات فردية.
             // مطابقة حرفياً للدورة في getEmployeeDefaultNaturalStatus: الثلاثية وجبة واحدة 24 ساعة،
@@ -2702,24 +2633,7 @@ import ReactDOM from 'react-dom';
                 return { triple, double };
             }, [staff]);
 
-            const getArabicDayName = (dateStr) => {
-                if (!dateStr) return '';
-                try {
-                    const p = dateStr.split('-');
-                    const d = new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
-                    const dayNames = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-                    return dayNames[d.getDay()] || '';
-                } catch (e) {
-                    return '';
-                }
-            };
 
-            const getTripleName = (fullName) => {
-                if (!fullName) return '';
-                const parts = fullName.trim().split(/\s+/);
-                if (parts.length <= 3) return fullName.trim();
-                return parts.slice(0, 3).join(' ');
-            };
 
             // ===== الفترات المؤرَّخة للحالات (Dated Status Periods) =====
             const PERIOD_TYPES = ['إجازة اعتيادية', 'في دورة', 'إيفاد', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
@@ -2751,16 +2665,6 @@ import ReactDOM from 'react-dom';
                 return null;
             };
 
-            // التاريخ المحلي بصيغة YYYY-MM-DD. لا تستعمل toISOString هنا: هي تعطي
-            // تاريخ UTC، وبغداد +3 — فبين منتصف الليل والثالثة فجراً يكون تاريخ
-            // UTC هو تاريخ الأمس، فتُصنَّف فترة انتهت أمس على أنها «توشك أن تنتهي».
-            const localDateStr = (input) => {
-                const d = (input === undefined || input === null) ? new Date() : new Date(input);
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                return y + '-' + m + '-' + day;
-            };
 
             // تنبيهات الفترات: ما يوشك على الانتهاء، وما انتهى ولم تُؤكَّد المباشرة.
             // يُحسب من الفترات في كل رسم — لا تخزين ولا وظيفة خلفية.
@@ -3014,13 +2918,6 @@ import ReactDOM from 'react-dom';
                 return 'غير محدد';
             };
 
-            // ما يلي يُبنى فوق getEmployeeDailyStatus/getEmployeeDefaultNaturalStatus أعلاه، لذا
-            // يُصرَّح بعدهما — استدعاء أيٍّ منهما من useMemo قبل تعريفه يُنفَّذ أثناء الرسم مباشرة
-            // (لا بعده كما في معالِج حدث)، فيفشل بصمت رغم نجاح بوابتي التحقق سابقاً على بيانات فارغة.
-            const daysInMonth = (monthStr) => {
-                const [y, m] = monthStr.split('-').map(Number);
-                return new Date(y, m, 0).getDate();
-            };
 
             const isWorkDay = (dateStr) => {
                 const [y, m, d] = dateStr.split('-').map(Number);
@@ -3151,32 +3048,7 @@ import ReactDOM from 'react-dom';
                 }));
             };
 
-            const ARABIC_MONTH_NAMES = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
-            const getArabicMonthLabel = (monthStr) => {
-                const [y, m] = monthStr.split('-').map(Number);
-                return ARABIC_MONTH_NAMES[m - 1] + ' / ' + y;
-            };
 
-            // تحويل رقم صحيح (0-999) إلى كلمات عربية — يُستخدَم فقط لعدد آلاف الدنانير هنا
-            const ARABIC_ONES = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
-            const ARABIC_TEENS = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
-            const ARABIC_TENS = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
-            const ARABIC_HUNDREDS = ['', 'مائة', 'مئتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
-            const numberChunkToArabicWords = (n) => {
-                if (n <= 0) return '';
-                const parts = [];
-                const h = Math.floor(n / 100);
-                const rem = n % 100;
-                if (h > 0) parts.push(ARABIC_HUNDREDS[h]);
-                if (rem > 0 && rem < 10) parts.push(ARABIC_ONES[rem]);
-                else if (rem >= 10 && rem < 20) parts.push(ARABIC_TEENS[rem - 10]);
-                else if (rem >= 20) {
-                    const tens = Math.floor(rem / 10);
-                    const ones = rem % 10;
-                    parts.push(ones > 0 ? (ARABIC_ONES[ones] + ' و' + ARABIC_TENS[tens]) : ARABIC_TENS[tens]);
-                }
-                return parts.join(' و');
-            };
             // المبلغ هنا دائماً عدد سيتات (أعداد صحيحة بعد التقريب للأقل أعلاه) × 1000 — نحوّل
             // عدد السيتات فقط إلى كلمات ونلحقه بـ"ألف"
             const amountToArabicWords = (amount) => {
@@ -4003,11 +3875,6 @@ import ReactDOM from 'react-dom';
             const periodRangeJsx = (p) => (
                 <React.Fragment>«{p.type}» من <bdi dir="ltr" className="whitespace-nowrap">{p.from}</bdi> {p.to ? <React.Fragment>إلى <bdi dir="ltr" className="whitespace-nowrap">{p.to}</bdi></React.Fragment> : '(مستمرة)'}</React.Fragment>
             );
-            // عدد الأيام المثبَّتة بصيغته العربية بعد «امسح»: يوماً واحداً، يومين، 3–10 أيام، 11 فأكثر يوماً
-            const arabicManualDaysCount = (n) => n === 1 ? 'يوماً واحداً مثبَّتاً'
-                : n === 2 ? 'يومين مثبَّتين'
-                : (n >= 3 && n <= 10) ? `${n} أيام مثبَّتة`
-                : `${n} يوماً مثبَّتاً`;
             const analyzeMergePeriods = (inc, existing, jobNumber, overrides, deletedPeriods = null) => {
                 const valid = (p) => p && p.type && p.from;
                 // نسخة مكرّرة حرفياً داخل الملف نفسه تُعرض وتُطبَّق مرة واحدة
@@ -4072,14 +3939,6 @@ import ReactDOM from 'react-dom';
                 return { items, localOnly };
             };
 
-            // ===== المواقف اليومية والساعات الزمنية والإضافي والعطل والإعدادات في الدمج =====
-            // حاجة صاحب النظام: تبقى الفترات المؤرخة كلها، ويُجلب من الملف تحديث المواقف حتى اليوم.
-            // سطر لكل موظف في كل يوم يجمع الموقف وساعاته الزمنية والإضافي: الساعات الزمنية لا تُحتسب إلا مع موقف «إجازة زمنية».
-            // المطابقة بالرقم الوظيفي: المعرّفات الداخلية قد تختلف بين الجهازين، وقيمة لموظف لا يطابقه أحد تُتجاهل.
-            // الافتراض: ما في الملف وليس لديك مؤشَّر؛ ما لديك بقيمة أخرى بلا تأشير؛ ويوم تغطيه فترة مؤرخة لديك بنوع آخر
-            // بلا تأشير مع تنبيه — فالموقف اليومي يتقدّم على الفترة في العرض. العطل تُضاف ولا تُحذف، والإعدادات العامة
-            // بلا تأشير. لا يُحذف شيء لديك. المعرّفات والتواريخ القادمة من الملف لا تُستعمل مفاتيح في كائن عادي.
-            const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
             const ownKey = (obj, k) => !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, k);
             const ATTENDANCE_PARTS = [['status', 'dailyStatusOverrides'], ['hourly', 'hourlyLeaveRecords'], ['overtime', 'overtimeHoursRecords']];
             // قيمة صالحة: الموقف نصّ غير فارغ؛ والساعات عدد موجب لا يتجاوز 24 — ملف مشوَّه لا يُكتب في بيانات الحضور
@@ -4170,11 +4029,6 @@ import ReactDOM from 'react-dom';
                                            values: { dataEntryOperator: bundle.dataEntryOperator } });
                 }
                 return result;
-            };
-            // عدد الساعات بصيغته العربية: ساعة واحدة، ساعتان، 3–10 ساعات، 11 فأكثر ساعة
-            const arabicHoursCount = (value) => {
-                const n = Number(value);
-                return n === 1 ? 'ساعة واحدة' : n === 2 ? 'ساعتان' : (n >= 3 && n <= 10) ? `${n} ساعات` : `${n} ساعة`;
             };
             // قيمة سطر المواقف: الموقف وساعاته بين قوسين — «إجازة زمنية» (3 ساعات)؛ والساعات وحدها تُسمّى بنوعها
             const attendanceValueJsx = (parts) => {
@@ -4686,67 +4540,8 @@ import ReactDOM from 'react-dom';
             const [showCamera, setShowCamera] = useState(false);
             const videoRef = useRef(null);
             
-            // إصلاح رقم الهاتف (إضافة 0 إذا كان مفقود)
-            const fixPhoneNumber = (phone) => {
-                if (!phone) return '';
-                const phoneStr = String(phone).trim();
-                
-                // إذا كان 10 أرقام ويبدأ بـ 7، أضف 0
-                if (phoneStr.length === 10 && phoneStr.startsWith('7')) {
-                    return '0' + phoneStr;
-                }
-                
-                return phoneStr;
-            };
             
-            // تحويل تاريخ Excel إلى JavaScript Date
-            const parseExcelDate = (excelDate) => {
-                if (!excelDate) return null;
-                
-                // نتوقع نص من Excel
-                if (typeof excelDate === 'string') {
-                    const trimmed = excelDate.trim();
-                    
-                    // تنسيق YYYY/MM/DD (من Excel العربي)
-                    const match1 = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
-                    if (match1) {
-                        const [_, year, month, day] = match1;
-                        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                    }
-                    
-                    // تنسيق DD/MM/YYYY
-                    const match2 = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-                    if (match2) {
-                        const [_, day, month, year] = match2;
-                        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                    }
-                    
-                    // تنسيق YYYY-MM-DD (جاهز)
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-                        return trimmed;
-                    }
-                    
-                    // محاولة أخيرة: تحويل باستخدام Date
-                    const date = new Date(trimmed);
-                    if (!isNaN(date.getTime())) {
-                        const year = date.getUTCFullYear();
-                        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-                        const day = String(date.getUTCDate()).padStart(2, '0');
-                        return `${year}-${month}-${day}`;
-                    }
-                }
-                
-                return null;
-            };
             
-            // formatDateToString الآن غير مطلوب لأن parseExcelDate يرجع نص مباشرة
-            const formatDateToString = (dateStr) => {
-                // إذا كان نص بالفعل، نرجعه كما هو
-                if (typeof dateStr === 'string') return dateStr;
-                // إذا كان null أو undefined
-                if (!dateStr) return '';
-                return String(dateStr);
-            };
             
             const getMissingFields = (emp) => {
                 const missing = [];
@@ -4765,59 +4560,7 @@ import ReactDOM from 'react-dom';
                 return missing;
             };
 
-            // حساب سنوات الخدمة بدقة
-            const calculateYearsOfService = (hireDate) => {
-                if (!hireDate) return 0;
-                
-                // تحويل التاريخ: إذا كان string بتنسيق YYYY-MM-DD، نحوله لـ Date
-                let hire;
-                if (typeof hireDate === 'string') {
-                    // إذا كان بتنسيق YYYY-MM-DD
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(hireDate)) {
-                        hire = new Date(hireDate + 'T00:00:00');
-                    } else {
-                        // محاولة تحويل مباشرة
-                        hire = new Date(hireDate);
-                    }
-                } else {
-                    hire = new Date(hireDate);
-                }
-                
-                if (!hire || isNaN(hire.getTime())) return 0;
-                
-                const now = new Date();
-                
-                // حساب الفرق بالسنوات
-                let years = now.getFullYear() - hire.getFullYear();
-                
-                // التحقق من الشهور والأيام
-                const monthDiff = now.getMonth() - hire.getMonth();
-                const dayDiff = now.getDate() - hire.getDate();
-                
-                // إذا لم يكمل السنة بعد (الشهر الحالي قبل شهر التعيين، أو نفس الشهر لكن اليوم قبل يوم التعيين)
-                if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-                    years--;
-                }
-                
-                return years;
-            };
             
-            // دالة توحيد النصوص العربية (لحل مشكلة الهمزات والتاء المربوطة)
-            const normalizeArabicText = (text) => {
-                if (!text) return '';
-                return text
-                    .normalize('NFKC')                             // توحيد ترميز يونيكود ومعالجة أشكال العرض (Shaped Presentation Forms)
-                    .replace(/[\u064B-\u0652]/g, '')             // إزالة الحركات والتنوين والسكون والشدة
-                    .replace(/\u0640/g, '')                        // إزالة الكشيدة أو التطويل الحرفي
-                    .replace(/[\u200B-\u200D\uFEFF\u200E\u200F]/g, '') // إزالة كافة الحروف غير المرئية والتحكمية
-                    .replace(/[أإآٱ]/g, 'ا')                       // توحيد الألف بكل أشكالها
-                    .replace(/[ىيئي]/g, 'ي')                       // توحيد الياء والألف المقصورة والياء الفارسية والهمزة على النبرة
-                    .replace(/[كک]/g, 'ك')                         // توحيد الكاف العربية والفارسية
-                    .replace(/ة/g, 'ه')                            // توحيد التاء المربوطة والهاء
-                    .replace(/\s+/g, ' ')                          // توحيد المسافات
-                    .trim()
-                    .toLowerCase();
-            };
 
             // موظفو العقود على صنفين: "عقد 315" و"عقد المحافظة" — والسجلات القديمة بعنوان "عقد" وحده
             // لا تزال قائمة. لذا يُعرَّف العقد بورود كلمة "عقد" في العنوان لا بمطابقتها حرفياً،
@@ -6132,17 +5875,6 @@ import ReactDOM from 'react-dom';
                 setEduResults([]);
             };
 
-            // ===== دوال البحث الموحد =====
-            // توسيع الاختصارات: ر=رئيس م=معاون ليتمكن البحث من إيجاد المدخلين
-            const expandAbbrev = (q) => {
-                let expanded = q;
-                if (q === 'ر' || q === 'ر.') expanded = 'رييس';
-                else if (q === 'م' || q === 'م.') expanded = 'معاون';
-                else if (q.startsWith('ر.') || q.startsWith('ر ')) expanded = 'رييس ' + q.slice(2);
-                else if (q.startsWith('م.ر.') || q.startsWith('م ر ')) expanded = 'معاون رييس ' + q.slice(4);
-                else if (q.startsWith('م.') || q.startsWith('م ')) expanded = 'معاون ' + q.slice(2);
-                return expanded;
-            };
 
             const performUnifiedSearch = () => {
                 let results = staff;
@@ -6612,13 +6344,6 @@ import ReactDOM from 'react-dom';
                 return () => window.removeEventListener('keydown', onKey);
             }, [periodHistoryEmpId]);
 
-            const addMonthsClamped = (dateStr, months) => {
-                const parts = dateStr.split('-').map(Number);
-                const target = new Date(parts[0], parts[1] - 1 + months, 1);
-                const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-                target.setDate(Math.min(parts[2], lastDay));
-                return localDateStr(target);
-            };
 
             // النهاية تُحتسب من المدة (يوم البداية محسوب ضمنها) أو تُؤخذ من تقويم النهاية مباشرة
             const quickPeriodEnd = (draft) => {
