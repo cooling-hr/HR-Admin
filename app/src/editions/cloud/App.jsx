@@ -1,5 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, isShiftOnDutyStatus } from '../../domain/water';
+import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../../domain/safety';
+import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, QUICK_STATUS_OPTIONS, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave } from '../../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../../core/arabic';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../../core/dates';
 
@@ -291,11 +294,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
         );
 
         function StaffSystem() {
-            const isLongOrMaternityLeave = (statusStr) => {
-                if (!statusStr) return false;
-                const str = String(statusStr).toLowerCase();
-                return str.includes('أموم') || str.includes('اموم') || str.includes('طويل');
-            };
             const [staff, setStaff] = useState(() => {
                 const saved = safeStorage.getItem('staffData');
                 let parsed = saved ? JSON.parse(saved) : INITIAL_DATA;
@@ -2635,35 +2633,10 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
 
 
 
-            // ===== الفترات المؤرَّخة للحالات (Dated Status Periods) =====
-            const PERIOD_TYPES = ['إجازة اعتيادية', 'في دورة', 'إيفاد', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
 
-            // الأنواع مفتوحة النهاية: تُدخَل بتاريخ بداية فقط بلا مدة ولا تاريخ نهاية، وتبقى سارية
-            // حتى تُنهى يدوياً بإعادة الحالة إلى «نشط». سحب اليد يُعامَل مطابقةً تامة للغياب هنا
-            // وفي الإحصائيات وقوائم الماء (WATER_LEAVE_TALLY_TYPES) — قرار صريح من المستخدم.
-            const OPEN_ENDED_PERIOD_TYPES = ['غياب', 'سحب يد'];
 
-            // خيارات الإجراء السريع في جدول الملاك. الحالة المخزَّنة قد تكون خارجها (إجازة اعتيادية،
-            // بدون راتب، أو حالة قديمة من استيراد Excel)، فتُضاف عندئذٍ كخيار معروض حتى لا تعرض
-            // القائمة أول خيار زوراً — وحينها لا يُطلق اختيار «نشط» حدث تغيير أصلاً.
-            const QUICK_STATUS_OPTIONS = ['نشط', 'في دورة', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
 
-            const periodsOf = (emp) => (emp && Array.isArray(emp.statusPeriods)) ? emp.statusPeriods : [];
 
-            // الفترة التي تغطّي تاريخاً بعينه. to فارغة تعني فترة مفتوحة النهاية.
-            // الحسابات القديمة التي تحمل حالة دائمة ولا فترات لها تُقرأ كفترة مفتوحة
-            // مشتقّة — بلا كتابة أي بيانات، فلا يتغيّر موقف أحد لحظة التحديث.
-            const getActivePeriod = (emp, dateStr) => {
-                if (!emp || !dateStr) return null;
-                const list = periodsOf(emp);
-                if (list.length > 0) {
-                    return list.find(p => p && p.from && dateStr >= p.from && (!p.to || dateStr <= p.to)) || null;
-                }
-                if (emp.status && emp.status !== 'نشط') {
-                    return { id: 'legacy_' + emp.id, type: emp.status, from: '1900-01-01', to: null, note: '', legacy: true };
-                }
-                return null;
-            };
 
 
             // تنبيهات الفترات: ما يوشك على الانتهاء، وما انتهى ولم تُؤكَّد المباشرة.
@@ -2925,13 +2898,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 return day !== 5 && day !== 6 && !officialHolidays.includes(dateStr);
             };
 
-            // 4 قناني/يوم من أيار حتى أيلول، وقنينتان من تشرين الأول حتى نيسان
-            const getWaterSeasonalRate = (monthStr) => {
-                const m = parseInt(monthStr.split('-')[1], 10);
-                return (m >= 5 && m <= 9) ? 4 : 2;
-            };
 
-            const WATER_LEAVE_TALLY_TYPES = ['إجازة اعتيادية', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
 
             // استثناء ثنائي المرحلة، وفق النموذج الرسمي لاستمارة تجهيز المياه المعدنية:
             //  • في دورة / إيفاد → أي تماس مع الشهر يستبعد فوراً، ولو يوماً واحداً.
@@ -2976,7 +2943,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 return set;
             }, [staff, waterMonth, officialHolidays, dailyStatusOverrides]);
 
-            const isShiftOnDutyStatus = (status) => status === 'دوام 24 ساعة' || status === 'دوام صباحي (12 ساعة)' || status === 'دوام مسائي (12 ساعة)';
 
             // أيام الدوام الفعلي مُحتسَبة تلقائياً من نفس منظومة "الموقف" ودورة المناوبة الموجودة
             // أصلاً (لا حاجة لإدخال يدوي): للصباحي = أيام العمل التقويمية، وللمناوَبين = عدد أيام
@@ -3708,47 +3674,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const [showPasteModal, setShowPasteModal] = useState(false);
             const [pastedJsonText, setPastedJsonText] = useState('');
 
-            const getSafetyStatus = (deliveryDate) => {
-                if (!deliveryDate) return { label: '❌ غير مجهز سابقاً', type: 'due-never', color: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
-                const delivery = new Date(deliveryDate + 'T00:00:00');
-                if (isNaN(delivery.getTime())) return { label: '❌ غير مجهز سابقاً', type: 'due-never', color: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
-                
-                const now = new Date();
-                const diffTime = Math.abs(now - delivery);
-                const diffMonths = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30.4375));
-                
-                // البدلة: سنة واحدة (12 شهر) والإنذار المبكر قبل شهرين (10 أشهر)
-                // حذاء السلامة: سنتين (24 شهر) والإنذار المبكر قبل شهرين (22 شهر)
-                
-                if (diffMonths >= 24) {
-                    // متأخر التجديد في كليهما
-                    return { label: `❌ متأخر التجديد (بدلة + حذاء) - منذ ${diffMonths} شهر`, type: 'due-both', color: 'bg-red-50 text-red-700 border-red-200 animate-pulse font-bold' };
-                } else if (diffMonths >= 22) {
-                    // يستحق التجهيز الجديد للحذاء والبدلة متأخرة
-                    return { label: `⚠️ يستحق التجهيز الجديد (حذاء + بدلة) - الاستحقاق قريب`, type: 'alert-both', color: 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse font-bold' };
-                } else if (diffMonths >= 12) {
-                    // متأخر البدلة فقط، الحذاء مجهز (متبقي له أكثر من شهرين)
-                    const shoesRemaining = 24 - diffMonths;
-                    return { label: `❌ متأخر البدلة (منذ ${diffMonths} شهر) | حذاء مجهز (متبقي ${shoesRemaining} شهر)`, type: 'due-uniform', color: 'bg-orange-50 text-orange-700 border-orange-200 animate-pulse font-bold' };
-                } else if (diffMonths >= 10) {
-                    // إنذار مبكر للبدلة، الحذاء مجهز
-                    const uniformRemaining = 12 - diffMonths;
-                    const shoesRemaining = 24 - diffMonths;
-                    return { label: `⚠️ يستحق التجهيز (البدلة) - متبقي ${uniformRemaining} شهر | حذاء مجهز (${shoesRemaining} شهر)`, type: 'alert-uniform', color: 'bg-amber-50 text-amber-700 border-amber-200 font-bold' };
-                } else {
-                    // كلاهما مجهز بشكل تام وآمن
-                    const uniformRemaining = 12 - diffMonths;
-                    const shoesRemaining = 24 - diffMonths;
-                    return { label: `✅ مجهز ومحمي (بدلة متبقي ${uniformRemaining} شهر | حذاء متبقي ${shoesRemaining} شهر)`, type: 'ok', color: 'bg-green-50 text-green-700 border-green-200 font-bold' };
-                }
-            };
-            const isInSafetyRoster = (s) => s.gender === 'ذكر' && s.status === 'نشط' && s.jobNumber !== '811645'; // استثناء فلاح مهدي (إداري)
-            // «مستحق التجديد» من جُهِّز سابقاً وحان تجديده أو اقترب؛ من لم يُجهَّز قط فئة مستقلة.
-            // كانا فلتراً واحداً، وحين يكون أغلب الملاك بلا تاريخ تجهيز يبقى الجدول كما هو تقريباً فيبدو الزر معطلاً
-            const safetyFilterGroup = (s) => {
-                const type = getSafetyStatus(s.lastSafetyDelivery).type;
-                return type === 'ok' ? 'ok' : type === 'due-never' ? 'never' : 'renewal';
-            };
+ // استثناء فلاح مهدي (إداري)
 
             // تطبيق تاريخ تجهيز (أو مسحه بقيمة فارغة) على المحددين، مع حفظ تواريخهم السابقة للتراجع
             const applySafetyDate = (ids, dateVal) => {
@@ -3853,22 +3779,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 address: 'عنوان السكن'
             };
 
-            // ===== الفترات المؤرخة في الدمج =====
-            // الفترات لا تُقارَن كحقل: كل فترة سجلّ بمعرّف، وموظفة لا يختلف أي حقل لها قد تختلف فترتها
-            // (هكذا غابت «إجازة بدون راتب» عن نافذة المزامنة ولم تنتقل حتى بعد «تحديد الكل»).
-            // قاعدة صاحب النظام: الفترة المؤرخة لا تضيع بالدمج. ما في الملف وحده يُعرض منبَّهاً عليه، وما لدى
-            // الجهاز وحده يبقى منبَّهاً عليه — فغيابها عن نسخةٍ قد يعني موقفاً قديماً لم يُدخَل فيها بعد —
-            // وكل اختلاف يُعرض ليُختار ما يُنفَّذ وما يُلغى.
-            // الافتراض مبني على الخطر كالحقول: ما لا يمسّ شيئاً لديك كسبٌ فيُؤشَّر؛ وما يمسّ فترة أو حالة
-            // غير مؤرخة أو يوماً مثبَّتاً لديك، أو يغيّر فترة لديك، يبقى بلا تأشير.
-            const periodEndOf = (p) => (p && p.to) ? p.to : '9999-12-31';
-            // تداخل تواريخ صارم: النهاية الفارغة مفتوحة، والفترتان المتتاليتان لا تتداخلان
-            const periodsOverlap = (a, b) => a.from <= periodEndOf(b) && b.from <= periodEndOf(a);
-            // هوية الفترة: معرّفها، أو نوعها وتواريخها إن كانت قديمة بلا معرّف — فلا تتطابق فترتان لمجرد غياب معرّفيهما
-            const periodIdentityOf = (p) => p.id || ('~' + [p.type, p.from, p.to || ''].join('|'));
-            const periodMergeKeyOf = (jobNumber, p) => `${jobNumber}::${periodIdentityOf(p)}`;
-            const samePeriodDates = (a, b) => a.type === b.type && a.from === b.from && (a.to || '') === (b.to || '');
-            const samePeriodExtras = (a, b) => (a.note || '') === (b.note || '') && !!a.confirmedReturn === !!b.confirmedReturn;
             // نطاق الفترة بالكلمات، والتواريخ معزولة الاتجاه: التاريخ بعد نصّ عربي يُعرض مقلوباً (23-08-2026)
             // والسهم بين تاريخين يشير بصرياً إلى البداية، فيُقرأ النطاق معكوساً
             // ويبقى التاريخ في سطر واحد: المتصفح قد يكسره عند الشرطة («2026-» في آخر السطر و«09-03» في أوله)
@@ -6335,7 +6245,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const periodSpanJsx = (p) => (p && p.to)
                 ? (<React.Fragment><bdi dir="ltr" className="whitespace-nowrap">{p.from}</bdi> ← <bdi dir="ltr" className="whitespace-nowrap">{p.to}</bdi></React.Fragment>)
                 : (<React.Fragment>منذ <bdi dir="ltr" className="whitespace-nowrap">{p ? p.from : ''}</bdi> (مستمرة)</React.Fragment>);
-            const periodPhaseOf = (p, today) => (p && p.to && p.to < today) ? 'منتهية' : ((p && p.from > today) ? 'قادمة' : 'سارية');
 
             React.useEffect(() => {
                 if (!periodHistoryEmpId) return;
@@ -6345,16 +6254,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             }, [periodHistoryEmpId]);
 
 
-            // النهاية تُحتسب من المدة (يوم البداية محسوب ضمنها) أو تُؤخذ من تقويم النهاية مباشرة
-            const quickPeriodEnd = (draft) => {
-                if (!draft || !draft.from) return '';
-                if (draft.mode === 'date') return draft.to || '';
-                const count = parseInt(draft.count, 10);
-                if (!count || count < 1) return '';
-                return draft.unit === 'months'
-                    ? localDateStr(new Date(addMonthsClamped(draft.from, count)).getTime() - 86400000)
-                    : localDateStr(new Date(draft.from).getTime() + (count - 1) * 86400000);
-            };
 
             const changeStatus = (id, newStatus) => {
                 if (!canEdit('staffMaster')) {
