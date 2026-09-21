@@ -23,6 +23,12 @@ if (edition === 'offline') {
   const bad = txt.match(/firebaseio|identitytoolkit|AIza|firebase|googleapis|gstatic/gi);
   if (bad) errors.push(`العزل مخروق: ${[...new Set(bad.map((s) => s.toLowerCase()))].join(', ')} (${bad.length} موضع)`);
 }
+if (edition === 'cloud') {
+  // السحابية يجب أن تحمل روابط Firebase ومفتاح الويب؛ غيابها يعني بناءً ناقصاً دون أي خطأ ظاهر
+  for (const needle of ['firebaseio.com', 'identitytoolkit', 'AIza']) {
+    if (!txt.includes(needle)) errors.push(`السحابية ينقصها ${needle}`);
+  }
+}
 if (errors.length) {
   console.error('FAIL', file, '\n - ' + errors.join('\n - '));
   process.exit(1);
