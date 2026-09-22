@@ -89,13 +89,13 @@ export const parseExcelDate = (excelDate: unknown): string | null => {
             return trimmed;
         }
         
-        // محاولة أخيرة: تحويل باستخدام Date
+        // محاولة أخيرة: تحويل باستخدام Date — صيغ غير قياسية (مثل "Jan 15 2024") يُفسّرها
+        // JS بالتوقيت المحلي لا UTC؛ localDateStr تقرأ بالتوقيت المحلي فتطابق ما فسّره JS
+        // فعلاً بلا انزياح يوم (getUTCDate كانت هنا تُرجع تاريخ الأمس لمستخدم بغداد +3،
+        // نفس عطل toISOString الموثَّق أعلاه في هذا الملف).
         const date = new Date(trimmed);
         if (!isNaN(date.getTime())) {
-            const year = date.getUTCFullYear();
-            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(date.getUTCDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+            return localDateStr(date);
         }
     }
     

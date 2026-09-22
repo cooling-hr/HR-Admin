@@ -6,9 +6,12 @@ export const getSafetyStatus = (deliveryDate?: string | null): SafetyStatus => {
     if (isNaN(delivery.getTime())) return { label: '❌ غير مجهز سابقاً', type: 'due-never', color: 'bg-rose-50 text-rose-700 border-rose-200 font-bold' };
     
     const now = new Date();
-    // التأكيدان يُمحيان عند الترجمة فالناتج Math.abs(now - delivery) حرفياً؛ TypeScript وحدها
-    // ترفض طرح تاريخين، وتحويل التعبير إلى getTime() تغيير في النص لا داعي له هنا.
-    const diffTime = Math.abs((now as unknown as number) - (delivery as unknown as number));
+    // التأكيدان يُمحيان عند الترجمة فالناتج طرح تاريخين حرفياً؛ TypeScript وحدها
+    // ترفض العملية، وتحويلها إلى getTime() تغيير في النص لا داعي له هنا.
+    // Math.max(0, ...) لا Math.abs: تاريخ تجهيز مستقبلي (خطأ إدخال أو تجهيز مُسبَق) يُعامَل
+    // كأنه اليوم (0 شهر منقضي، أي "مجهز بالكامل") لا كأنه بنفس بُعد الماضي زمنياً (كان سابقاً
+    // يظهر تاريخ الغد كـ«متأخر التجديد منذ 0 شهر» بنفس معاملة تاريخ الأمس تماماً).
+    const diffTime = Math.max(0, (now as unknown as number) - (delivery as unknown as number));
     const diffMonths = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30.4375));
     
     // البدلة: سنة واحدة (12 شهر) والإنذار المبكر قبل شهرين (10 أشهر)
