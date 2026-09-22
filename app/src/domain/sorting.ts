@@ -45,32 +45,25 @@ export const getJobRank = (jobTitle?: string | null): number => {
 };
 
 export const sortByJobNumber = (arr: Employee[]): Employee[] => {
-    // أسامة ووسام دائماً في البداية (حسب الرقم الوظيفي)
-    const priorityNumbers = ['49158', '79944'];  // أسامة، وسام
-    
     // تنظيف الرقم الوظيفي (إزالة المسافات والأحرف غير الرقمية)
     const cleanJobNumber = (num?: unknown): string => String(num || '').trim().replace(/\D/g, '');
-    
-    const priorityItems = arr.filter(s => 
-        priorityNumbers.includes(cleanJobNumber(s.jobNumber))
-    );
-    
+    const hasPriority = (s: Employee): boolean => s.globalPriorityRank != null;
+
+    // من يحمل globalPriorityRank يظهر أولاً دائماً (الأصغر أولاً)
+    const priorityItems = arr.filter(hasPriority);
+
     // فصل العقود عن الباقي
-    const contracts = arr.filter(s => 
-        !priorityNumbers.includes(cleanJobNumber(s.jobNumber)) && isContractEmployee(s)
-    );
-    
-    const regularItems = arr.filter(s => 
-        !priorityNumbers.includes(cleanJobNumber(s.jobNumber)) && !isContractEmployee(s)
-    );
-    
-    // ترتيب الأولويات: أسامة (49158) أولاً، ثم وسام (79944)
+    const contracts = arr.filter(s => !hasPriority(s) && isContractEmployee(s));
+
+    const regularItems = arr.filter(s => !hasPriority(s) && !isContractEmployee(s));
+
+    // ترتيب-فرعي بالرقم الوظيفي عند تساوي الأولوية (رتبتان مكرَّرتان خطأً) لضمان ترتيب ثابت
     priorityItems.sort((a, b) => {
-        const indexA = priorityNumbers.indexOf(cleanJobNumber(a.jobNumber));
-        const indexB = priorityNumbers.indexOf(cleanJobNumber(b.jobNumber));
-        return indexA - indexB;
+        const diff = (a.globalPriorityRank ?? 0) - (b.globalPriorityRank ?? 0);
+        if (diff !== 0) return diff;
+        return (parseInt(cleanJobNumber(a.jobNumber)) || 999999) - (parseInt(cleanJobNumber(b.jobNumber)) || 999999);
     });
-    
+
     // ترتيب الباقي حسب الرقم الوظيفي (من الأصغر للأكبر)
     regularItems.sort((a, b) => {
         const numA = parseInt(cleanJobNumber(a.jobNumber)) || 999999;
@@ -91,66 +84,29 @@ export const sortByJobNumber = (arr: Employee[]): Employee[] => {
 
 // دالة الترتيب الهرمي حسب العنوان الوظيفي (للوحدات)
 export const sortByJobTitleHierarchy = (arr: Employee[], unitName: string = ''): Employee[] => {
-    const priorityNumbers = ['49158', '79944'];
     const cleanJobNumber = (num?: unknown): string => String(num || '').trim().replace(/\D/g, '');
-    
-    // أولويات خاصة حسب الوحدة (المسؤولين في كل موقع)
-    const unitPriorities: Record<string, string[]> = {
-        'تبريد باب الزبير': ['نورس', 'حسين صالح', 'اسامه عباس', 'اسيل'],
-        'ورشة التبريد': ['756873', '656698', '722609'], // أمين، سرى، نهلة (بالأرقام)
-        'تبريد المركز الثقافي': ['حازم', 'سناء', 'حسن'],
-        'تبريد المكينة': ['93289', '612456', '698636', '642231', '752894'] // فوزي، محمد عيسى، ايار، محمد ريسان، ذكاء
+
+    // ترتيب-فرعي بالرقم الوظيفي عند تساوي الأولوية (رتبتان مكرَّرتان خطأً) لضمان ترتيب ثابت
+    const byRankThenJobNumber = (rankKey: 'globalPriorityRank' | 'unitPriorityRank') => (a: Employee, b: Employee) => {
+        const diff = (a[rankKey] ?? 0) - (b[rankKey] ?? 0);
+        if (diff !== 0) return diff;
+        return (parseInt(cleanJobNumber(a.jobNumber)) || 999999) - (parseInt(cleanJobNumber(b.jobNumber)) || 999999);
     };
-    
-    // فصل الأولويات العامة (أسامة ووسام)
-    const generalPriorityItems = arr.filter(s => priorityNumbers.includes(cleanJobNumber(s.jobNumber)));
-    let remainingItems = arr.filter(s => !priorityNumbers.includes(cleanJobNumber(s.jobNumber)));
-    
-    // ترتيب الأولويات العامة
-    generalPriorityItems.sort((a, b) => {
-        const indexA = priorityNumbers.indexOf(cleanJobNumber(a.jobNumber));
-        const indexB = priorityNumbers.indexOf(cleanJobNumber(b.jobNumber));
-        return indexA - indexB;
-    });
-    
-    // فصل أولويات الوحدة (المسؤولين)
+
+    // فصل الأولويات العامة (globalPriorityRank — تسبق كل الوحدات)
+    const generalPriorityItems = arr.filter(s => s.globalPriorityRank != null);
+    let remainingItems = arr.filter(s => s.globalPriorityRank == null);
+    generalPriorityItems.sort(byRankThenJobNumber('globalPriorityRank'));
+
+    // فصل أولويات الوحدة (unitPriorityRank — تسبق باقي موظفي نفس الوحدة فقط،
+    // و arr هنا أصلاً مُقتصرة على موظفي وحدة واحدة عبر استدعاء sortByUnit)
     let unitPriorityItems: Employee[] = [];
-    if (unitName && unitPriorities[unitName]) {
-        const priorityNames = unitPriorities[unitName];
-        
-        // استخراج المسؤولين حسب الترتيب
-        priorityNames.forEach(priorityName => {
-            const normalizedPriority = normalizeArabicText(priorityName);
-            
-            // البحث بمرونة: يطابق الرقم الوظيفي أو الاسم
-            const found = remainingItems.find(s => {
-                const normalizedName = normalizeArabicText(s.name);
-                const cleanedJobNum = cleanJobNumber(s.jobNumber);
-                
-                // يطابق إذا:
-                // 1. الرقم الوظيفي يطابق
-                if (cleanedJobNum === priorityName) return true;
-                
-                // 2. الاسم المطلوب جزء من الاسم الكامل
-                if (normalizedName.includes(normalizedPriority)) return true;
-                
-                // 3. أول كلمة من الاسم تطابق
-                if (normalizedPriority.includes(normalizedName.split(' ')[0])) return true;
-                
-                return false;
-            });
-            
-            if (found) {
-                unitPriorityItems.push(found);
-            }
-        });
-        
-        // إزالة المسؤولين من القائمة الرئيسية
-        remainingItems = remainingItems.filter(s => 
-            !unitPriorityItems.some(p => p.id === s.id)
-        );
+    if (unitName) {
+        unitPriorityItems = remainingItems.filter(s => s.unitPriorityRank != null);
+        unitPriorityItems.sort(byRankThenJobNumber('unitPriorityRank'));
+        remainingItems = remainingItems.filter(s => s.unitPriorityRank == null);
     }
-    
+
     const getJobRank = (jobTitle?: string | null): number => {
         const title = normalizeArabicText(jobTitle);
         let mainCategory = 0;
@@ -253,26 +209,19 @@ export const sortByJobTitleHierarchy = (arr: Employee[], unitName: string = ''):
 };
 
 // دالة الترتيب حسب الوحدات (لتبويبة "الكل")
-// دالة لضمان أن أسامة (49158) ووسام (79944) يكونون في البداية دائماً
+// دالة لضمان أن حاملي globalPriorityRank يكونون في البداية دائماً
 export const ensureTopTwo = (arr: Employee[]): Employee[] => {
-    // النوع يحتمل undefined لأن البحث يجري بقيمة emp.jobNumber الخام وقد تكون غائبة — تعريف نوع لا تغيير منطق
-    const topJobNumbers: (string | undefined)[] = ['49158', '79944'];
-    const topEmployees: Employee[] = [];
-    const otherEmployees: Employee[] = [];
-    
-    arr.forEach(emp => {
-        if (topJobNumbers.includes(emp.jobNumber)) {
-            topEmployees.push(emp);
-        } else {
-            otherEmployees.push(emp);
-        }
-    });
-    
-    // ترتيب الموظفين الأوائل: أسامة أولاً، ووسام ثانياً
+    const cleanJobNumber = (num?: unknown): string => String(num || '').trim().replace(/\D/g, '');
+    const topEmployees = arr.filter(emp => emp.globalPriorityRank != null);
+    const otherEmployees = arr.filter(emp => emp.globalPriorityRank == null);
+
+    // ترتيب-فرعي بالرقم الوظيفي عند تساوي الأولوية (رتبتان مكرَّرتان خطأً) لضمان ترتيب ثابت
     topEmployees.sort((a, b) => {
-        return topJobNumbers.indexOf(a.jobNumber) - topJobNumbers.indexOf(b.jobNumber);
+        const diff = (a.globalPriorityRank ?? 0) - (b.globalPriorityRank ?? 0);
+        if (diff !== 0) return diff;
+        return (parseInt(cleanJobNumber(a.jobNumber)) || 999999) - (parseInt(cleanJobNumber(b.jobNumber)) || 999999);
     });
-    
+
     return [...topEmployees, ...otherEmployees];
 };
 

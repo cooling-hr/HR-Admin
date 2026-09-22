@@ -1974,8 +1974,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const [showPasteModal, setShowPasteModal] = useState(false);
             const [pastedJsonText, setPastedJsonText] = useState('');
 
- // استثناء فلاح مهدي (إداري)
-
             // تطبيق تاريخ تجهيز (أو مسحه بقيمة فارغة) على المحددين، مع حفظ تواريخهم السابقة للتراجع
             const applySafetyDate = (ids, dateVal) => {
                 const idSet = new Set(ids);
@@ -2721,7 +2719,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 inCourse: staff.filter(s => s.status === 'في دورة').length,
                 male: staff.filter(s => s.gender === 'ذكر').length,
                 female: staff.filter(s => s.gender === 'أنثى').length,
-                safety: staff.filter(s => s.gender === 'ذكر' && s.status === 'نشط' && s.jobNumber !== '811645').length,
+                safety: staff.filter(isInSafetyRoster).length,
                 missingData: staff.filter(s => getMissingFields(s).length > 0).length
             }), [staff, waterMonth, excludedWaterIds]);
 
@@ -3355,12 +3353,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const exportSafetyEquipment = async () => {
                 if (!(await ensureLibs('xlsx'))) return;
                 try {
-                    // فلترة الموظفين (ذكور نشطين، مع العقود، استثناء الإداريين)
-                    let safetyStaff = staff.filter(s => 
-                        s.gender === 'ذكر' && 
-                        s.status === 'نشط' && 
-                        s.jobNumber !== '811645' // استثناء فلاح مهدي (إداري)
-                    );
+                    // فلترة الموظفين (ذكور نشطين، مع العقود، استثناء الإداريين المعفَين)
+                    let safetyStaff = staff.filter(isInSafetyRoster);
                     
                     // ترتيب حسب الرقم الوظيفي مع العقود في النهاية
                     safetyStaff = sortByJobNumber(safetyStaff);
@@ -6516,13 +6510,14 @@ return (
                                                 </div>
                                             );
 
-                                            const PRIORITY = ['49158', '79944'];
                                             const resSorted = [...res].sort((a, b) => {
-                                                const ai = PRIORITY.indexOf(String(a.jobNumber));
-                                                const bi = PRIORITY.indexOf(String(b.jobNumber));
-                                                if (ai !== -1 && bi !== -1) return ai - bi;
-                                                if (ai !== -1) return -1;
-                                                if (bi !== -1) return 1;
+                                                const ap = a.globalPriorityRank, bp = b.globalPriorityRank;
+                                                if (ap != null && bp != null) {
+                                                    if (ap !== bp) return ap - bp;
+                                                    return (parseInt(String(a.jobNumber || '').replace(/\D/g, '')) || 999999) - (parseInt(String(b.jobNumber || '').replace(/\D/g, '')) || 999999);
+                                                }
+                                                if (ap != null) return -1;
+                                                if (bp != null) return 1;
                                                 return getJobRank(b.jobTitle) - getJobRank(a.jobTitle);
                                             });
 
@@ -10585,6 +10580,42 @@ return (
                                         {/* حُذف «تاريخ آخر تجهيز معدات» من الاستمارة: ليس حالة دائمة للموظف،
                                             ومكانه الطبيعي تبويب السلامة حيث يُسجَّل مع كل تجهيز.
                                             الحقل lastSafetyDelivery نفسه باقٍ في البيانات والاستيراد والتصدير والفلاتر. */}
+
+                                    {/* قسم الأولويات الإدارية — فارغة لمعظم الموظفين، تُضبَط فقط لمن يحتاج
+                                        أولوية ترتيب خاصة أو إعفاء سلامة (كانت أسماء/أرقام مُضمَّنة في الكود العام،
+                                        نُقلت إلى بيانات الموظف نفسه لأن المستودع عام على GitHub) */}
+                                    <div className="col-span-1 md:col-span-2 border-t border-gray-200 pt-6 mt-2">
+                                        <h3 className="text-base font-bold text-gray-800 flex items-center gap-2 mb-4">
+                                            <span>⭐</span>
+                                            <span>أولويات الترتيب والاستثناءات الإدارية (اختياري)</span>
+                                        </h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-2">أولوية عامة تسبق كل الوحدات</label>
+                                                <input type="number" value={editingEmployee.globalPriorityRank ?? ''}
+                                                    onChange={(e) => updateEditField('globalPriorityRank', e.target.value === '' ? undefined : Number(e.target.value))}
+                                                    placeholder="فارغ = بلا أولوية"
+                                                    className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none" />
+                                                <div className="text-xs text-gray-500 mt-1">الرقم الأصغر يظهر أولاً</div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-2">أولوية ضمن وحدته فقط</label>
+                                                <input type="number" value={editingEmployee.unitPriorityRank ?? ''}
+                                                    onChange={(e) => updateEditField('unitPriorityRank', e.target.value === '' ? undefined : Number(e.target.value))}
+                                                    placeholder="فارغ = بلا أولوية"
+                                                    className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none" />
+                                                <div className="text-xs text-gray-500 mt-1">الرقم الأصغر يظهر أولاً</div>
+                                            </div>
+                                            <div className="flex items-end pb-2">
+                                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 cursor-pointer">
+                                                    <input type="checkbox" checked={!!editingEmployee.safetyRosterExempt}
+                                                        onChange={(e) => updateEditField('safetyRosterExempt', e.target.checked)}
+                                                        className="w-4 h-4" />
+                                                    استثناء من قائمة معدات السلامة
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
 
                                         {/* قسم الصورة الشخصية والوثائق الرسمية */}
                                         <div className="col-span-1 md:col-span-2 border-t border-gray-200 pt-6 mt-2">

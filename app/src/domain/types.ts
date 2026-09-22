@@ -45,6 +45,11 @@ export interface Employee {
   squad?: string;
   workType?: string;
   lastModified?: string;
+  // أولوية ترتيب صريحة تتجاوز الترتيب الهرمي الاعتيادي حسب العنوان الوظيفي —
+  // الأصغر يظهر أولاً. اختيارية: تبقى القائمة العادية لمن لا يحمل قيمة هنا.
+  globalPriorityRank?: number;                  // أولوية عامة تسبق كل الوحدات (sortByJobNumber/sortByJobTitleHierarchy/ensureTopTwo)
+  unitPriorityRank?: number;                    // أولوية ضمن وحدته فقط (sortByJobTitleHierarchy)
+  safetyRosterExempt?: boolean;                 // استثناء إداري من قائمة تجهيزات السلامة (isInSafetyRoster)
   [key: string]: unknown;                       // بقية الحقول تُعلَن عند الحاجة
 }
 

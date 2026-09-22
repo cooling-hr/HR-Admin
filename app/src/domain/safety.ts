@@ -37,7 +37,7 @@ export const getSafetyStatus = (deliveryDate?: string | null): SafetyStatus => {
     }
 };
 
-export const isInSafetyRoster = (s: Employee): boolean => s.gender === 'ذكر' && s.status === 'نشط' && s.jobNumber !== '811645';
+export const isInSafetyRoster = (s: Employee): boolean => s.gender === 'ذكر' && s.status === 'نشط' && !s.safetyRosterExempt;
 
 // «مستحق التجديد» من جُهِّز سابقاً وحان تجديده أو اقترب؛ من لم يُجهَّز قط فئة مستقلة.
 // كانا فلتراً واحداً، وحين يكون أغلب الملاك بلا تاريخ تجهيز يبقى الجدول كما هو تقريباً فيبدو الزر معطلاً
