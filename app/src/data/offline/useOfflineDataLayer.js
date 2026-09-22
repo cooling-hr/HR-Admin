@@ -34,6 +34,7 @@ export function useOfflineDataLayer(deps) {
     useState,
   } = deps;
 
+            // ===== نظام إدارة المستخدمين والصلاحيات الديناميكي المخصص للتبويبات (Dynamic Users & Granular RBAC) =====
 const defaultSystemUsers = [
     { 
         id: 'usr_1', 

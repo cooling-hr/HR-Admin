@@ -116,7 +116,12 @@ const dedent = (s, col) => s.split('\n').map((l, i) => (i === 0 ? l : l.startsWi
 const first = regionStatements[0];
 const last = regionStatements[regionStatements.length - 1];
 const col = sf.getLineAndCharacterOfPosition(first.getStart()).character;
-const bodyText = dedent(text.slice(first.getStart(), last.getEnd()), col);
+// first.getStart() يتجاوز التعليقات السابقة للعبارة الأولى (تُعامَل كـ"trivia" في AST،
+// لا جزءاً من العبارة) — نسخ النص من هناك كان يُسقِط صامتاً التعليق التوضيحي الذي يسبق
+// أول عبارة في النطاق مباشرة. نبدأ بدل ذلك من نهاية سطر علامة @data-layer:start نفسها،
+// فيُنسَخ كل شيء بعدها حرفياً (تعليقات وعبارات) بلا تمييز — مطابق لمعنى "بين العلامتين".
+const bodyStart = text.indexOf('\n', startMarkerPos) + 1;
+const bodyText = dedent(text.slice(bodyStart, last.getEnd()), col);
 
 const hookName = `use${edition[0].toUpperCase()}${edition.slice(1)}DataLayer`;
 const params = [...paramsSet].sort();
@@ -171,7 +176,9 @@ ${params.map((p) => `${' '.repeat(col + 4)}${p},`).join('\n')}
 ${' '.repeat(col)}});
 `;
 
-const newText = text.slice(0, first.getStart()) + callSrc + text.slice(last.getEnd());
+// يبدأ الاستبدال من bodyStart لا first.getStart() لنفس السبب أعلاه — وإلا بقي التعليق
+// السابق لأول عبارة في مكانه هنا (فيتكرر: مرة في App.jsx ومرة داخل الـhook)
+const newText = text.slice(0, bodyStart) + callSrc + text.slice(last.getEnd());
 // نسبي مبني بـpath.relative لا بسلسلة نصية يدوية — عدد مستويات ../ يعتمد على عمق مجلد
 // النسخة، وخطأ يدوي هنا سبق أن أنتج مساراً غير موجود (src/editions/data/... بدل src/data/...)
 let hookImportRel = path.relative(path.dirname(file), hookFile).replace(/\\/g, '/');

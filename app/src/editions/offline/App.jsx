@@ -730,8 +730,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             // ----------------------------------------------------
             
             // @data-layer:start
-            // ===== نظام إدارة المستخدمين والصلاحيات الديناميكي المخصص للتبويبات (Dynamic Users & Granular RBAC) =====
-                        const {
+            const {
                 fb_DB_URL: FIREBASE_DB_URL,
                 activeSessions,
                 availableSnapshots,
