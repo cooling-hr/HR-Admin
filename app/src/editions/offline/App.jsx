@@ -728,6 +728,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             // محرك المزامنة حياً مع السيرفر المحلي للشعبة (Local Live Sync Engine)
             // ----------------------------------------------------
             
+            // @data-layer:start
             // ===== نظام إدارة المستخدمين والصلاحيات الديناميكي المخصص للتبويبات (Dynamic Users & Granular RBAC) =====
             const defaultSystemUsers = [
                 { 
@@ -1701,6 +1702,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     pushDataToServer();
                 }
             }, [staff, officialHolidays, hourlyLeaveRecords, overtimeHoursRecords, dailyStatusOverrides, anchorDate, dataEntryOperator]);
+            // @data-layer:end
 
 
 
