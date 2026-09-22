@@ -84,6 +84,13 @@ const sf = ts.createSourceFile(file, text, ts.ScriptTarget.ES2020, true, ts.Scri
 const startMarkerPos = text.indexOf('@data-layer:start');
 const endMarkerPos = text.indexOf('@data-layer:end');
 if (startMarkerPos === -1 || endMarkerPos === -1) { console.error('علامتا الحدود غير موجودتين — نفّذ المهمة 1 أولاً'); process.exit(1); }
+// الأداة ليست idempotent: تشغيلها مرة ثانية بعد --write يجعل استدعاء الـhook نفسه هو
+// "النطاق" (العلامتان تبقيان في مكانهما)، فتعيد كتابة ملف الـhook بمحتوى دائري فاسد.
+// حارس صريح بدل اكتشاف العطل لاحقاً بصمت (ملاحظة Codex، مرحلة 2أ)
+if (write && text.slice(startMarkerPos, endMarkerPos).includes('DataLayer(')) {
+  console.error('يبدو أن هذا الملف مُستخرَج مسبقاً (النطاق بين العلامتين يحوي استدعاء hook) — الأداة ليست idempotent، لا تُعِد تشغيلها بـ--write على ملف مُستخرَج.');
+  process.exit(1);
+}
 
 let comp = null;
 sf.forEachChild((n) => { if (ts.isFunctionDeclaration(n) && n.name?.text === 'StaffSystem') comp = n; });
@@ -135,8 +142,10 @@ const returns = [...returnsSet].sort();
 // القيمة والمتغير المحلي في كل بقية الملف يبقيان بلا أي تغيير؛ فقط مفتاح هذا الحقل الواحد
 // في نقطتي الإرجاع/التفكيك يُستعاض عنه بلقب لا يحوي الكلمة، حصراً في نسخة الأوفلاين.
 const OFFLINE_FORBIDDEN_NAME = /firebaseio|identitytoolkit|aiza|firebase|googleapis|gstatic/i;
+// الاستبدال يزيل كل الأنماط المحظورة من المفتاح، لا "firebase" فقط — ملاحظة Codex: اسم
+// يطابق aiza/googleapis/gstatic بلا احتواء "firebase" كان سيفلت من إعادة التسمية القديمة
 const bundleEntry = (name) => (edition === 'offline' && OFFLINE_FORBIDDEN_NAME.test(name))
-  ? `${name.replace(/firebase/gi, 'fb')}: ${name}`
+  ? `${name.replace(/firebaseio|identitytoolkit|aiza|firebase|googleapis|gstatic/gi, 'fb')}: ${name}`
   : name;
 
 // هذا النطاق لم يكن مفحوصاً بصرامة من قبل (كان جزءاً من App.jsx حيث checkJs: false)، ويحوي
