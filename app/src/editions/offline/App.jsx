@@ -730,7 +730,61 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             // ----------------------------------------------------
             
             // @data-layer:start
-            const {
+
+            // @data-layer:end
+
+
+
+
+            React.useEffect(() => {
+                setSelectedSafetyIds([]);
+                setBulkSafetyDate('');
+                if (view !== 'units') {
+                    setUnitsSubView('roster');
+                }
+            }, [view]);
+            const [search, setSearch] = useState('');
+            const [statsQuery, setStatsQuery] = useState('');
+            const [advancedSearch, setAdvancedSearch] = useState({ jobTitle:'', location:'', unit:'', yearsOfService:'' });
+            const [advancedResults, setAdvancedResults] = useState([]);
+            const [eduSearch, setEduSearch] = useState({ education:'', graduationYear:'', hireYear:'' });
+            const [eduResults, setEduResults] = useState([]);
+
+            // ===== البحث الموحد =====
+            const [unifiedQuery, setUnifiedQuery] = useState('');
+            const [unifiedFilters, setUnifiedFilters] = useState({ location:'', unit:'', selectedUnits:[], workType:'', education:'', yearsOfService:'', graduationYear:'', hireYear:'', gender:'', hasMissingInfo:'' });
+            const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+            // نتائج البحث والاستعلام تُحسب مرة واحدة عند الضغط على "بحث" وتُخزَّن كلقطة.
+            // لكن الحفظ يُنشئ كائناً جديداً للموظف داخل staff، فتبقى اللقطة ممسكة بالكائن القديم
+            // وتعرض بياناته السابقة حتى إعادة تحميل الصفحة. لذا تُخزَّن اللقطة خاماً، ويُعاد
+            // ربطها بأحدث نسخة من كل موظف عند كل رسم، مع إسقاط من حُذف من الملاك.
+            const [unifiedResultsRaw, setUnifiedResults] = useState(null);
+            const unifiedResults = useMemo(() => {
+                if (unifiedResultsRaw === null) return null;
+                const byId = new Map(staff.map(s => [s.id, s]));
+                return unifiedResultsRaw.map(r => (r && r.id) ? byId.get(r.id) : r).filter(Boolean);
+            }, [unifiedResultsRaw, staff]);
+            const [editingEmployee, setEditingEmployee] = useState(null);
+            const [selectedEmployeeCard, setSelectedEmployeeCard] = useState(null);
+            // صنف عزل طباعة البطاقة لا يبقى بعد إغلاقها: لو بقي (متصفح لم يُطلق afterprint)
+            // لطبّق عزله على أي طباعة تالية — المصفوفة مثلاً — فأخرجها بيضاء.
+            React.useEffect(() => {
+                if (!selectedEmployeeCard) document.body.classList.remove('printing-card');
+            }, [selectedEmployeeCard]);
+            
+    
+            const [cardFieldsVisibility, setCardFieldsVisibility] = useState({
+                mobile: true,
+                jobNumber: true,
+                workType: true,
+                education: true,
+                bloodType: true,
+                safetySizes: true
+            });
+            const [showFieldCustomizer, setShowFieldCustomizer] = useState(false);
+            const [showEditModal, setShowEditModal] = useState(false);
+            const [showWelcome, setShowWelcome] = useState(true);
+            const [showLoginModal, setShowLoginModal] = useState(false);            const {
                 fb_DB_URL: FIREBASE_DB_URL,
                 activeSessions,
                 availableSnapshots,
@@ -813,60 +867,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 useState,
             });
 
-            // @data-layer:end
-
-
-
-
-            React.useEffect(() => {
-                setSelectedSafetyIds([]);
-                setBulkSafetyDate('');
-                if (view !== 'units') {
-                    setUnitsSubView('roster');
-                }
-            }, [view]);
-            const [search, setSearch] = useState('');
-            const [statsQuery, setStatsQuery] = useState('');
-            const [advancedSearch, setAdvancedSearch] = useState({ jobTitle:'', location:'', unit:'', yearsOfService:'' });
-            const [advancedResults, setAdvancedResults] = useState([]);
-            const [eduSearch, setEduSearch] = useState({ education:'', graduationYear:'', hireYear:'' });
-            const [eduResults, setEduResults] = useState([]);
-
-            // ===== البحث الموحد =====
-            const [unifiedQuery, setUnifiedQuery] = useState('');
-            const [unifiedFilters, setUnifiedFilters] = useState({ location:'', unit:'', selectedUnits:[], workType:'', education:'', yearsOfService:'', graduationYear:'', hireYear:'', gender:'', hasMissingInfo:'' });
-            const [showUnitDropdown, setShowUnitDropdown] = useState(false);
-            // نتائج البحث والاستعلام تُحسب مرة واحدة عند الضغط على "بحث" وتُخزَّن كلقطة.
-            // لكن الحفظ يُنشئ كائناً جديداً للموظف داخل staff، فتبقى اللقطة ممسكة بالكائن القديم
-            // وتعرض بياناته السابقة حتى إعادة تحميل الصفحة. لذا تُخزَّن اللقطة خاماً، ويُعاد
-            // ربطها بأحدث نسخة من كل موظف عند كل رسم، مع إسقاط من حُذف من الملاك.
-            const [unifiedResultsRaw, setUnifiedResults] = useState(null);
-            const unifiedResults = useMemo(() => {
-                if (unifiedResultsRaw === null) return null;
-                const byId = new Map(staff.map(s => [s.id, s]));
-                return unifiedResultsRaw.map(r => (r && r.id) ? byId.get(r.id) : r).filter(Boolean);
-            }, [unifiedResultsRaw, staff]);
-            const [editingEmployee, setEditingEmployee] = useState(null);
-            const [selectedEmployeeCard, setSelectedEmployeeCard] = useState(null);
-            // صنف عزل طباعة البطاقة لا يبقى بعد إغلاقها: لو بقي (متصفح لم يُطلق afterprint)
-            // لطبّق عزله على أي طباعة تالية — المصفوفة مثلاً — فأخرجها بيضاء.
-            React.useEffect(() => {
-                if (!selectedEmployeeCard) document.body.classList.remove('printing-card');
-            }, [selectedEmployeeCard]);
-            
-    
-            const [cardFieldsVisibility, setCardFieldsVisibility] = useState({
-                mobile: true,
-                jobNumber: true,
-                workType: true,
-                education: true,
-                bloodType: true,
-                safetySizes: true
-            });
-            const [showFieldCustomizer, setShowFieldCustomizer] = useState(false);
-            const [showEditModal, setShowEditModal] = useState(false);
-            const [showWelcome, setShowWelcome] = useState(true);
-            const [showLoginModal, setShowLoginModal] = useState(false);
 
             // شاشة الترحيب: Enter يفتح نافذة الدخول كما لو ضُغط الزر — نافذة الدخول نفسها
             // نموذج (form) فيُرسله Enter تلقائياً، فلا حاجة لمعالجة إضافية هناك

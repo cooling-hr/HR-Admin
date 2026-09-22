@@ -123,6 +123,7 @@ const dedent = (s, col) => s.split('\n').map((l, i) => (i === 0 ? l : l.startsWi
 const first = regionStatements[0];
 const last = regionStatements[regionStatements.length - 1];
 const col = sf.getLineAndCharacterOfPosition(first.getStart()).character;
+
 // first.getStart() يتجاوز التعليقات السابقة للعبارة الأولى (تُعامَل كـ"trivia" في AST،
 // لا جزءاً من العبارة) — نسخ النص من هناك كان يُسقِط صامتاً التعليق التوضيحي الذي يسبق
 // أول عبارة في النطاق مباشرة. نبدأ بدل ذلك من نهاية سطر علامة @data-layer:start نفسها،
@@ -133,6 +134,32 @@ const bodyText = dedent(text.slice(bodyStart, last.getEnd()), col);
 const hookName = `use${edition[0].toUpperCase()}${edition.slice(1)}DataLayer`;
 const params = [...paramsSet].sort();
 const returns = [...returnsSet].sort();
+
+// بعض المعاملات قد تُصرَّح بعد النطاق في الملف الأصلي — لا قبله. الكود الأصلي كان يقرؤها
+// فقط داخل إغلاقات (معالجات أحداث) لا تُستدعى إلا لاحقاً، فلا مشكلة زمنية هناك (JS تسمح
+// بإغلاق يشير لتصريح لاحق ما دام لا يُقرأ قبل تنفيذه). لكن استدعاء الـhook بكائن معاملات
+// صريح `{ x }` يقرأ x فوراً وقت الاستدعاء — فإن كان تصريح x لاحقاً هنا، ينفجر التنفيذ بخطأ
+// "Cannot access 'x' before initialization" (TDZ حقيقي رصدته تجربة فعلية في المتصفح، لا
+// tsc ولا البناء). الإصلاح: إن وُجد معامل كهذا، يُنقَل موضع استدعاء الـhook نفسه (لا محتواه)
+// إلى ما بعد آخر تصريح متأخر من هذا النوع — بشرط ألا يُستعمَل أي اسم من مُخرَجات الـhook في
+// الفجوة بين نهاية النطاق الأصلي وموضع الاستدعاء الجديد (وإلا انعكست المشكلة على مُخرَج بدل معامل).
+const declStatementFor = (name) => outsideStatements.find((st) => topLevelDeclaredNames([st]).has(name));
+const forwardDeclStatements = params
+  .map((p) => declStatementFor(p))
+  .filter((st) => st && st.getStart() > endMarkerPos);
+let callInsertPos = last.getEnd();
+if (forwardDeclStatements.length) {
+  const anchor = forwardDeclStatements.reduce((a, b) => (b.getEnd() > a.getEnd() ? b : a));
+  const gapStatements = outsideStatements.filter((st) => st.getStart() >= endMarkerPos && st.getEnd() <= anchor.getEnd());
+  const usedInGap = freeVars(gapStatements, new Set());
+  const unsafe = returns.filter((r) => usedInGap.has(r));
+  if (unsafe.length) {
+    console.error(`تعذّر النقل الآلي: معاملات مُصرَّحة لاحقاً (${forwardDeclStatements.length}) تتطلب تأخير موضع الاستدعاء، لكن مُخرَجات الـhook التالية تُستعمَل في الفجوة قبل ذلك الموضع: ${unsafe.join(', ')}. يحتاج تدخلاً يدوياً.`);
+    process.exit(1);
+  }
+  callInsertPos = anchor.getEnd();
+  console.log(`ملاحظة: ${forwardDeclStatements.length} معاملاً مُصرَّحاً بعد النطاق (${[...new Set(forwardDeclStatements.flatMap((st) => [...topLevelDeclaredNames([st])]))].sort().join(', ')}) — نُقل موضع استدعاء الـhook إلى ما بعد آخر تصريح منها، بلا مساس بمحتوى الفجوة.`);
+}
 
 // اسم مثل FIREBASE_DB_URL (ثابت أوفلاين دائم القيمة الفارغة، مُستعمَل في مسار كود ميت —
 // راجع تقرير المهمة) يُعاد من الـhook عبر مفتاح اختصار {FIREBASE_DB_URL} في بنية الكائن،
@@ -186,8 +213,11 @@ ${' '.repeat(col)}});
 `;
 
 // يبدأ الاستبدال من bodyStart لا first.getStart() لنفس السبب أعلاه — وإلا بقي التعليق
-// السابق لأول عبارة في مكانه هنا (فيتكرر: مرة في App.jsx ومرة داخل الـhook)
-const newText = text.slice(0, bodyStart) + callSrc + text.slice(last.getEnd());
+// السابق لأول عبارة في مكانه هنا (فيتكرر: مرة في App.jsx ومرة داخل الـhook). استدعاء الـhook
+// نفسه يُدرَج عند callInsertPos لا مباشرة بعد النطاق — إن وُجدت معاملات مُصرَّحة لاحقاً
+// (أعلاه)، تبقى عبارات الفجوة (last.getEnd() .. callInsertPos) في مكانها الأصلي بلا تغيير،
+// ويُدرَج الاستدعاء بعدها مباشرة بدل قبلها.
+const newText = text.slice(0, bodyStart) + text.slice(last.getEnd(), callInsertPos) + callSrc + text.slice(callInsertPos);
 // نسبي مبني بـpath.relative لا بسلسلة نصية يدوية — عدد مستويات ../ يعتمد على عمق مجلد
 // النسخة، وخطأ يدوي هنا سبق أن أنتج مساراً غير موجود (src/editions/data/... بدل src/data/...)
 let hookImportRel = path.relative(path.dirname(file), hookFile).replace(/\\/g, '/');
