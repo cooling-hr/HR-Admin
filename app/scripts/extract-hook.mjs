@@ -157,6 +157,16 @@ if (forwardDeclStatements.length) {
     console.error(`تعذّر النقل الآلي: معاملات مُصرَّحة لاحقاً (${forwardDeclStatements.length}) تتطلب تأخير موضع الاستدعاء، لكن مُخرَجات الـhook التالية تُستعمَل في الفجوة قبل ذلك الموضع: ${unsafe.join(', ')}. يحتاج تدخلاً يدوياً.`);
     process.exit(1);
   }
+  // نقل الاستدعاء عبر عبارات تحكّم (if/return/throw/حلقات) على مستوى المكوّن مباشرة قد
+  // يجعله شرطياً أو يُبدِّل ترتيب أثر جانبي على استدعاء hooks أخرى تسبقه — كلاهما مخاطرة
+  // منفصلة عن TDZ لا يغطيها فحص المُخرَجات أعلاه (ملاحظة Codex). الفجوة هنا آمنة فقط إن
+  // كانت كل عباراتها تعبيرية (نداءات hooks/تأثيرات غير مشروطة) أو تصريحات متغيّرات.
+  const controlFlowKinds = new Set([ts.SyntaxKind.IfStatement, ts.SyntaxKind.ReturnStatement, ts.SyntaxKind.ThrowStatement, ts.SyntaxKind.ForStatement, ts.SyntaxKind.ForOfStatement, ts.SyntaxKind.ForInStatement, ts.SyntaxKind.WhileStatement, ts.SyntaxKind.DoStatement, ts.SyntaxKind.SwitchStatement, ts.SyntaxKind.TryStatement]);
+  const hasControlFlow = gapStatements.some((st) => controlFlowKinds.has(st.kind));
+  if (hasControlFlow) {
+    console.error('تعذّر النقل الآلي: الفجوة بين نهاية النطاق وآخر تصريح متأخر تحوي عبارة تحكّم (if/return/throw/حلقة) على مستوى المكوّن — نقل الاستدعاء عبرها قد يجعله شرطياً أو يبدّل ترتيب hooks أخرى. يحتاج تدخلاً يدوياً.');
+    process.exit(1);
+  }
   callInsertPos = anchor.getEnd();
   console.log(`ملاحظة: ${forwardDeclStatements.length} معاملاً مُصرَّحاً بعد النطاق (${[...new Set(forwardDeclStatements.flatMap((st) => [...topLevelDeclaredNames([st])]))].sort().join(', ')}) — نُقل موضع استدعاء الـhook إلى ما بعد آخر تصريح منها، بلا مساس بمحتوى الفجوة.`);
 }
