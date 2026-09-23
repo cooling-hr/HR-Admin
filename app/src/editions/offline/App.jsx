@@ -3749,7 +3749,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     }
                     const newRequest = {
                         id: 'del_req_' + Date.now(),
-                        requestedBy: dataEntryOperator || 'الإداري المُدخل',
+                        requestedBy: currentUserName || dataEntryOperator || 'الإداري المُدخل',
                         reason: reason.trim(),
                         timestamp: new Date().toLocaleString('ar-IQ'),
                         status: 'pending'
