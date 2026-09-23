@@ -1810,6 +1810,8 @@ const authorizeWipeApproval = () => confirm('⚠️ هل توافق رسمياً
 
 // مفتاح جلسة المستخدم في activeSessions: معرّف الحساب الموثّق لا المعرّف المحلي usr_<وقت>.
 const sessionKeyFor = (u) => u.uid;
+// صاحب الجلسة الحالية: صفّه يُظهر «أنت» بدل زر فك القفل.
+const isSelfUser = (u) => u.uid === currentUserIdRef.current;
 
   return {
     activeSessions,
@@ -1850,6 +1852,7 @@ const sessionKeyFor = (u) => u.uid;
     isInitialCloudLoadCompleteRef,
     isLoadingSnapshots,
     isSyncingRef,
+    isSelfUser,
     knownServerUpdateRef,
     lockedSections,
     logAuditEvent,

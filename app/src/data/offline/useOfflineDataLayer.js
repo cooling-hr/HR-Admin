@@ -1044,6 +1044,8 @@ const authorizeWipeApproval = () => {
 
 // مفتاح جلسة المستخدم في activeSessions: المعرّف المحلي هنا، ومعرّف الحساب الموثّق سحابياً.
 const sessionKeyFor = (u) => u.id;
+// لا تمييز لصاحب الجلسة في جدول المستخدمين هنا: زر فك القفل يظهر لكل صف كما كان.
+const isSelfUser = () => false;
 
 // لا سجل تدقيق ولا قفل أقسام ولا حزمة سحابية في هذه النسخة. قيم خاملة تُبقي نصّ الجسم
 // المشترك واحداً بلا شرط، وسلوك الأوفلاين كما هو: pushDataToCloud يعود فوراً هنا أصلاً.
@@ -1085,6 +1087,7 @@ const setShowSyncModal = () => {};
     isInitialCloudLoadCompleteRef,
     isLoadingSnapshots,
     isSyncingRef,
+    isSelfUser,
     lockedSections,
     logAuditEvent,
     loginError,

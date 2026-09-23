@@ -632,3 +632,26 @@ export const UserRowCredentialCell = ({ ctx }) => {
         </>
     );
 };
+
+
+// النصوص التي تختلف بالنسخة. تبقى هنا لا في الجسم المشترك: ثلاثة منها تذكر Firebase
+// صراحةً، ولو وُضعت في شرط داخل الجسم لدخلت حزمة الأوفلاين ولأوقف فحصُ العزل البناء.
+export const editionTexts = {
+    loginSubtitle: 'الدخول بحساب موثّق عبر Firebase — تُحدَّد صلاحياتك آلياً حسب الدور المسند لحسابك',
+    userManagementSubtitle: 'ربط المستخدمين بحسابات Firebase وتعيين أدوارهم وصلاحياتهم مع المزامنة السحابية الحية',
+    credentialColumn: 'معرّف Firebase (UID)',
+    userManagementCard: 'ربط الحسابات وتعيين الأدوار والصلاحيات',
+};
+
+// أنواع الصلاحية أربعة هنا: يُضاف دور «إداري» (manager) الذي لا وجود له أوفلاين.
+export const RoleOptions = () => (
+    <>
+    <option value="operator">✍️ مُدخل بيانات (صلاحيات مخصصة حسب التبويبات)</option>
+    <option value="manager">🛡️ إداري (تعديل كل الأقسام بلا إدارة حسابات ولا استعادة)</option>
+    <option value="admin">👑 مدير النظام (كامل الصلاحيات والحذف)</option>
+    <option value="viewer">👁️ مستعرض (عرض وطباعة وبحث فقط)</option>
+    </>
+);
+
+export const DeviceAdminPinPanel = () => null;   // لا رمز مدير محلي: الدخول بحساب موثّق
+export const RevealPinsToggle = () => null;      // كلمات المرور لا تُخزَّن هنا فلا تُكشَف

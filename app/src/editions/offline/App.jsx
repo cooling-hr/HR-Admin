@@ -845,6 +845,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 isDarkTheme,
                 isInitialCloudLoadCompleteRef,
                 isLoadingSnapshots,
+                isSelfUser,
                 isSyncingRef,
                 knownServerUpdateRef,
                 lockedSections,
@@ -859,6 +860,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 pushDataToServer,
                 revealedPinUsers,
                 selectedSnapshotPreview,
+                sessionKeyFor,
                 setCurrentUserRole,
                 setDevicePinLock,
                 setIsDarkTheme,
@@ -5543,11 +5545,11 @@ return (
                             </button>
                             <div className="text-4xl mb-2">🔐</div>
                             <h2 className="text-2xl font-black">تسجيل الدخول للنظام</h2>
-                            <p className="text-xs text-blue-200 mt-1">يتعرف النظام آلياً على صفة المستخدم فور إدخال كلمة المرور الخاص به</p>
+                            <p className="text-xs text-blue-200 mt-1">{AuthViews.editionTexts.loginSubtitle}</p>
                         </div>
 
                         <form onSubmit={handleLogin} className="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
-                            <AuthViews.LoginFields ctx={{ loginInputPin, setLoginInputPin, loginError, isCheckingLogin, setShowLoginModal, setShowWelcome, setCurrentUserRole, safeStorage }} />
+                            <AuthViews.LoginFields ctx={{ loginInputPin, setLoginInputPin, loginEmail, setLoginEmail, loginPassword, setLoginPassword, showLoginPassword, setShowLoginPassword, loginError, isCheckingLogin, pendingTakeover, confirmSessionTakeover, cancelSessionTakeover, setShowLoginModal, setShowWelcome, setCurrentUserRole, safeStorage }} />
                         </form>
                     </div>
                 </div>
@@ -5566,7 +5568,7 @@ return (
                                         <span>إدارة الحسابات وصلاحيات المستخدمين</span>
                                         <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">خاص بالمدير 👑</span>
                                     </h3>
-                                    <p className="text-xs text-slate-300 mt-0.5">إضافة وتعديل المستخدمين وتعيين الصلاحيات وكلمات المرور مع المزامنة السحابية الحية</p>
+                                    <p className="text-xs text-slate-300 mt-0.5">{AuthViews.editionTexts.userManagementSubtitle}</p>
                                 </div>
                             </div>
                             <button
@@ -5581,21 +5583,7 @@ return (
                         </div>
 
                         <div id="userModalScrollBody" className="p-5 md:p-6 space-y-6 max-h-[80vh] overflow-y-auto scroll-smooth">
-                            {currentUserRole === 'admin' && (
-                                <div className="p-4 rounded-2xl border border-amber-300 bg-amber-50 flex flex-wrap items-center justify-between gap-3">
-                                    <div>
-                                        <div className="text-xs font-black text-amber-900">🔐 رمز مدير هذا الجهاز (النسخة الأوفلاين)</div>
-                                        <div className="text-[11px] text-amber-700 mt-0.5">رمز طوارئ محلي من 4 أرقام لهذا الجهاز فقط، مستقل عن حسابات المستخدمين أدناه. الحالي: <span className="font-mono font-black">{getLocalOfflineAdminPin()}</span></div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => updateLocalOfflineAdminPin(prompt('أدخل رمزاً جديداً من 4 أرقام لمدير هذا الجهاز:'))}
-                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black transition cursor-pointer"
-                                    >
-                                        ✏️ تغيير الرمز
-                                    </button>
-                                </div>
-                            )}
+                            <AuthViews.DeviceAdminPinPanel ctx={{ currentUserRole, getLocalOfflineAdminPin, updateLocalOfflineAdminPin }} />
                             {/* نموذج إضافة / تعديل مستخدم */}
                             <form
                                 id="userEditFormSection"
@@ -5646,13 +5634,11 @@ return (
                                             onChange={(e) => setUserFormRole(e.target.value)}
                                             className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-800 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition shadow-sm cursor-pointer"
                                         >
-                                            <option value="operator">✍️ إداري مُدخل (صلاحيات مخصصة حسب التبويبات)</option>
-                                            <option value="admin">👑 مدير النظام (كامل الصلاحيات والحذف)</option>
-                                            <option value="viewer">👁️ مستعرض (عرض وطباعة وبحث فقط)</option>
+                                            <AuthViews.RoleOptions />
                                         </select>
                                     </div>
 
-                                    <AuthViews.UserCredentialFields ctx={{ userFormPin, setUserFormPin }} />
+                                    <AuthViews.UserCredentialFields ctx={{ editingUserId, userFormPin, setUserFormPin, userFormManualUid, setUserFormManualUid, userFormUid, setUserFormUid, userFormLocalPart, setUserFormLocalPart, userFormPassword, setUserFormPassword, userFormPriority, setUserFormPriority }} />
 
                                     {/* مربعات اختيار صلاحيات التعديل للتبويبات (Granular Tab Permissions) */}
                                     {userFormRole === 'operator' && (
@@ -5737,13 +5723,7 @@ return (
                                         <span>📋 قائمة المستخدمين المعرفين بالنظام:</span>
                                         <span className="text-[11px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold">{systemUsers.length} مستخدم</span>
                                     </span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowUserPins(!showUserPins)}
-                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
-                                    >
-                                        <span>{showUserPins ? '🙈 إخفاء كلمات المرور' : '👁️ إظهار كلمات المرور'}</span>
-                                    </button>
+                                    <AuthViews.RevealPinsToggle ctx={{ showUserPins, setShowUserPins }} />
                                 </div>
 
                                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
@@ -5754,7 +5734,7 @@ return (
                                                     <th className="p-3 font-black text-center w-10">ت</th>
                                                     <th className="p-3 font-black">اسم المستخدم</th>
                                                     <th className="p-3 font-black text-center">الصلاحية</th>
-                                                    <th className="p-3 font-black text-center">كلمة المرور</th>
+                                                    <th className="p-3 font-black text-center">{AuthViews.editionTexts.credentialColumn}</th>
                                                     <th className="p-3 font-black text-center">الحساب</th>
                                                     <th className="p-3 font-black text-center">الجلسة النشطة</th>
                                                     <th className="p-3 font-black text-center w-28">الإجراءات</th>
@@ -5779,11 +5759,11 @@ return (
                                                     else if (u.role === 'manager') roleBadge = <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-teal-50 text-teal-900 border border-teal-300">🛡️ إداري</span>;
                                                     else if (u.role === 'viewer') roleBadge = <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">👁️ مستعرض (اطلاع فقط)</span>;
 
-                                                    const userSess = activeSessions && activeSessions[u.id];
+                                                    // مفتاح الجلسة يأتي من الطبقة: المعرّف المحلي أوفلاين، ومعرّف الحساب الموثّق سحابياً
+                                                    const userSess = (sessionKeyFor(u) && activeSessions) ? activeSessions[sessionKeyFor(u)] : null;
                                                     const isOnline = userSess && userSess.lastSeen && (Date.now() - userSess.lastSeen < 15000);
 
                                                     const isCurrentlyEditing = editingUserId === u.id;
-                                                    const isPinRevealed = showUserPins || !!revealedPinUsers[u.id];
 
                                                     return (
                                                         <tr 
@@ -5808,7 +5788,7 @@ return (
                                                             </td>
                                                             <td className="p-3 text-center">{roleBadge}</td>
                                                             <td className="p-3 text-center font-mono font-black text-slate-700">
-                                                                <AuthViews.UserRowCredentialCell ctx={{ u, isPinRevealed, revealedPinUsers, setRevealedPinUsers }} />
+                                                                <AuthViews.UserRowCredentialCell ctx={{ u, showUserPins, revealedPinUsers, setRevealedPinUsers }} />
                                                             </td>
                                                             <td className="p-3 text-center">
                                                                 <button
@@ -5831,14 +5811,20 @@ return (
                                                                             <span>🟢</span>
                                                                             <span>متصل الآن</span>
                                                                         </span>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleForceEvictSession(u.id, u.name)}
-                                                                            title="إنهاء الجلسة وفك القفل"
-                                                                            className="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-black transition cursor-pointer border border-rose-300"
-                                                                        >
-                                                                            🔓 فك القفل
-                                                                        </button>
+                                                                        {isSelfUser(u) ? (
+                                                                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
+                                                                                أنت
+                                                                            </span>
+                                                                        ) : (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleForceEvictSession(sessionKeyFor(u), u.name)}
+                                                                                title="إنهاء الجلسة وفك القفل"
+                                                                                className="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 text-[10px] font-black transition cursor-pointer border border-rose-300"
+                                                                            >
+                                                                                🔓 فك القفل
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 ) : (
                                                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
@@ -6882,7 +6868,7 @@ return (
                                                     <span className="w-9 h-9 bg-amber-500 text-white rounded-lg flex items-center justify-center flex-shrink-0 text-base">👥</span>
                                                     <div>
                                                         <div className="font-bold text-amber-900 text-sm">إدارة الحسابات والمستخدمين</div>
-                                                        <div className="text-xs text-amber-700">تعديل الصلاحيات وكلمات المرور والحسابات</div>
+                                                        <div className="text-xs text-amber-700">{AuthViews.editionTexts.userManagementCard}</div>
                                                     </div>
                                                 </button>
                                                 <button onClick={exportBackupJSON} className="w-full flex items-center gap-3 px-4 py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition text-right">

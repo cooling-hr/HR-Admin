@@ -136,7 +136,9 @@ export const UserCredentialFields = ({ ctx }) => {
 
 // خانة الاعتماد في صف المستخدم: الرمز المحلي مع زر كشفه.
 export const UserRowCredentialCell = ({ ctx }) => {
-    const { u, isPinRevealed, revealedPinUsers, setRevealedPinUsers } = ctx;
+    const { u, showUserPins, revealedPinUsers, setRevealedPinUsers } = ctx;
+    // كان يُحسَب في الجسم المشترك؛ نُقل إلى هنا لأن السحابية لا تعرف showUserPins.
+    const isPinRevealed = showUserPins || !!revealedPinUsers[u.id];
     return (
         <>
         <div className="flex items-center justify-center gap-1">
@@ -160,6 +162,65 @@ export const UserRowCredentialCell = ({ ctx }) => {
                 {revealedPinUsers[u.id] ? '🙈' : '👁️'}
             </button>
         </div>
+        </>
+    );
+};
+
+
+// النصوص التي تختلف بالنسخة. تبقى هنا لا في الجسم المشترك: ثلاثة منها تذكر Firebase
+// صراحةً، ولو وُضعت في شرط داخل الجسم لدخلت حزمة الأوفلاين ولأوقف فحصُ العزل البناء.
+export const editionTexts = {
+    loginSubtitle: 'يتعرف النظام آلياً على صفة المستخدم فور إدخال كلمة المرور الخاص به',
+    userManagementSubtitle: 'إضافة وتعديل المستخدمين وتعيين الصلاحيات وكلمات المرور مع المزامنة السحابية الحية',
+    credentialColumn: 'كلمة المرور',
+    userManagementCard: 'تعديل الصلاحيات وكلمات المرور والحسابات',
+};
+
+// أنواع الصلاحية المتاحة هنا ثلاثة؛ لا دور «إداري» (manager) في هذه النسخة.
+export const RoleOptions = () => (
+    <>
+    <option value="operator">✍️ إداري مُدخل (صلاحيات مخصصة حسب التبويبات)</option>
+    <option value="admin">👑 مدير النظام (كامل الصلاحيات والحذف)</option>
+    <option value="viewer">👁️ مستعرض (عرض وطباعة وبحث فقط)</option>
+    </>
+);
+
+// لوحة رمز مدير هذا الجهاز: خاصة بالأوفلاين تماماً، لا مقابل لها سحابياً.
+export const DeviceAdminPinPanel = ({ ctx }) => {
+    const { currentUserRole, getLocalOfflineAdminPin, updateLocalOfflineAdminPin } = ctx;
+    return (
+        <>
+        {currentUserRole === 'admin' && (
+            <div className="p-4 rounded-2xl border border-amber-300 bg-amber-50 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <div className="text-xs font-black text-amber-900">🔐 رمز مدير هذا الجهاز (النسخة الأوفلاين)</div>
+                    <div className="text-[11px] text-amber-700 mt-0.5">رمز طوارئ محلي من 4 أرقام لهذا الجهاز فقط، مستقل عن حسابات المستخدمين أدناه. الحالي: <span className="font-mono font-black">{getLocalOfflineAdminPin()}</span></div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => updateLocalOfflineAdminPin(prompt('أدخل رمزاً جديداً من 4 أرقام لمدير هذا الجهاز:'))}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-black transition cursor-pointer"
+                >
+                    ✏️ تغيير الرمز
+                </button>
+            </div>
+        )}
+        </>
+    );
+};
+
+// زر كشف كلمات المرور في قائمة المستخدمين: الرموز محلية هنا فتُكشَف؛ سحابياً لا تُخزَّن.
+export const RevealPinsToggle = ({ ctx }) => {
+    const { showUserPins, setShowUserPins } = ctx;
+    return (
+        <>
+        <button
+            type="button"
+            onClick={() => setShowUserPins(!showUserPins)}
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+        >
+            <span>{showUserPins ? '🙈 إخفاء كلمات المرور' : '👁️ إظهار كلمات المرور'}</span>
+        </button>
         </>
     );
 };
