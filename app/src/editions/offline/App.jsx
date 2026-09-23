@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { useOfflineDataLayer } from '../../data/offline/useOfflineDataLayer.js';
+// يُستورد بالاسم الموحَّد useDataLayer عمداً، كما AuthViews أدناه: يبقى نصّ الاستدعاء
+// داخل الجسم واحداً في النسختين، ويحجبه الـprop حين يصير الجسم مشتركاً في المهمة التالية.
+import { useOfflineDataLayer as useDataLayer } from '../../data/offline/useOfflineDataLayer.js';
 // يُستورد باسم AuthViews عمداً: حين يصير الجسم مشتركاً ويستقبل AuthViews كـprop،
 // يحجب الـprop هذا الاستيراد داخل المكوّن فتبقى مواضع الاستدعاء كما هي بلا تعديل ثانٍ.
 import * as AuthViews from './AuthViews.jsx';
@@ -787,18 +789,45 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const [showFieldCustomizer, setShowFieldCustomizer] = useState(false);
             const [showEditModal, setShowEditModal] = useState(false);
             const [showWelcome, setShowWelcome] = useState(true);
-            const [showLoginModal, setShowLoginModal] = useState(false);            const {
+            const [showLoginModal, setShowLoginModal] = useState(false);
+
+            // رمز الدخول الرباعي — حالات شاشة الدخول السريع وعرض إتاحته بعد أول دخول كامل
+            // الأوفلاين لا يستعمل شيئاً من حالات الرمز أدناه (مكوّناتها المقابلة في AuthViews
+            // تُعيد null)، وتبقى معلنة هنا بلا شرط حتى يظل نصّ الجسم واحداً في النسختين.
+            const [showPinScreen, setShowPinScreen] = useState(false);
+            // الحساب المختار من قائمة الجهاز؛ يُملأ تلقائياً حين يكون على الجهاز حساب واحد فقط
+            const [selectedPinUid, setSelectedPinUid] = useState(null);
+            const [pinInput, setPinInput] = useState('');
+            const [pinError, setPinError] = useState('');
+            const [pinAttempts, setPinAttempts] = useState(0);
+            const [showSetPinOffer, setShowSetPinOffer] = useState(false);
+            const [pendingPinOfferUser, setPendingPinOfferUser] = useState(null);
+
+            // طبقة البيانات: كل نسخة تستوردها في أعلى ملفها باسم useDataLayer، فيبقى نصّ الاستدعاء
+            // هنا واحداً. ما لا تُوفّره نسخة يأتي undefined ولا يقرؤه إلا مكوّن AuthViews الخاص
+            // بالنسخة الأخرى، وهو لا يُركَّب فيها أصلاً.
+            const {
                 fb_DB_URL: FIREBASE_DB_URL,
                 activeSessions,
                 authorizeDirectWipe,
                 authorizeEmployeeDelete,
                 authorizeWipeApproval,
                 availableSnapshots,
+                buildCloudBundle,
+                cancelSessionTakeover,
                 canEdit,
+                clearDevicePinLock,
+                cloudFetch,
+                cloudSyncStatus,
+                confirmSessionTakeover,
+                currentUserIdRef,
                 currentUserName,
+                currentUserPermissions,
                 currentUserRole,
                 editingUserId,
                 fetchAvailableSnapshots,
+                getDevicePinLockFor,
+                getDevicePinLocks,
                 getLocalOfflineAdminPin,
                 handleCancelUserEdit,
                 handleDeleteUser,
@@ -808,6 +837,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 handleLogin,
                 handleLogout,
                 handleOpenUserManagement,
+                handlePinLogin,
                 handleRestoreSnapshot,
                 handleSaveUser,
                 handleToggleUserActive,
@@ -816,35 +846,61 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 isInitialCloudLoadCompleteRef,
                 isLoadingSnapshots,
                 isSyncingRef,
+                knownServerUpdateRef,
+                lockedSections,
+                logAuditEvent,
+                loginEmail,
                 loginError,
                 loginInputPin,
+                loginPassword,
                 pendingDeletionRequest,
+                pendingTakeover,
                 pushDataToCloud,
+                pushDataToServer,
                 revealedPinUsers,
                 selectedSnapshotPreview,
                 setCurrentUserRole,
+                setDevicePinLock,
                 setIsDarkTheme,
+                setLoginEmail,
                 setLoginInputPin,
+                setLoginPassword,
                 setPendingDeletionRequest,
                 setRevealedPinUsers,
                 setSelectedSnapshotPreview,
+                setShowLoginPassword,
                 setShowRestoreCenterModal,
+                setShowSyncModal,
                 setShowUserManagementModal,
                 setShowUserPins,
+                setUserFormLocalPart,
+                setUserFormManualUid,
                 setUserFormName,
+                setUserFormPassword,
                 setUserFormPerms,
                 setUserFormPin,
+                setUserFormPriority,
                 setUserFormRole,
+                setUserFormUid,
+                showLoginPassword,
                 showRestoreCenterModal,
+                showSyncModal,
                 showUserManagementModal,
                 showUserPins,
+                snapshotsError,
+                syncStatus,
                 systemUsers,
                 updateLocalOfflineAdminPin,
+                useAnotherAccount,
+                userFormLocalPart,
+                userFormManualUid,
                 userFormName,
+                userFormPassword,
                 userFormPerms,
                 userFormPin,
+                userFormPriority,
                 userFormRole,
-            } = useOfflineDataLayer({
+            } = useDataLayer({
                 anchorDate,
                 dailyStatusOverrides,
                 dataEntryOperator,
@@ -852,6 +908,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 officialHolidays,
                 overtimeHoursRecords,
                 overtimeIds,
+                pinAttempts,
+                pinInput,
                 safeStorage,
                 setAnchorDate,
                 setDailyStatusOverrides,
@@ -860,7 +918,14 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 setOfficialHolidays,
                 setOvertimeHoursRecords,
                 setOvertimeIds,
+                setPendingPinOfferUser,
+                setPinAttempts,
+                setPinError,
+                setPinInput,
+                setSelectedPinUid,
                 setShowLoginModal,
+                setShowPinScreen,
+                setShowSetPinOffer,
                 setShowWelcome,
                 setStaff,
                 setThreeShiftAnchorSquad,
