@@ -798,8 +798,11 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const [pinAttempts, setPinAttempts] = useState(0);
             const [showSetPinOffer, setShowSetPinOffer] = useState(false);
             const [pendingPinOfferUser, setPendingPinOfferUser] = useState(null);            const {
-                FIREBASE_DB_URL,
+                fb_DB_URL: FIREBASE_DB_URL,
                 activeSessions,
+                authorizeDirectWipe,
+                authorizeEmployeeDelete,
+                authorizeWipeApproval,
                 availableSnapshots,
                 buildCloudBundle,
                 canEdit,
@@ -3635,10 +3638,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     alert('⛔ عذراً، ليس لديك صلاحية حذف منتسبين من الملاك العام!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
                     return;
                 }
-                if (currentUserRole !== 'admin' && currentUserRole !== 'manager') {
-                    alert('⛔ حذف منتسب من الملاك مخصص لمدير النظام والإداري.');
-                    return;
-                }
+                if (!authorizeEmployeeDelete()) return;
                 // تأكيد مزدوج للحذف
                 const firstName = editingEmployee.name.split(' ')[0];
                 const confirmMsg1 = `⚠️ هل أنت متأكد من حذف الموظف؟
@@ -3884,10 +3884,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 }
 
                 // مسار مدير النظام المباشر
-                if (currentUserRole !== 'admin') {
-                    alert('❌ الرمز السري غير صحيح! تم إلغاء العملية للحماية والأمان.');
-                    return;
-                }
+                if (!authorizeDirectWipe()) return;
                 if (confirm('⚠️ تحذير أمني:\n\nهل أنت متأكد تماماً من تفريغ ومسح قاعدة البيانات بالكامل؟\nسيتم تعميم المسح سحابياً على جميع أجهزة الشعبة.')) {
                     executeCompleteDatabaseWipe();
                 }
@@ -5042,7 +5039,7 @@ return (
                                 <>
                                     <button 
                                         onClick={() => {
-                                            if (confirm('⚠️ هل توافق رسمياً على تنفيذ طلب الحذف ومسح كافة البيانات سحابياً؟\n\nهذا الإجراء لا يمكن التراجع عنه.')) {
+                                            if (authorizeWipeApproval()) {
                                                 executeCompleteDatabaseWipe();
                                             }
                                         }}
@@ -8639,10 +8636,7 @@ return (
                                                                     {view === 'all' && (
                                                                         <button
                                                                             onClick={() => {
-                                                                                if (currentUserRole !== 'admin' && currentUserRole !== 'manager') {
-                                                                                    alert('⛔ حذف منتسب من الملاك مخصص لمدير النظام والإداري.');
-                                                                                    return;
-                                                                                }
+                                                                                if (!authorizeEmployeeDelete()) return;
                                                                                 const firstName = s.name.split(' ')[0];
                                                                                 if (confirm(`⚠️ هل أنت متأكد من حذف الموظف؟\n\nالموظف: ${s.name}\nالرقم الوظيفي: ${s.jobNumber}\n\n⚠️ هذه العملية لا يمكن التراجع عنها!`)) {
                                                                                     const userInput = prompt(`⚠️⚠️ تأكيد نهائي ⚠️⚠️\n\nأنت على وشك حذف: ${s.name}\n\nاكتب اسم الموظف الأول (${firstName}) للتأكيد:`);

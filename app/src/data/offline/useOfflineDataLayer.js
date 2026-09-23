@@ -1,9 +1,13 @@
 // نُقل حرفياً من editions/offline/App.jsx بأداة extract-hook.mjs — راجع ذلك الملف قبل
 // أي تعديل يدوي هنا لاحقاً؛ لا منطق جديد أُضيف أثناء النقل.
+
 // .jsx عمداً لا .ts: هذا الكود لم يكن مفحوصاً بصرامة من قبل (checkJs: false في تصريحه
 // الأصلي داخل App.jsx)، وإخضاعه لفحص tsc الآن يحتاج كتابة عشرات الأنواع على منطق مزامنة
 // حسّاس أثبتته التجربة الفعلية لا الأنواع — تقويته بأنواع حقيقية عمل منفصل لاحق مقصود.
 import React from 'react';
+
+// قفل الأقسام ميزة سحابية: كائن فارغ ثابت هنا حتى لا يتغيّر مرجعه بين الرسمات.
+const EMPTY_LOCKED_SECTIONS = {};
 
 export function useOfflineDataLayer(deps) {
   const {
@@ -1008,14 +1012,60 @@ React.useEffect(() => {
     }
 }, [staff, officialHolidays, hourlyLeaveRecords, overtimeHoursRecords, dailyStatusOverrides, anchorDate, dataEntryOperator]);
 
+
+// ===== بوابات الإجراءات الحسّاسة =====
+// نصّ الجسم المشترك واحد: `if (!authorizeX()) return;`. صيغة الإذن تختلف بالنسخة فتبقى
+// هنا في طبقة كل نسخة: الأوفلاين ترمز مدير محلي من أربعة أرقام، والسحابية دور الحساب
+// الموثّق. الرسائل والسلوك منقولة حرفياً كما كانت في الجسم قبل الدمج.
+const authorizeEmployeeDelete = () => {
+    const adminPin = prompt('🔐 يتطلب حذف الموظف إدخال الرمز السري للإداري:');
+    if (!isAdminPin(adminPin)) {
+        alert('❌ الرمز السري غير صحيح! تم إلغاء عملية الحذف للحماية.');
+        return false;
+    }
+    return true;
+};
+const authorizeDirectWipe = () => {
+    const adminPin = prompt('🔐 تأكيد الحذف المباشر: يرجى إدخال الرمز السري لمدير النظام:');
+    if (!isAdminPin(adminPin)) {
+        alert('❌ الرمز السري غير صحيح! تم إلغاء العملية للحماية والأمان.');
+        return false;
+    }
+    return true;
+};
+const authorizeWipeApproval = () => {
+    const pin = prompt('🔐 تأكيد الموافقة على الحذف: أدخل الرمز السري لمدير النظام:');
+    if (!isAdminPin(pin)) {
+        alert('❌ الرمز السري غير صحيح!');
+        return false;
+    }
+    return confirm('⚠️ هل توافق رسمياً على تنفيذ طلب الحذف ومسح كافة البيانات سحابياً؟');
+};
+
+// مفتاح جلسة المستخدم في activeSessions: المعرّف المحلي هنا، ومعرّف الحساب الموثّق سحابياً.
+const sessionKeyFor = (u) => u.id;
+
+// لا سجل تدقيق ولا قفل أقسام ولا حزمة سحابية في هذه النسخة. قيم خاملة تُبقي نصّ الجسم
+// المشترك واحداً بلا شرط، وسلوك الأوفلاين كما هو: pushDataToCloud يعود فوراً هنا أصلاً.
+const logAuditEvent = () => {};
+const buildCloudBundle = (partial) => partial;
+const lockedSections = EMPTY_LOCKED_SECTIONS;
+const showSyncModal = false;
+const setShowSyncModal = () => {};
+
   return {
-    fb_DB_URL: FIREBASE_DB_URL,
     activeSessions,
+    authorizeDirectWipe,
+    authorizeEmployeeDelete,
+    authorizeWipeApproval,
     availableSnapshots,
+    buildCloudBundle,
     canEdit,
+    currentUserIdRef,
     currentUserName,
     currentUserRole,
     editingUserId,
+    fb_DB_URL: FIREBASE_DB_URL,
     fetchAvailableSnapshots,
     getLocalOfflineAdminPin,
     handleCancelUserEdit,
@@ -1035,12 +1085,15 @@ React.useEffect(() => {
     isInitialCloudLoadCompleteRef,
     isLoadingSnapshots,
     isSyncingRef,
+    lockedSections,
+    logAuditEvent,
     loginError,
     loginInputPin,
     pendingDeletionRequest,
     pushDataToCloud,
     revealedPinUsers,
     selectedSnapshotPreview,
+    sessionKeyFor,
     setCurrentUserRole,
     setIsDarkTheme,
     setLoginInputPin,
@@ -1048,6 +1101,7 @@ React.useEffect(() => {
     setRevealedPinUsers,
     setSelectedSnapshotPreview,
     setShowRestoreCenterModal,
+    setShowSyncModal,
     setShowUserManagementModal,
     setShowUserPins,
     setUserFormName,
@@ -1055,6 +1109,7 @@ React.useEffect(() => {
     setUserFormPin,
     setUserFormRole,
     showRestoreCenterModal,
+    showSyncModal,
     showUserManagementModal,
     showUserPins,
     systemUsers,

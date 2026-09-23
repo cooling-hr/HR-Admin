@@ -1790,13 +1790,36 @@ React.useEffect(() => {
     }
 }, [staff, officialHolidays, hourlyLeaveRecords, overtimeHoursRecords, dailyStatusOverrides, anchorDate, dataEntryOperator]);
 
+
+// ===== بوابات الإجراءات الحسّاسة ===== (انظر التعليق المقابل في طبقة الأوفلاين)
+const authorizeEmployeeDelete = () => {
+    if (currentUserRole !== 'admin' && currentUserRole !== 'manager') {
+        alert('⛔ حذف منتسب من الملاك مخصص لمدير النظام والإداري.');
+        return false;
+    }
+    return true;
+};
+const authorizeDirectWipe = () => {
+    if (currentUserRole !== 'admin') {
+        alert('❌ الرمز السري غير صحيح! تم إلغاء العملية للحماية والأمان.');
+        return false;
+    }
+    return true;
+};
+const authorizeWipeApproval = () => confirm('⚠️ هل توافق رسمياً على تنفيذ طلب الحذف ومسح كافة البيانات سحابياً؟\n\nهذا الإجراء لا يمكن التراجع عنه.');
+
+// مفتاح جلسة المستخدم في activeSessions: معرّف الحساب الموثّق لا المعرّف المحلي usr_<وقت>.
+const sessionKeyFor = (u) => u.uid;
+
   return {
-    FIREBASE_DB_URL,
     activeSessions,
+    authorizeDirectWipe,
+    authorizeEmployeeDelete,
+    authorizeWipeApproval,
     availableSnapshots,
     buildCloudBundle,
-    canEdit,
     cancelSessionTakeover,
+    canEdit,
     clearDevicePinLock,
     cloudFetch,
     cloudSyncStatus,
@@ -1806,6 +1829,7 @@ React.useEffect(() => {
     currentUserPermissions,
     currentUserRole,
     editingUserId,
+    fb_DB_URL: FIREBASE_DB_URL,
     fetchAvailableSnapshots,
     getDevicePinLockFor,
     getDevicePinLocks,
@@ -1837,6 +1861,7 @@ React.useEffect(() => {
     pushDataToCloud,
     pushDataToServer,
     selectedSnapshotPreview,
+    sessionKeyFor,
     setCurrentUserRole,
     setDevicePinLock,
     setIsDarkTheme,

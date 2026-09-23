@@ -790,6 +790,9 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const [showLoginModal, setShowLoginModal] = useState(false);            const {
                 fb_DB_URL: FIREBASE_DB_URL,
                 activeSessions,
+                authorizeDirectWipe,
+                authorizeEmployeeDelete,
+                authorizeWipeApproval,
                 availableSnapshots,
                 canEdit,
                 currentUserName,
@@ -808,7 +811,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 handleRestoreSnapshot,
                 handleSaveUser,
                 handleToggleUserActive,
-                isAdminPin,
                 isCheckingLogin,
                 isDarkTheme,
                 isInitialCloudLoadCompleteRef,
@@ -3575,11 +3577,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     alert('⛔ عذراً، ليس لديك صلاحية حذف منتسبين من الملاك العام!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
                     return;
                 }
-                const adminPin = prompt('🔐 يتطلب حذف الموظف إدخال الرمز السري للإداري:');
-                if (!isAdminPin(adminPin)) {
-                    alert('❌ الرمز السري غير صحيح! تم إلغاء عملية الحذف للحماية.');
-                    return;
-                }
+                if (!authorizeEmployeeDelete()) return;
                 // تأكيد مزدوج للحذف
                 const firstName = editingEmployee.name.split(' ')[0];
                 const confirmMsg1 = `⚠️ هل أنت متأكد من حذف الموظف؟
@@ -3822,11 +3820,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 }
 
                 // مسار مدير النظام المباشر
-                const adminPin = prompt('🔐 تأكيد الحذف المباشر: يرجى إدخال الرمز السري لمدير النظام:');
-                if (!isAdminPin(adminPin)) {
-                    alert('❌ الرمز السري غير صحيح! تم إلغاء العملية للحماية والأمان.');
-                    return;
-                }
+                if (!authorizeDirectWipe()) return;
                 if (confirm('⚠️ تحذير أمني:\n\nهل أنت متأكد تماماً من تفريغ ومسح قاعدة البيانات بالكامل؟\nسيتم تعميم المسح سحابياً على جميع أجهزة الشعبة.')) {
                     executeCompleteDatabaseWipe();
                 }
@@ -4968,13 +4962,8 @@ return (
                                 <>
                                     <button 
                                         onClick={() => {
-                                            const pin = prompt('🔐 تأكيد الموافقة على الحذف: أدخل الرمز السري لمدير النظام:');
-                                            if (isAdminPin(pin)) {
-                                                if (confirm('⚠️ هل توافق رسمياً على تنفيذ طلب الحذف ومسح كافة البيانات سحابياً؟')) {
-                                                    executeCompleteDatabaseWipe();
-                                                }
-                                            } else {
-                                                alert('❌ الرمز السري غير صحيح!');
+                                            if (authorizeWipeApproval()) {
+                                                executeCompleteDatabaseWipe();
                                             }
                                         }}
                                         className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black px-4 py-2 rounded-xl shadow-lg transition flex items-center gap-1"
@@ -8560,11 +8549,7 @@ return (
                                                                     {view === 'all' && (
                                                                         <button
                                                                             onClick={() => {
-                                                                                const adminPin = prompt('🔐 يتطلب حذف الموظف إدخال الرمز السري للإداري:');
-                                                                                if (!isAdminPin(adminPin)) {
-                                                                                    alert('❌ الرمز السري غير صحيح! تم إلغاء عملية الحذف للحماية.');
-                                                                                    return;
-                                                                                }
+                                                                                if (!authorizeEmployeeDelete()) return;
                                                                                 const firstName = s.name.split(' ')[0];
                                                                                 if (confirm(`⚠️ هل أنت متأكد من حذف الموظف؟\n\nالموظف: ${s.name}\nالرقم الوظيفي: ${s.jobNumber}\n\n⚠️ هذه العملية لا يمكن التراجع عنها!`)) {
                                                                                     const userInput = prompt(`⚠️⚠️ تأكيد نهائي ⚠️⚠️\n\nأنت على وشك حذف: ${s.name}\n\nاكتب اسم الموظف الأول (${firstName}) للتأكيد:`);
