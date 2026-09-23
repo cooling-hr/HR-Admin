@@ -1,6 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { useOfflineDataLayer } from '../../data/offline/useOfflineDataLayer.js';
+// يُستورد باسم AuthViews عمداً: حين يصير الجسم مشتركاً ويستقبل AuthViews كـprop،
+// يحجب الـprop هذا الاستيراد داخل المكوّن فتبقى مواضع الاستدعاء كما هي بلا تعديل ثانٍ.
+import * as AuthViews from './AuthViews.jsx';
 import { FIELD_NAMES_AR, mergeKeyOf, ownKey, ATTENDANCE_PARTS, isValidAttendanceValue, analyzeMergePeriods, analyzeMergeAttendance, analyzeMerge } from '../../domain/merge';
 import { getJobRank, sortByJobNumber, sortByJobTitleHierarchy, ensureTopTwo, sortByUnit } from '../../domain/sorting';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../../domain/employees';
@@ -868,6 +871,10 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             });
 
 
+            // الوجهة من شاشة الترحيب تختلف بالنسخة، فتأتي من AuthViews: هنا نافذة الدخول
+            // مباشرة، وفي السحابية شاشة الرمز الرباعي إن كان على الجهاز رمز محفوظ.
+            const proceedFromWelcome = AuthViews.makeWelcomeAction({ setShowLoginModal });
+
             // شاشة الترحيب: Enter يفتح نافذة الدخول كما لو ضُغط الزر — نافذة الدخول نفسها
             // نموذج (form) فيُرسله Enter تلقائياً، فلا حاجة لمعالجة إضافية هناك
             React.useEffect(() => {
@@ -875,7 +882,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 const onKeyDown = (e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        setShowLoginModal(true);
+                        proceedFromWelcome();
                     }
                 };
                 window.addEventListener('keydown', onKeyDown);
@@ -4922,7 +4929,7 @@ return (
                                     {/* زر إغلاق بارز */}
                                     <div className="mt-4 animate-fadeInUp-delay1">
                                         <button 
-                                            onClick={() => setShowLoginModal(true)}
+                                            onClick={proceedFromWelcome}
                                             className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-bold text-lg transition-all transform hover:scale-105 shadow-xl border-2 border-white border-opacity-30">
                                             ✓ ابدأ العمل الآن
                                         </button>
@@ -5040,28 +5047,7 @@ return (
                                             {/* طبقة الإغلاق بالنقر خارج القائمة — تحتها في التكديس لا فوقها */}
                                             <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)}></div>
                                             <div className="absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 z-50 text-right animate-fadeIn">
-                                                {currentUserRole === 'admin' && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => { setShowUserMenu(false); handleOpenUserManagement(); }}
-                                                            className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
-                                                            title="إدارة الحسابات والمستخدمين والصلاحيات وكلمات المرور"
-                                                        >
-                                                            <span>👥</span><span>الحسابات والصلاحيات</span>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                setShowUserMenu(false);
-                                                                fetchAvailableSnapshots();
-                                                                setShowRestoreCenterModal(true);
-                                                            }}
-                                                            className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
-                                                            title="مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية"
-                                                        >
-                                                            <span>🛡️</span><span>الأرشيف والاستعادة</span>
-                                                        </button>
-                                                    </>
-                                                )}
+                                                <AuthViews.UserMenuItems ctx={{ currentUserRole, setShowUserMenu, handleOpenUserManagement, fetchAvailableSnapshots, setShowRestoreCenterModal }} />
                                             </div>
                                         </>
                                     )}
@@ -5469,67 +5455,7 @@ return (
                         </div>
 
                         <form onSubmit={handleLogin} className="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
-                            <div className="space-y-1.5">
-                                <label className="block text-xs font-black text-slate-700">🔑 أدخل كلمة المرور الخاصة بك:</label>
-                                <input
-                                    type="password"
-                                    autoFocus
-                                    placeholder="••••"
-                                    value={loginInputPin}
-                                    onChange={(e) => setLoginInputPin(e.target.value)}
-                                    className="w-full bg-slate-50 border-2 border-slate-300 rounded-xl px-4 py-3 text-center text-xl font-mono font-bold text-indigo-900 outline-none focus:border-indigo-600 transition shadow-inner"
-                                />
-                            </div>
-
-                            {loginError && (
-                                <div className="p-3 bg-red-50 border-2 border-red-300 text-red-700 text-xs font-bold rounded-xl text-center whitespace-pre-line leading-relaxed shadow-sm">
-                                    {loginError}
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={isCheckingLogin}
-                                className={`w-full py-3.5 text-white font-bold rounded-xl text-sm shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2 ${
-                                    isCheckingLogin 
-                                        ? 'bg-slate-400 cursor-not-allowed' 
-                                        : 'bg-gradient-to-r from-green-600 via-emerald-600 to-teal-700 hover:from-green-700 hover:to-teal-800 cursor-pointer'
-                                }`}
-                            >
-                                <span>{isCheckingLogin ? '⏳' : '🔓'}</span>
-                                <span>{isCheckingLogin ? 'جارٍ التحقق من الجلسة والصلاحية...' : 'دخول للنظام'}</span>
-                            </button>
-
-                            <div className="text-center pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setCurrentUserRole('viewer');
-                                        setShowWelcome(false);
-                                        setShowLoginModal(false);
-                                    }}
-                                    className="text-xs font-bold text-slate-500 hover:text-indigo-600 hover:underline transition cursor-pointer"
-                                >
-                                    👁️ استمرار كـ (مستعرض فقط) دون كلمة سر
-                                </button>
-                            </div>
-
-                            <div className="pt-3 mt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-                                <span>الإصدار: <strong className="text-slate-600 font-mono">v9.5 Enterprise</strong></span>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        safeStorage.removeItem('systemUsersList');
-                                        safeStorage.removeItem('passwordsConfig');
-                                        window.location.href = window.location.pathname + '?v=' + Date.now();
-                                    }}
-                                    className="text-indigo-600 hover:text-indigo-800 font-bold underline cursor-pointer flex items-center gap-1"
-                                    title="تفريغ ذاكرة التخزين المؤقت وتحميل أحدث كود برمجيات من السحابة"
-                                >
-                                    <span>🔄</span>
-                                    <span>تحديث الكاش والصفحة</span>
-                                </button>
-                            </div>
+                            <AuthViews.LoginFields ctx={{ loginInputPin, setLoginInputPin, loginError, isCheckingLogin, setShowLoginModal, setShowWelcome, setCurrentUserRole, safeStorage }} />
                         </form>
                     </div>
                 </div>
