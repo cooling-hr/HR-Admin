@@ -379,7 +379,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 const t = setTimeout(() => el.classList.remove('tab-enter'), 400);
                 return () => { clearTimeout(t); el.removeEventListener('animationend', onEnd); };
             }, [view]);
-
             // آخر شريحة زارها المستخدم في كل قسم — العودة إلى «الملاك» تعيده إلى شريحته
             // لا إلى «الكل» دائماً، وهو ما يتوقّعه من يعمل على «المناوبين» طوال اليوم
             const [sectionMemory, setSectionMemory] = useState({});
@@ -1058,6 +1057,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             //
             // تجري بعد اكتمال أول تحميل سحابي لا عند أول رسم: التحميل يستبدل staff بالكامل،
             // فتنفيذها قبله يُفقَد فوراً ولا تُعاد المحاولة.
+            // (في الأوفلاين يكتمل التحميل المحلي فوراً، فيمرّ الحارس من أول رسم بلا انتظار فعلي.)
             //
             // تُضبَط القيمة فقط حين تكون غائبة، فلا تنقض ما عدّله المستخدم من الواجهة —
             // عدا حالة واحدة: من يمحو قيمة عمداً تعود إليه عند التحميل التالي. مقبول عمداً
@@ -1208,7 +1208,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 if (activePeriod) {
                     return activePeriod.type;
                 }
-                
+
                 // 2. فحص العطل الرسمية المحددة بالنظام
                 const isOfficialHoliday = officialHolidays.includes(dateStr);
 
@@ -3815,7 +3815,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     stopCamera();
                 }
             };
-            
+
             const addPeriodToEditing = () => {
                 if (!editingEmployee) return;
                 const today = localDateStr();
@@ -4315,7 +4315,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     // current مُستبعد أصلاً بحسب isExcludedFromWater — لا حاجة لتكرار الاستبعاد هنا
                     const morning = current.filter(s => s.workType === 'صباحي');
                     const shift = current.filter(s => s.workType === 'مناوب');
-                    
+
                     // فصل مناوبي الثلاثية (نهر بن عمر) عن الثنائي
                     const shiftThreeDay = shift.filter(s => s.unit === 'تبريد نهر بن عمر');
                     const shiftTwoDay = shift.filter(s => s.unit !== 'تبريد نهر بن عمر');
@@ -5567,9 +5567,9 @@ return (
 
                         <div id="userModalScrollBody" className="p-5 md:p-6 space-y-6 max-h-[80vh] overflow-y-auto scroll-smooth">
                             {/* نموذج إضافة / تعديل مستخدم */}
-                            <form 
-                                id="userEditFormSection" 
-                                onSubmit={handleSaveUser} 
+                            <form
+                                id="userEditFormSection"
+                                onSubmit={handleSaveUser}
                                 className={`p-4 md:p-5 rounded-2xl border transition-all duration-300 ${
                                     editingUserId 
                                         ? 'bg-gradient-to-br from-amber-50 to-orange-50/70 border-amber-400 shadow-md ring-2 ring-amber-400/50' 
@@ -5872,6 +5872,7 @@ return (
                 </div>
             )}
 
+            {/* نافذة مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center Modal) */}
             {showRestoreCenterModal && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden animate-fadeInUp my-auto">
@@ -9189,7 +9190,7 @@ return (
                                             )}
                                         </div>
 
-                                        {/* الخيار الأول: الدمج الذكي */}
+                                        {/* الخيار الأول: تطبيق ما اختاره المستخدم */}
                                         {(() => {
                                             // ملخّص بلا تفاعل: الزرّ الفعلي انتقل إلى الذيل الثابت أسفل النافذة، فلا يبقى الوصول
                                             // إليه مرهوناً بالتمرير حتى آخر القائمة مهما طال عرض الفروقات

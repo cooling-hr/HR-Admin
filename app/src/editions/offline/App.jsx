@@ -1006,7 +1006,9 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             // المفاتيح معرّفات داخلية مُبهمة (emp_<وقت>_<عشوائي>_<فهرس>): لا تكشف اسماً ولا
             // رقماً وظيفياً ولا وحدة، فلا تُعيد بياناتٍ حقيقية إلى المستودع العام.
             //
-            // لا مزامنة سحابية في هذه النسخة، فلا انتظار لتحميل — تكفي ملاحظة وجود بيانات.
+            // تجري بعد اكتمال أول تحميل سحابي لا عند أول رسم: التحميل يستبدل staff بالكامل،
+            // فتنفيذها قبله يُفقَد فوراً ولا تُعاد المحاولة.
+            // (في الأوفلاين يكتمل التحميل المحلي فوراً، فيمرّ الحارس من أول رسم بلا انتظار فعلي.)
             //
             // تُضبَط القيمة فقط حين تكون غائبة، فلا تنقض ما عدّله المستخدم من الواجهة —
             // عدا حالة واحدة: من يمحو قيمة عمداً تعود إليه عند التحميل التالي. مقبول عمداً
@@ -1344,8 +1346,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 const days = isAuto ? getAutoWaterAttendanceDays(groupKey, monthStr) : manualDays;
                 const rate = getWaterSeasonalRate(monthStr);
                 const bottles = headcount * days * rate;
-                // نُقل نفس الإصلاح من index.html: نصف سيت يُقرَّب دائماً للسيت الأقل (318.5 →
-                // 318)، لا يبقى كسراً ولا يُرفع لسيت كامل (انظر التعليق المقابل هناك)
+                // توضيح لاحق من المستخدم: نصف سيت يُقرَّب دائماً للسيت الأقل (318.5 → 318)،
+                // لا يبقى كسراً ولا يُرفع لسيت كامل — لا يُطلَب سيت جزئي من المورّد أصلاً
                 const sets = Math.floor(bottles / 12);
                 const cost = sets * 1000;
                 return { headcount, days, rate, bottles, sets, cost, isAuto };
@@ -1368,6 +1370,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             };
 
 
+            // المبلغ هنا دائماً عدد سيتات (أعداد صحيحة بعد التقريب للأقل أعلاه) × 1000 — نحوّل
+            // عدد السيتات فقط إلى كلمات ونلحقه بـ"ألف"
             const amountToArabicWords = (amount) => {
                 const sets = Math.round(amount / 1000);
                 if (sets <= 0) return 'لا يوجد مبلغ';
@@ -2165,9 +2169,9 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             // أيٌّ منهما لم يُمرَّر ⇒ يُطبَّق كل ما في بابه (سلوك النداءات القديمة، وتوافق خلفي).
             //
             // التحليل يُعاد اشتقاقه هنا عمداً بدل استعمال mergeAnalysis: لو تغيّرت `staff` بين
-            // فتح النافذة والضغط، فالاشتقاق الآن يضمن مطابقة الفروقات للبيانات الحيّة. والمفاتيح
-            // (رقم، حقل) تبقى صالحة، وأي فرق جديد لم يره المستخدم لا مفتاح له في selection
-            // فلا يُطبَّق — الاتجاه الآمن.
+            // فتح النافذة والضغط (وصول مزامنة سحابية مثلاً)، فالاشتقاق الآن يضمن مطابقة الفروقات
+            // للبيانات الحيّة. والمفاتيح (رقم، حقل) تبقى صالحة، وأي فرق جديد لم يره المستخدم
+            // لا مفتاح له في selection فلا يُطبَّق — الاتجاه الآمن.
             const handleSmartMerge = (incoming, selection = null, addSelection = null, periodSelection = null, clearDaysSelection = null, attendanceSelection = null, deleteSelection = null) => {
                 const analysis = analyzeMerge(incoming, staff, dailyStatusOverrides, mergeTombstones, incomingBundle && incomingBundle.mergeTombstones);
                 const isPicked = (jobNumber, field) =>
@@ -3576,7 +3580,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     alert('❌ الرمز السري غير صحيح! تم إلغاء عملية الحذف للحماية.');
                     return;
                 }
-                
                 // تأكيد مزدوج للحذف
                 const firstName = editingEmployee.name.split(' ')[0];
                 const confirmMsg1 = `⚠️ هل أنت متأكد من حذف الموظف؟
@@ -4272,6 +4275,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     // ورقة 2: مناوبي الثلاثية - نهر بن عمر (تسلسل جديد من 1)
                     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                     if (shiftThreeDay.length > 0) {
+                        // فاصل الصفحة فقط إن كان قبله محتوى فعلي — وإلا (صباحي فارغ مثلاً)
+                        // يصبح أول صف في الجدول فيُنتج صفحة أولى فارغة عند الطباعة (ملاحظة Codex)
                         if (displayData.length > 0) displayData.push({ type: 'page_break' });
                         displayData.push({ type: 'separator', content: '━━━ مناوبي الثلاثية - نهر بن عمر ━━━' });
                         let counter = 1; // تسلسل جديد
@@ -4819,7 +4824,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             };
 
 
-            
+
                         // إغلاق موحّد بـEsc: مستمع واحد يُسجَّل أثناء ظهور النافذة فقط ويُزال عند إغلاقها
             const useEscapeClose = (active, onClose) => {
                 React.useEffect(() => {
@@ -4847,7 +4852,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
 
 return (
                 <div className="min-h-screen bg-gray-50">
-                    
+
                     {/* Splash Screen - نافذة ترحيبية متحركة */}
                     {showWelcome && (
                         <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center z-50 overflow-auto">
@@ -4928,7 +4933,7 @@ return (
                                     
                                     {/* زر إغلاق بارز */}
                                     <div className="mt-4 animate-fadeInUp-delay1">
-                                        <button 
+                                        <button
                                             onClick={proceedFromWelcome}
                                             className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg font-bold text-lg transition-all transform hover:scale-105 shadow-xl border-2 border-white border-opacity-30">
                                             ✓ ابدأ العمل الآن
@@ -9403,6 +9408,10 @@ return (
                                                 if (row.type === 'page_break') return null;
                                                 const needsPageBreak = idx > 0 && previewData[idx - 1].type === 'page_break';
                                                 if (row.type === 'signature_footer') {
+                                                    // تذييل توقيع مستقل بنهاية كل مجموعة (صباحي/ثلاثية/
+                                                    // ثنائية) في قائمة الماء الموحّدة — نفس محتوى تذييل
+                                                    // الصفحة الواحد أدناه، مكرَّر هنا داخل الجدول ليظهر
+                                                    // في نهاية صفحة كل مجموعة تحديداً لا نهاية المستند فقط
                                                     return (
                                                         <tr key={idx} className={`signature-footer-row ${needsPageBreak ? 'print-page-break' : ''}`}>
                                                             <td colSpan={getColSpan()} className="signature-footer-cell">
