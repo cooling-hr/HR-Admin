@@ -1,6 +1,6 @@
 # نظام إدارة الملاك — تعليمات المشروع
 
-نظام إدارة ملاك (شؤون موظفين) لشعبة تبريد المركز ومحطة عزل نهر بن عمر التابعة لشركة نفط البصرة. تطبيق React يُبنى بـ Vite (منذ 2026-09-22): المصدر في `app/`، والناتج ملف HTML واحد لكل نسخة (أوفلاين وسحابية). الانتقال تدريجي: كود الواجهة حالياً منقول حرفياً من الملفين القديمين إلى `app/src/editions/<edition>/App.jsx` ثم يُقسَّم على مراحل حسب `docs/superpowers/specs/2026-09-21-professional-restructure-design.md`. لا تضف إطاراً أو مكتبة حالة؛ React 18 نفسه.
+نظام إدارة ملاك (شؤون موظفين) لشعبة تبريد المركز ومحطة عزل نهر بن عمر التابعة لشركة نفط البصرة. تطبيق React يُبنى بـ Vite (منذ 2026-09-22): المصدر في `app/`، والناتج ملف HTML واحد لكل نسخة (أوفلاين وسحابية). الواجهة مصدر واحد مشترك للنسختين منذ 2026-09-23 (المرحلة 2ب): `app/src/app/StaffSystem.jsx`، ويُكمَل تقسيمه على مراحل حسب `docs/superpowers/specs/2026-09-21-professional-restructure-design.md`. لا تضف إطاراً أو مكتبة حالة؛ React 18 نفسه.
 
 ## بداية كل جلسة — راجع الذاكرة الدائمة أولاً
 
@@ -8,7 +8,11 @@
 
 ## المشروع والنسختان (`app/`)
 
-- **المصدر:** `app/src/editions/offline/App.jsx` و`app/src/editions/cloud/App.jsx` (كل تعديل منطقي/واجهة يُطبَّق على الاثنتين بتعديل مطابق ما دامتا منفصلتين — يُدمجان في مصدر واحد في المرحلة 2 من المواصفة). قوالب الصفحة: `app/hr-offline.html` و`app/hr-cloud.html`.
+- **المصدر (مصدر واحد للنسختين):** `app/src/app/StaffSystem.jsx` هو الجسم المشترك كله — **كل تعديل منطقي أو واجهة يُكتب هنا مرة واحدة** ويصل النسختين معاً. يُصدّر `createStaffSystem({ useDataLayer, AuthViews })`.
+  - **ما يختلف بالنسخة فقط** يعيش في ثلاثة أماكن: طبقة البيانات `app/src/data/{offline,cloud}/use*DataLayer.js` (المزامنة، الدخول، بوابات الحذف/المسح، `sessionKeyFor`/`isSelfUser`)، و`app/src/editions/{offline,cloud}/AuthViews.jsx` (كتل واجهة ونصوص `editionTexts` خاصة بالنسخة؛ ما لا تحتاجه نسخة يُصدَّر `() => null` بنفس الاسم)، وملف المدخل `app/src/editions/<edition>/App.jsx` (~11 سطراً يربط الطبقة وAuthViews ويركّب — لا منطق فيه).
+  - **قيد العزل:** `StaffSystem.jsx` لا يستورد أي طبقة بيانات أبداً. ونصٌّ يذكر Firebase لا يوضع في شرط داخل الجسم المشترك (يدخل حزمة الأوفلاين فيُفشل فحص العزل) — مكانه `editionTexts` في AuthViews السحابية. واسم خاصية يذكر firebase لا يُفكَّك في الجسم (أسماء الخصائص تنجو من التصغير) — لذا يُعاد رابط القاعدة بالمفتاح `fb_DB_URL`.
+  - **فحص ما بعد أي نقل كتلة:** البناء لا يكشف اسماً ساقطاً في JSX. يكشفه `node scripts/check-authviews.mjs src/editions/<edition>/AuthViews.jsx` لملفات AuthViews، و`tsc --checkJs` على `StaffSystem.jsx` بحثاً عن TS2304 (المقبول وحده: `XLSX` و`saveAs` من CDN). بصمة النصوص: `node scripts/compare-ui-strings.mjs <dist> --against .baseline/<edition>.txt` — أي **نقص** عطل.
+- قوالب الصفحة: `app/hr-offline.html` و`app/hr-cloud.html`.
 - **البناء (من داخل `app/`):** `npm run build:offline` · `npm run build:cloud` · `npm run build` · `npm run typecheck`. الناتج: `dist/offline/hr-offline.html` و`dist/cloud/hr-cloud.html` (ملف واحد لكل نسخة، خارج Git).
 - **العزل:** النسخة الأوفلاين بتسجيل دخول محلي برمز (PIN)، **صفر إشارات** إلى Firebase (`firebaseio`, `identitytoolkit`, `AIza`). يفحصه `npm run build:offline` آلياً (`app/scripts/check-shell.mjs`) ويفشل البناء عند أي إشارة. تحقّق يدوي: `grep -c "firebaseio\|identitytoolkit\|AIza" app/dist/offline/hr-offline.html` يجب أن يكون **0**.
 - **النشر:** فرع `main` يُبنى وينشر تلقائياً عبر `.github/workflows/deploy.yml` (GitHub Actions) — الرفع نشر إنتاجي كما كان. الصفحة تُنشر باسم `index.html` مع `sw.js` و`manifest.json` والأيقونات من `app/public/`.
