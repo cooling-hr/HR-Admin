@@ -34,8 +34,37 @@ export const FIELD_NAMES_AR: Record<string, string> = {
     lastSafetyDelivery: 'تاريخ آخر تجهيز',
     email: 'البريد الإلكتروني',
     relativePhone: 'هاتف احد ذوي الموظف',
-    address: 'عنوان السكن'
+    address: 'عنوان السكن',
+    // حقول الأولويات والاستثناء: بلا هذه السطور لا تنتقل بين الأوفلاين والسحابية إطلاقاً وبصمت.
+    globalPriorityRank: 'أولوية الترتيب العامة',
+    unitPriorityRank: 'أولوية الترتيب ضمن الوحدة',
+    safetyRosterExempt: 'استثناء من قائمة معدات السلامة'
 };
+
+// الحقول الثلاثة أعلاه ليست نصوصاً كبقية الحقول، ومعاملتها كنصّ تُنتج أخطاء لا مجرد نوع غير مرتَّب:
+// «false» نصّاً قيمة صادقة فتقلب استثناء السلامة رأساً على عقب، و«abc» من ملف مُحرَّر يدوياً يجتاز
+// فحص (!= null) فيصير رتبة مثبَّتة تُنتج NaN في المقارنة فيضطرب الترتيب. لذا تُقارَن وتُطبَّق بنوعها.
+export const TYPED_MERGE_FIELDS: Record<string, 'number' | 'boolean'> = {
+    globalPriorityRank: 'number',
+    unitPriorityRank: 'number',
+    safetyRosterExempt: 'boolean'
+};
+
+// undefined تعني «لا قيمة» أو «قيمة غير صالحة»، وكلتاهما لا تُقترح ولا تُطبَّق.
+// ‏0 وfalse قيمتان صادقتان هنا لا فراغ — لذا الفحص بـ== null لا بـ|| كبقية الحقول.
+export const parseTypedMergeValue = (kind: 'number' | 'boolean', value: unknown): number | boolean | undefined => {
+    if (value == null || value === '') return undefined;
+    if (kind === 'boolean') {
+        if (typeof value === 'boolean') return value;
+        const s = String(value).trim().toLowerCase();
+        return s === 'true' ? true : s === 'false' ? false : undefined;
+    }
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+};
+
+export const formatTypedMergeValue = (value: number | boolean): string =>
+    typeof value === 'boolean' ? (value ? 'نعم' : 'لا') : String(value);
 
 // ===== انتقاء فروقات الدمج حقلاً حقلاً =====
 //
@@ -265,6 +294,23 @@ export const analyzeMerge = (
         } else {
             const employeeChanges: MergeFieldChange[] = [];
             fieldsToCompare.forEach(field => {
+                // الحقول المُنمَّطة مسار مستقل: بقية الحقول نصوص وسلوكها لا يتغيّر بحرف
+                const typedKind = TYPED_MERGE_FIELDS[field];
+                if (typedKind) {
+                    const incTyped = parseTypedMergeValue(typedKind, inc[field]);
+                    const extTyped = parseTypedMergeValue(typedKind, existing[field]);
+                    if (incTyped === undefined || incTyped === extTyped) return;
+                    employeeChanges.push({
+                        field: field,
+                        fieldNameAr: FIELD_NAMES_AR[field],
+                        oldVal: extTyped === undefined ? 'فارغ' : formatTypedMergeValue(extTyped),
+                        newVal: formatTypedMergeValue(incTyped),
+                        newValTyped: incTyped,
+                        wasEmpty: extTyped === undefined,
+                        cosmeticOnly: false
+                    });
+                    return;
+                }
                 const incVal = String(inc[field] || '').trim();
                 const extVal = String(existing[field] || '').trim();
 

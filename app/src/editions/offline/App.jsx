@@ -2171,7 +2171,9 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     let touched = false;
                     upd.changes.forEach(ch => {
                         if (!isPicked(upd.jobNumber, ch.field)) return;
-                        existing[ch.field] = ch.newVal;
+                        // newVal نصّ للعرض؛ الحقول المُنمَّطة (الأولويات، استثناء السلامة) تُسند بنوعها
+                        // وإلا صار المنطقي نصّ "false" وهو قيمة صادقة. false قيمة صحيحة فالفحص بـ!== undefined
+                        existing[ch.field] = ch.newValTyped !== undefined ? ch.newValTyped : ch.newVal;
                         touched = true;
                         appliedFieldCount++;
                     });
