@@ -96,7 +96,9 @@ let failed = 0;
 try {
     for (const file of files) {
         const mod = await server.ssrLoadModule('/' + file.replace(/\\/g, '/').replace(/^\.\//, ''));
-        const names = Object.keys(mod).filter((k) => typeof mod[k] === 'function');
+        // اصطلاح: المكوّنات بحرف كبير وتُرسَم؛ الدوال المساعدة (makeX) تُصدَّر أيضاً
+        // لكنها تُرجع دالة لا عنصراً، فرسمها بلا معنى — يكفيها فحص الأسماء أعلاه.
+        const names = Object.keys(mod).filter((k) => typeof mod[k] === 'function' && /^[A-Z]/.test(k));
         if (!names.length) { console.error(`FAIL ${file}: لا مكوّنات مُصدَّرة`); failed++; continue; }
         for (const name of names) {
             const ctx = new Proxy({}, { get: () => anyValue(), has: () => true });

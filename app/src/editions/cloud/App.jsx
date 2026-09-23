@@ -922,19 +922,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             // الوجهة: جلسة محفوظة ورمز مضبوط لصاحبها ⇒ شاشة الرمز السريع، وإلا الدخول الكامل.
             // ملاحظة: pinGateOpenRef يُغلَق أصلاً منذ الرسم الأول (أعلاه)، فلا فرق أمنياً بين
             // إظهار شاشة الرمز فوراً أو بعد ضغطة — الغلق لا يعتمد على أي منهما.
-            const proceedFromWelcome = () => {
-                const locks = getDevicePinLocks().filter(l => l.session && l.session.refreshToken);
-                if (locks.length === 0) {
-                    setShowLoginModal(true);
-                    return;
-                }
-                // حساب واحد على الجهاز: لا داعي لخطوة اختيار — تُفتح شاشة رمزه مباشرة
-                setSelectedPinUid(locks.length === 1 ? locks[0].uid : null);
-                setPinInput('');
-                setPinError('');
-                setPinAttempts(0);
-                setShowPinScreen(true);
-            };
+            const proceedFromWelcome = AuthViews.makeWelcomeAction({ getDevicePinLocks, setShowLoginModal, setSelectedPinUid, setPinInput, setPinError, setPinAttempts, setShowPinScreen });
 
             // شاشة الترحيب: Enter يفتح الوجهة المناسبة كما لو ضُغط الزر — نافذة الدخول الكامل
             // نموذج (form) فيُرسله Enter تلقائياً بلا حاجة لمعالجة إضافية هناك؛ شاشة الرمز ليست
@@ -5098,42 +5086,7 @@ return (
                                             {/* طبقة الإغلاق بالنقر خارج القائمة — تحتها في التكديس لا فوقها */}
                                             <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)}></div>
                                             <div className="absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 z-50 text-right animate-fadeIn">
-                                                {currentUserRole === 'admin' && (
-                                                    <button
-                                                        onClick={() => { setShowUserMenu(false); handleOpenUserManagement(); }}
-                                                        className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
-                                                        title="إدارة الحسابات والمستخدمين وربطها بحسابات Firebase وتعيين الصلاحيات"
-                                                    >
-                                                        <span>👥</span><span>الحسابات والصلاحيات</span>
-                                                    </button>
-                                                )}
-                                                {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setShowUserMenu(false);
-                                                            fetchAvailableSnapshots();
-                                                            setShowRestoreCenterModal(true);
-                                                        }}
-                                                        className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
-                                                        title={currentUserRole === 'admin' ? "مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية" : "استعراض وتنزيل اللقطات اليومية (الاستعادة خاصة بمدير النظام)"}
-                                                    >
-                                                        <span>🛡️</span><span>{currentUserRole === 'admin' ? 'الأرشيف والاستعادة' : 'الأرشيف'}</span>
-                                                    </button>
-                                                )}
-                                                {getDevicePinLockFor(currentUserIdRef.current) && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setShowUserMenu(false);
-                                                            if (!confirm('إلغاء رمزك الرباعي على هذا الجهاز؟\n\nستحتاج بريدك وكلمة مرورك عند دخولك القادم. رموز زملائك على هذا الجهاز لن تتأثر.')) return;
-                                                            clearDevicePinLock(currentUserIdRef.current);
-                                                            alert('✅ أُلغي رمزك الرباعي على هذا الجهاز.');
-                                                        }}
-                                                        className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
-                                                        title="إلغاء رمزك الرباعي على هذا الجهاز (لا يمسّ رموز الزملاء)"
-                                                    >
-                                                        <span>🔢</span><span>إلغاء رمزي على هذا الجهاز</span>
-                                                    </button>
-                                                )}
+                                                <AuthViews.UserMenuItems ctx={{ currentUserRole, setShowUserMenu, handleOpenUserManagement, fetchAvailableSnapshots, setShowRestoreCenterModal, getDevicePinLockFor, currentUserIdRef, clearDevicePinLock }} />
                                             </div>
                                         </>
                                     )}

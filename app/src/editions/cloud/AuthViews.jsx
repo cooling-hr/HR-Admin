@@ -352,3 +352,69 @@ export const SetPinOffer = ({ ctx }) => {
         </>
     );
 };
+
+// عناصر قائمة المستخدم في الشريط العلوي. الغلاف مشترك ويبقى في الجسم؛ المحتوى يختلف:
+// السحابية تفصل صلاحية الأرشيف عن صلاحية الحسابات، وتضيف إلغاء الرمز الرباعي لهذا الجهاز.
+export const UserMenuItems = ({ ctx }) => {
+    const { currentUserRole, setShowUserMenu, handleOpenUserManagement, fetchAvailableSnapshots,
+        setShowRestoreCenterModal, getDevicePinLockFor, currentUserIdRef, clearDevicePinLock } = ctx;
+    return (
+        <>
+        {currentUserRole === 'admin' && (
+            <button
+                onClick={() => { setShowUserMenu(false); handleOpenUserManagement(); }}
+                className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
+                title="إدارة الحسابات والمستخدمين وربطها بحسابات Firebase وتعيين الصلاحيات"
+            >
+                <span>👥</span><span>الحسابات والصلاحيات</span>
+            </button>
+        )}
+        {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
+            <button
+                onClick={() => {
+                    setShowUserMenu(false);
+                    fetchAvailableSnapshots();
+                    setShowRestoreCenterModal(true);
+                }}
+                className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
+                title={currentUserRole === 'admin' ? "مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية" : "استعراض وتنزيل اللقطات اليومية (الاستعادة خاصة بمدير النظام)"}
+            >
+                <span>🛡️</span><span>{currentUserRole === 'admin' ? 'الأرشيف والاستعادة' : 'الأرشيف'}</span>
+            </button>
+        )}
+        {getDevicePinLockFor(currentUserIdRef.current) && (
+            <button
+                onClick={() => {
+                    setShowUserMenu(false);
+                    if (!confirm('إلغاء رمزك الرباعي على هذا الجهاز؟\n\nستحتاج بريدك وكلمة مرورك عند دخولك القادم. رموز زملائك على هذا الجهاز لن تتأثر.')) return;
+                    clearDevicePinLock(currentUserIdRef.current);
+                    alert('✅ أُلغي رمزك الرباعي على هذا الجهاز.');
+                }}
+                className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
+                title="إلغاء رمزك الرباعي على هذا الجهاز (لا يمسّ رموز الزملاء)"
+            >
+                <span>🔢</span><span>إلغاء رمزي على هذا الجهاز</span>
+            </button>
+        )}
+        </>
+    );
+};
+
+// وجهة المستخدم عند المضيّ من شاشة الترحيب. تختلف بالنسخة لا بالواجهة: السحابية
+// تفتح شاشة الرمز الرباعي إن كان على الجهاز رمز محفوظ، وإلا نافذة الدخول.
+// دالة مساعدة لا مكوّن (بحرف صغير) — تُرجع دالة لا عنصراً، فلا تُرسَم في الحارس.
+export const makeWelcomeAction = (ctx) => () => {
+    const { getDevicePinLocks, setShowLoginModal, setSelectedPinUid, setPinInput, setPinError,
+        setPinAttempts, setShowPinScreen } = ctx;
+    const locks = getDevicePinLocks().filter(l => l.session && l.session.refreshToken);
+    if (locks.length === 0) {
+        setShowLoginModal(true);
+        return;
+    }
+    // حساب واحد على الجهاز: لا داعي لخطوة اختيار — تُفتح شاشة رمزه مباشرة
+    setSelectedPinUid(locks.length === 1 ? locks[0].uid : null);
+    setPinInput('');
+    setPinError('');
+    setPinAttempts(0);
+    setShowPinScreen(true);
+};
