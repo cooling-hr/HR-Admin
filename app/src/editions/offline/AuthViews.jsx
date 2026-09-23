@@ -12,9 +12,10 @@ export const SetPinOffer = () => null;    // ولا عرض لتفعيل رمز �
 // الوجهة من شاشة الترحيب: نافذة الدخول مباشرة، بلا شاشة رمز وسيطة.
 export const makeWelcomeAction = (ctx) => () => ctx.setShowLoginModal(true);
 
-// عناصر قائمة المستخدم: صلاحية المدير وحدها تفتح الحسابات والأرشيف معاً.
+// عناصر قائمة المستخدم: صلاحية المدير وحدها تفتح الحسابات. لا أرشيف ولا استعادة هنا: لقطاتهما
+// تُحفظ في السحابة، والأوفلاين لا تتصل بها فكانت النافذة تُفتح فارغة دائماً.
 export const UserMenuItems = ({ ctx }) => {
-    const { currentUserRole, setShowUserMenu, handleOpenUserManagement, fetchAvailableSnapshots, setShowRestoreCenterModal } = ctx;
+    const { currentUserRole, setShowUserMenu, handleOpenUserManagement } = ctx;
     return (
         <>
         {currentUserRole === 'admin' && (
@@ -25,17 +26,6 @@ export const UserMenuItems = ({ ctx }) => {
                     title="إدارة الحسابات والمستخدمين والصلاحيات وكلمات المرور"
                 >
                     <span>👥</span><span>الحسابات والصلاحيات</span>
-                </button>
-                <button
-                    onClick={() => {
-                        setShowUserMenu(false);
-                        fetchAvailableSnapshots();
-                        setShowRestoreCenterModal(true);
-                    }}
-                    className="w-full text-right px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition flex items-center gap-2 cursor-pointer"
-                    title="مركز الاستعادة والأرشيف الزمني للنسخ الاحتياطية اليومية"
-                >
-                    <span>🛡️</span><span>الأرشيف والاستعادة</span>
                 </button>
             </>
         )}
