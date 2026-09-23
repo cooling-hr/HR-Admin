@@ -1,10 +1,18 @@
-// حارس الكتل المستخرَجة: يُشغّل كل مكوّن في AuthViews فعلياً ويرسمه، فيسقط فوراً أي اسم
-// نُسي في النقل من StaffSystem (ReferenceError).
+// حارس الكتل المستخرَجة: فحصان متكاملان على كل مكوّن في AuthViews.
 //
-// لماذا التشغيل لا الفحص النصّي: اسم ساقط لا يكشفه شيء آخر — tsc لا يفحص .jsx بهذا
-// العمق، والبناء ينجح، وبصمة النصوص تبقى مطابقة. مُتحقَّق منه عملياً: حذف اسم واحد من
-// تفكيك ctx مرّ من typecheck ومن build معاً بلا شكوى، وكان سيظهر عند المستخدم وحده
-// كنافذة لا تفتح أو شاشة بيضاء. وهذه بالضبط فئة الأعطال التي آذت هذا المشروع سابقاً.
+// لماذا يلزم حارس أصلاً: اسم يسقط أثناء نقل كتلة من StaffSystem لا يكشفه شيء في
+// المنظومة — `npm run typecheck` لا يصل إلى .jsx بهذا العمق، والبناء ينجح، وبصمة
+// النصوص تبقى مطابقة. مُتحقَّق منه عملياً بحذف اسم واحد عمداً: مرّ من الثلاثة، وكان
+// سيصل المستخدم وحده وقت التشغيل كنافذة لا تفتح أو شاشة بيضاء — وهي بالضبط فئة
+// الأعطال التي آذت هذا المشروع سابقاً.
+//
+// ولماذا فحصان لا واحد: كلٌّ منهما أعمى عمّا يراه الآخر.
+//   1) tsc --checkJs موجَّهاً إلى هذه الملفات وحدها يرى كل معرّف حرّ، حتى ما لا
+//      يُنفَّذ أبداً أثناء الرسم (اسم داخل onClick مثلاً).
+//   2) الرسم الفعلي يرى ما لا يراه فحص الأسماء: استدعاء قيمة ليست دالة، أو قراءة
+//      خاصية من undefined أثناء التركيب.
+// الاقتصار على الرسم وحده كان يمرّر حذف pushDataToServer (يُقرأ داخل onClick فقط) —
+// ملاحظة Codex، مُتحقَّق منها في الاتجاهين.
 //
 // ctx وسيط (Proxy) يُرجع قيمة لأي مفتاح، فما يصل عبر ctx لا يفشل مهما كان اسمه، ولا
 // يسقط إلا المعرّف الحر فعلاً. والقيمة المُرجَعة تقبل الاستدعاء والقراءة والمقارنة
@@ -12,12 +20,57 @@
 import { createServer } from 'vite';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 const files = process.argv.slice(2);
 if (!files.length) {
     console.error('usage: node scripts/check-authviews.mjs <AuthViews.jsx> [...]');
     process.exit(2);
 }
+// نسخة واحدة لا تخلط النسختين: إعداد المشروع يفرض mode واحداً لكل تشغيل، وخلطهما
+// يُحمّل ملفات نسخة بإعداد الأخرى فتمرّ أعطال أو تظهر أخرى وهمية (ملاحظة Codex).
+const editionsOf = new Set(files.map((f) => (f.replace(/\\/g, '/').includes('/offline/') ? 'offline' : 'cloud')));
+if (editionsOf.size > 1) {
+    console.error('FAIL: لا تخلط ملفات النسختين في تشغيل واحد — شغّل الأمر مرة لكل نسخة.');
+    process.exit(2);
+}
+
+// الفحص الأول: الأسماء. tsc بـ checkJs موجَّهاً إلى هذه الملفات وحدها يكشف كل معرّف حرّ،
+// حتى ما لا يُنفَّذ أثناء الرسم — وهو بالضبط ما يفوت حارس الرسم أدناه: اسم لا يُقرأ إلا
+// داخل onClick لا يُنفَّذ في renderToStaticMarkup فيمرّ سالماً (ملاحظة Codex، مُتحقَّق منها
+// بحذف pushDataToServer: مرّ من حارس الرسم، وأمسكه tsc فوراً بـTS2304).
+console.log('— فحص الأسماء (tsc --checkJs):');
+// يُشغَّل tsc عبر Node مباشرة لا عبر node_modules/.bin: استدعاء الغلاف .cmd على ويندوز
+// بـexecFileSync بلا shell يفشل بـENOENT، فيُبتلع الفشل ويمرّ الفحص بلا أن ينفَّذ أصلاً —
+// حارس أعمى، وهو أسوأ من لا حارس. لذا أي تعذّر تشغيل هنا يُنهي العملية بخطأ صريح.
+const tscEntry = 'node_modules/typescript/bin/tsc';
+if (!existsSync(tscEntry)) { console.error(`FAIL: لم يُعثر على ${tscEntry}`); process.exit(2); }
+let tscOut = '';
+let tscFailed = false;
+try {
+    execFileSync(process.execPath, [tscEntry,
+        '--noEmit', '--allowJs', '--checkJs', '--jsx', 'preserve', '--target', 'es2022',
+        '--module', 'esnext', '--moduleResolution', 'bundler', '--skipLibCheck', ...files,
+    ], { stdio: 'pipe', encoding: 'utf8' });
+} catch (err) {
+    tscFailed = true;
+    tscOut = String(err.stdout || '') + String(err.stderr || '');
+    if (!tscOut.trim()) { console.error('FAIL: تعذّر تشغيل tsc ولم يُرجع مخرجات — لا تعتبر الفحص ناجحاً.'); process.exit(2); }
+}
+if (tscFailed) {
+    const undef = tscOut.split('\n').filter((l) => /TS2304/.test(l));
+    if (undef.length) {
+        console.error('FAIL: أسماء لا تصل عبر ctx ولا مستورَدة:');
+        undef.forEach((l) => console.error('   ' + l.trim()));
+        console.error('   أضِف كلاً منها إلى تفكيك ctx وإلى الكائن في موضع الاستدعاء.');
+        process.exit(1);
+    }
+    console.error('FAIL: أخطاء من tsc:');
+    tscOut.split('\n').filter((l) => /error TS/.test(l)).slice(0, 10).forEach((l) => console.error('   ' + l.trim()));
+    process.exit(1);
+}
+console.log('  ✓ لا اسم حرّ');
 
 // قيمة تقبل كل شيء: استدعاء، فهرسة، تكرار، تحويل لنص أو رقم.
 const anyValue = () => new Proxy(function () { return anyValue(); }, {
@@ -34,8 +87,10 @@ const anyValue = () => new Proxy(function () { return anyValue(); }, {
     has() { return true; },
 });
 
-// إعداد المشروع يفرض mode من {offline, cloud}؛ يُشتق من المسار ولا أثر له على الرسم هنا.
-const mode = files[0].replace(/\\/g, '/').includes('/offline/') ? 'offline' : 'cloud';
+// الفحص الثاني: الرسم الفعلي. يكشف ما لا تكشفه الأسماء وحدها — استدعاء قيمة ليست دالة،
+// قراءة خاصية من undefined أثناء الرسم، وأي انهيار فعلي عند التركيب.
+console.log('— فحص الرسم:');
+const mode = [...editionsOf][0];
 const server = await createServer({ mode, server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 let failed = 0;
 try {
