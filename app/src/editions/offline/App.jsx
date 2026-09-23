@@ -938,14 +938,17 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             });
 
 
-            // الوجهة من شاشة الترحيب تختلف بالنسخة، فتأتي من AuthViews: هنا نافذة الدخول
-            // مباشرة، وفي السحابية شاشة الرمز الرباعي إن كان على الجهاز رمز محفوظ.
-            const proceedFromWelcome = AuthViews.makeWelcomeAction({ setShowLoginModal });
+            // شاشة الترحيب (الشعار واسم الشعبة) تبقى الأولى دائماً كالمعتاد، وبعدها فقط تُقرَّر
+            // الوجهة: جلسة محفوظة ورمز مضبوط لصاحبها ⇒ شاشة الرمز السريع، وإلا الدخول الكامل.
+            // ملاحظة: pinGateOpenRef يُغلَق أصلاً منذ الرسم الأول (أعلاه)، فلا فرق أمنياً بين
+            // إظهار شاشة الرمز فوراً أو بعد ضغطة — الغلق لا يعتمد على أي منهما.
+            const proceedFromWelcome = AuthViews.makeWelcomeAction({ getDevicePinLocks, setShowLoginModal, setSelectedPinUid, setPinInput, setPinError, setPinAttempts, setShowPinScreen });
 
-            // شاشة الترحيب: Enter يفتح نافذة الدخول كما لو ضُغط الزر — نافذة الدخول نفسها
-            // نموذج (form) فيُرسله Enter تلقائياً، فلا حاجة لمعالجة إضافية هناك
+            // شاشة الترحيب: Enter يفتح الوجهة المناسبة كما لو ضُغط الزر — نافذة الدخول الكامل
+            // نموذج (form) فيُرسله Enter تلقائياً بلا حاجة لمعالجة إضافية هناك؛ شاشة الرمز ليست
+            // كذلك (زر عادي) فتحتاج هذا المعالج ليعمل فيها Enter أيضاً
             React.useEffect(() => {
-                if (!showWelcome || showLoginModal) return;
+                if (!showWelcome || showLoginModal || showPinScreen) return;
                 const onKeyDown = (e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
@@ -954,7 +957,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 };
                 window.addEventListener('keydown', onKeyDown);
                 return () => window.removeEventListener('keydown', onKeyDown);
-            }, [showWelcome, showLoginModal]);
+            }, [showWelcome, showLoginModal, showPinScreen]);
             const [showPreview, setShowPreview] = useState(false);
             const [showPrintForm, setShowPrintForm] = useState(false);
             const [previewData, setPreviewData] = useState([]);
@@ -1102,6 +1105,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const adminDefaultsSeededRef = React.useRef(false);
             React.useEffect(() => {
                 if (adminDefaultsSeededRef.current) return;
+                if (!isInitialCloudLoadCompleteRef.current) return;
                 if (!staff || staff.length === 0) return;
                 adminDefaultsSeededRef.current = true;
                 const missing = staff.some(s => {
@@ -1116,7 +1120,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     for (const k of Object.keys(seed)) if (s[k] == null) add[k] = seed[k];
                     return Object.keys(add).length ? { ...s, ...add } : s;
                 }));
-            }, [staff]);
+            }, [staff, isInitialCloudLoadCompleteRef.current]);
 
             const [dismissedReturnIds, setDismissedReturnIds] = useState([]);
 
@@ -1124,7 +1128,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             const pendingReturnPrompt = React.useMemo(() => {
                 if (!canEdit('staffMaster')) return null;
                 return periodAlerts.endedUnconfirmed.find(a => !dismissedReturnIds.includes(a.period.id)) || null;
-            }, [periodAlerts, dismissedReturnIds, currentUserRole]);
+            }, [periodAlerts, dismissedReturnIds, currentUserRole, currentUserPermissions]);
 
             const confirmReturn = (didResume) => {
                 if (!pendingReturnPrompt) return;
@@ -1146,6 +1150,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 });
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
+                pushDataToCloud(buildCloudBundle({ staffData: updated }));
+                logAuditEvent((didResume ? 'confirm_return:' : 'no_return:') + (emp.jobNumber || emp.id), currentUserName);
                 setDismissedReturnIds(prev => [...prev, period.id]);
             };
 
@@ -1452,7 +1458,11 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
 
             const setEmployeeDailyStatusOverride = (empId, dateStr, status) => {
                 if (!canEdit('dailyReport')) {
-                    alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    if (lockedSections['dailyReport']) {
+                        alert('🔒 ' + lockedSections['dailyReport'] + ' يعدّل الموقف اليومي الآن.\n\nأنت في وضع الاطلاع مؤقتاً، وتعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه.');
+                    } else {
+                        alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    }
                     return;
                 }
                 const emp = staff.find(s => s.id === empId);
@@ -1580,7 +1590,11 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
             // تسليط إجراء جماعي لمنتسبي موقع / وحدة معينة (تعذر حضور للصباحي فقط، أو استعادة الافتراضي)
             const setUnitBulkStatus = (unitName, statusValue) => {
                 if (!canEdit('dailyReport')) {
-                    alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    if (lockedSections['dailyReport']) {
+                        alert('🔒 ' + lockedSections['dailyReport'] + ' يعدّل الموقف اليومي الآن.\n\nأنت في وضع الاطلاع مؤقتاً، وتعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه.');
+                    } else {
+                        alert('⛔ عذراً، ليس لديك صلاحية تعديل أو مزامنة الموقف اليومي!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
+                    }
                     return;
                 }
                 const targetStaff = staff.filter(s => s.unit === unitName);
@@ -3669,6 +3683,9 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     return;
                 }
                 
+                // القيد يُكتب بعد التأكيد النهائي: السجل لا يُمحى، فلا يجوز أن يوثّق حذفاً لم يقع
+                logAuditEvent('delete_employee:' + (editingEmployee.jobNumber || editingEmployee.id), currentUserName);
+
                 // حذف الموظف — ويُسجَّل محذوفاً فلا يعود صامتاً من ملف أقدم يحمله
                 updateTombstones({ addEmployees: [{ job: editingEmployee.jobNumber, name: editingEmployee.name }] });
                 setStaff(staff.filter(s => s.id !== editingEmployee.id));
@@ -4053,6 +4070,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                         const updated = staff.map(s => s.id === id ? { ...s, status: 'نشط' } : s);
                         setStaff(updated);
                         safeStorage.setItem('staffData', JSON.stringify(updated));
+                        pushDataToCloud(buildCloudBundle({ staffData: updated }));
+                        logAuditEvent('change_status:نشط:' + (emp.jobNumber || emp.id), currentUserName);
                         return;
                     }
                     // فترة بدأت اليوم نفسه أو لم تبدأ بعد: لا يوجد يوم فعلي "قبلها" لإغلاقها عنده،
@@ -4065,6 +4084,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     const updated = staff.map(s => s.id === id ? { ...s, statusPeriods: updatedPeriods, status: 'نشط' } : s);
                     setStaff(updated);
                     safeStorage.setItem('staffData', JSON.stringify(updated));
+                    pushDataToCloud(buildCloudBundle({ staffData: updated }));
+                    logAuditEvent('end_period:' + active.type + ':' + (emp.jobNumber || emp.id), currentUserName);
                     return;
                 }
 
@@ -4140,7 +4161,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: rest, status: (activeNow && !activeNow.legacy) ? activeNow.type : 'نشط' } : s);
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
-                pushDataToCloud();
+                pushDataToCloud(buildCloudBundle({ staffData: updated }));
                 if (typeof logAuditEvent === 'function') logAuditEvent('delete_period:' + p.type + ':' + (emp.jobNumber || emp.id), currentUserName);
             };
 
@@ -4248,8 +4269,11 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 const updated = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: updatedPeriods, status: (activeToday && !activeToday.legacy) ? activeToday.type : 'نشط' } : s);
                 setStaff(updated);
                 safeStorage.setItem('staffData', JSON.stringify(updated));
-                pushDataToCloud();
-                // لا سجل تدقيق في النسخة الأوفلاين — logAuditEvent سحابية ولا وجود لها هنا
+                pushDataToCloud(buildCloudBundle({
+                    staffData: updated,
+                    ...(clearedOverrides ? { dailyStatusOverrides: clearedOverrides } : {})
+                }));
+                logAuditEvent((conflicts.length > 0 ? 'replace_period:' : 'add_period:') + periodType + ':' + (emp.jobNumber || emp.id), currentUserName);
                 setQuickPeriod(null);
             };
 
@@ -4893,6 +4917,8 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                     return () => window.removeEventListener('keydown', onKey);
                 }, [active, onClose]);
             };
+            useEscapeClose(showSetPinOffer && !!pendingPinOfferUser, () => setShowSetPinOffer(false));
+            useEscapeClose(showSyncModal, () => setShowSyncModal(false));
             useEscapeClose(!!selectedEmployeeCard, () => setSelectedEmployeeCard(null));
             useEscapeClose(showLoginModal, () => setShowLoginModal(false));
             useEscapeClose(showUserManagementModal, () => setShowUserManagementModal(false));
@@ -5003,7 +5029,11 @@ return (
                             </div>
                         </div>
                     )}
-                    
+
+                    <AuthViews.PinScreen ctx={{ showPinScreen, getDevicePinLocks, selectedPinUid, setSelectedPinUid, pinInput, setPinInput, pinError, setPinError, setPinAttempts, isCheckingLogin, handlePinLogin, useAnotherAccount, pendingTakeover, confirmSessionTakeover, cancelSessionTakeover }} />
+
+                    <AuthViews.SetPinOffer ctx={{ showSetPinOffer, pendingPinOfferUser, setShowSetPinOffer, setPendingPinOfferUser, setDevicePinLock, safeStorage }} />
+
                     {/* رأس الصفحة الكلاسيكي المطور بألوان زاهية وراقية كالسابق */}
                                 {/* إشعار طلب الحذف السحابي المعلق لمدير النظام */}
             {pendingDeletionRequest && pendingDeletionRequest.status === 'pending' && (
@@ -5066,6 +5096,8 @@ return (
                                 </p>
                             </div>
                             
+                            <AuthViews.HeaderExtras ctx={{ cloudSyncStatus, syncStatus, setShowSyncModal }} />
+
                             {/* مبدّل الوضع الليلي — متاح للجميع، حتى الزائر الذي يتصفّح ويطبع دون تسجيل دخول */}
                             <button
                                 onClick={() => setIsDarkTheme(window.__toggleHrTheme())}
@@ -5097,7 +5129,7 @@ return (
                                         className="flex items-center gap-1.5 px-3 py-1 bg-white/15 hover:bg-white/25 backdrop-blur-md rounded-full border border-white/20 text-xs font-extrabold text-white shadow-sm transition cursor-pointer"
                                         title="حسابك وإدارة النظام"
                                     >
-                                        <span>{currentUserRole === 'admin' ? `👑 ${currentUserName || 'مدير النظام'}` : (currentUserRole === 'operator' ? `✍️ ${currentUserName || 'إداري مُدخل'}` : `👁️ ${currentUserName || 'مستعرض'}`)}</span>
+                                        <span>{currentUserRole === 'admin' ? `👑 ${currentUserName || 'مدير النظام'}` : (currentUserRole === 'manager' ? `🛡️ ${currentUserName || 'إداري'}` : (currentUserRole === 'operator' ? `✍️ ${currentUserName || 'إداري مُدخل'}` : `👁️ ${currentUserName || 'مستعرض'}`))}</span>
                                         <span className={`text-[9px] transition-transform ${showUserMenu ? 'rotate-180' : ''}`}>▼</span>
                                     </button>
 
@@ -5106,7 +5138,7 @@ return (
                                             {/* طبقة الإغلاق بالنقر خارج القائمة — تحتها في التكديس لا فوقها */}
                                             <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)}></div>
                                             <div className="absolute left-0 mt-2 w-60 bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 z-50 text-right animate-fadeIn">
-                                                <AuthViews.UserMenuItems ctx={{ currentUserRole, setShowUserMenu, handleOpenUserManagement, fetchAvailableSnapshots, setShowRestoreCenterModal }} />
+                                                <AuthViews.UserMenuItems ctx={{ currentUserRole, setShowUserMenu, handleOpenUserManagement, fetchAvailableSnapshots, setShowRestoreCenterModal, getDevicePinLockFor, currentUserIdRef, clearDevicePinLock }} />
                                             </div>
                                         </>
                                     )}
@@ -5286,6 +5318,7 @@ return (
 
                                 
             {/* نافذة تفاصيل المزامنة السحابية والمحلية لشعبة تبريد المركز */}
+            <AuthViews.SyncModal ctx={{ showSyncModal, setShowSyncModal, cloudSyncStatus, syncStatus, pushDataToServer }} />
     
 
                                 
@@ -5743,6 +5776,7 @@ return (
                                                         </div>
                                                     );
                                                     if (u.role === 'admin') roleBadge = <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 text-amber-900 border border-amber-300">👑 مدير النظام</span>;
+                                                    else if (u.role === 'manager') roleBadge = <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-teal-50 text-teal-900 border border-teal-300">🛡️ إداري</span>;
                                                     else if (u.role === 'viewer') roleBadge = <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">👁️ مستعرض (اطلاع فقط)</span>;
 
                                                     const userSess = activeSessions && activeSessions[u.id];
@@ -5879,7 +5913,7 @@ return (
                                 <div>
                                     <h3 className="text-lg md:text-xl font-black text-white flex items-center gap-2">
                                         <span>مركز الاستعادة والأرشيف الزمني (Time-Machine Recovery)</span>
-                                        <span className="text-xs bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full border border-teal-500/30">خاص بالمدير 👑</span>
+                                        <span className="text-xs bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full border border-teal-500/30">{currentUserRole === 'admin' ? 'خاص بالمدير 👑' : 'اطلاع وتنزيل 🛡️'}</span>
                                     </h3>
                                     <p className="text-xs text-slate-300 mt-0.5">أرشيف سحابي ومحلي تلقائي غير قابل للإلغاء لحفظ واسترجاع لقطات الأيام السابقة بضغطة زر</p>
                                 </div>
@@ -5956,16 +5990,23 @@ return (
                                         >
                                             <span>📥 تنزيل ملف النسخة (JSON)</span>
                                         </button>
-                                        <button
-                                            onClick={() => handleRestoreSnapshot(selectedSnapshotPreview)}
-                                            className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
-                                        >
-                                            <span>⏪ اعتماد واستعادة هذه النسخة كقاعدة حية</span>
-                                        </button>
+                                        {currentUserRole === 'admin' && (
+                                            <button
+                                                onClick={() => handleRestoreSnapshot(selectedSnapshotPreview)}
+                                                className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+                                            >
+                                                <span>⏪ اعتماد واستعادة هذه النسخة كقاعدة حية</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
+                                {currentUserRole !== 'admin' && (
+                                    <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs font-bold text-amber-900">
+                                        🛡️ يمكنك استعراض اللقطات وتنزيلها. اعتماد لقطة كقاعدة حية يبدّل بيانات الشعبة كلها ويبقى بيد مدير النظام.
+                                    </div>
+                                )}
                             {/* قائمة اللقطات المتاحة */}
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center px-1">
@@ -5974,6 +6015,12 @@ return (
                                         <span className="text-[11px] bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full font-bold">{availableSnapshots.length} نسخة محفوظة</span>
                                     </span>
                                 </div>
+
+                                {snapshotsError && (
+                                    <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-900">
+                                        ⚠️ {snapshotsError}
+                                    </div>
+                                )}
 
                                 {isLoadingSnapshots ? (
                                     <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200">
@@ -6045,14 +6092,16 @@ return (
                                                                         >
                                                                             📥
                                                                         </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleRestoreSnapshot(snap)}
-                                                                            className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-[11px] font-black shadow-sm transition cursor-pointer active:scale-95"
-                                                                            title="استعادة واعتماد هذه النسخة"
-                                                                        >
-                                                                            ⏪ استعادة
-                                                                        </button>
+                                                                        {currentUserRole === 'admin' && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleRestoreSnapshot(snap)}
+                                                                                className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white rounded-lg text-[11px] font-black shadow-sm transition cursor-pointer active:scale-95"
+                                                                                title="استعادة واعتماد هذه النسخة"
+                                                                            >
+                                                                                ⏪ استعادة
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 </td>
                                                             </tr>
@@ -6865,6 +6914,12 @@ return (
 
                                 {unitsSubView === 'dailyStatus' ? (
                                     <div className="space-y-5 animate-fadeIn">
+                                        {lockedSections['dailyReport'] && (
+                                            <div className="mb-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-xl text-xs font-black text-amber-900 flex items-center gap-2 no-print">
+                                                <span className="text-lg">🔒</span>
+                                                <span>{lockedSections['dailyReport']} يعدّل الموقف اليومي الآن — أنت في وضع الاطلاع. تعود صلاحيتك تلقائياً خلال 15 ثانية من خروجه. الطباعة والتصدير متاحان كالمعتاد.</span>
+                                            </div>
+                                        )}
                                         {/* شريط الموقف اليومي البصري */}
                                         <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
                                         <div className="px-6 pt-6">
@@ -8619,6 +8674,8 @@ return (
                                                                                 if (confirm(`⚠️ هل أنت متأكد من حذف الموظف؟\n\nالموظف: ${s.name}\nالرقم الوظيفي: ${s.jobNumber}\n\n⚠️ هذه العملية لا يمكن التراجع عنها!`)) {
                                                                                     const userInput = prompt(`⚠️⚠️ تأكيد نهائي ⚠️⚠️\n\nأنت على وشك حذف: ${s.name}\n\nاكتب اسم الموظف الأول (${firstName}) للتأكيد:`);
                                                                                     if (userInput === firstName) {
+                                                                                        // القيد بعد التأكيد النهائي لا قبله: السجل غير قابل للتصحيح
+                                                                                        logAuditEvent('delete_employee:' + (s.jobNumber || s.id), currentUserName);
                                                                                         updateTombstones({ addEmployees: [{ job: s.jobNumber, name: s.name }] });
                                                                                         setStaff(staff.filter(emp => emp.id !== s.id));
                                                                                         alert('✅ تم حذف الموظف من النظام');
@@ -9455,7 +9512,10 @@ return (
                                         </thead>
                                         <tbody>
                                             {previewData.map((row, idx) => {
-                                                if (row.type === 'page_break') return null;
+                                                if (row.type === 'page_break') return null; // ليس صفاً فعلياً — مجرد علامة يقرأها الصف التالي أدناه
+                                                // الصف التالي مباشرة لعلامة فاصل صفحة يحمل صنف الطباعة
+                                                // (لا صف فارغ منفصل — ملاحظة Codex: صف فارغ فعلي قد يطبع
+                                                // بحدوده وحشوه الخاصين فيُنتج فجوة أو صفاً فارغاً ظاهراً)
                                                 const needsPageBreak = idx > 0 && previewData[idx - 1].type === 'page_break';
                                                 if (row.type === 'signature_footer') {
                                                     // تذييل توقيع مستقل بنهاية كل مجموعة (صباحي/ثلاثية/
@@ -9517,8 +9577,9 @@ return (
                                         </tbody>
                                     </table>
 
-                                    {/* نُقل نفس الإصلاح من index.html: يُخفى إن كانت كل مجموعة تحمل
-                                        تذييلها الخاص داخل الجدول بالفعل — انظر التعليق المقابل هناك */}
+                                    {/* قسم عناوين التوقيعات النظيفة — يُخفى إن كان كل مجموعة تحمل تذييلها
+                                        الخاص بنهايتها داخل الجدول بالفعل (previewData بها signature_footer)،
+                                        وإلا لظهر تذييل مكرَّر عديم الفائدة بعد تذييل آخر مجموعة مباشرة */}
                                     {!previewData.some(d => d.type === 'signature_footer') && (
                                     <>
                                     <div className="preview-signatures-row mt-52 mb-14 px-12 flex justify-between items-center text-slate-950 font-black text-sm md:text-base">
