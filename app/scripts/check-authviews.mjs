@@ -59,7 +59,10 @@ try {
     if (!tscOut.trim()) { console.error('FAIL: تعذّر تشغيل tsc ولم يُرجع مخرجات — لا تعتبر الفحص ناجحاً.'); process.exit(2); }
 }
 if (tscFailed) {
-    const undef = tscOut.split('\n').filter((l) => /TS2304/.test(l));
+    // ثلاثة رموز لاسم غير محلول: TS2304 (لا اسم)، TS2552 (لا اسم مع «هل تقصد…؟»)، TS18004 (اسم
+    // مختصر في كائن بلا قيمة في نطاقه — صيغة ctx كلها). TS2304 وحده أفلت اسماً ساقطاً فعلاً
+    // في 2026-09-23 فانهارت نافذة الحسابات عند فتحها.
+    const undef = tscOut.split('\n').filter((l) => /TS(2304|2552|18004)/.test(l));
     if (undef.length) {
         console.error('FAIL: أسماء لا تصل عبر ctx ولا مستورَدة:');
         undef.forEach((l) => console.error('   ' + l.trim()));

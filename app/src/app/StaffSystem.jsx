@@ -901,6 +901,7 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 userFormPin,
                 userFormPriority,
                 userFormRole,
+                userFormUid,
             } = useDataLayer({
                 anchorDate,
                 dailyStatusOverrides,
