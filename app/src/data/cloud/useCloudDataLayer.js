@@ -1809,9 +1809,24 @@ const authorizeDirectWipe = () => {
 const authorizeWipeApproval = () => confirm('⚠️ هل توافق رسمياً على تنفيذ طلب الحذف ومسح كافة البيانات سحابياً؟\n\nهذا الإجراء لا يمكن التراجع عنه.');
 
 // مفتاح جلسة المستخدم في activeSessions: معرّف الحساب الموثّق لا المعرّف المحلي usr_<وقت>.
-const sessionKeyFor = (u) => u.uid;
+// صف بلا uid (أُنشئ قبل ميزة الربط) يُطابَق بالجلسة التي تحمل اسمه نفسه، إن كانت واحدة
+// فقط — وإلا فصاحبه الداخل فعلاً يظهر «غير متصل» ولا يعمل له «فك القفل». عرض فقط بلا
+// أي كتابة: ربطٌ يُكتب في السحابة يتصادم مع الحفظ الكامل للأجهزة الأخرى (ملاحظة Codex).
+const sessionKeyFor = (u) => {
+    if (u.uid) return u.uid;
+    const name = String(u.name || '').trim();
+    if (!name) return undefined;
+    // الصف الوحيد بلا uid بهذا الاسم في الجدول، والجلسة الوحيدة بالاسم والدور نفسيهما
+    const sameNameRows = systemUsers.filter(o => !String(o.uid || '').trim() && String(o.name || '').trim() === name);
+    if (sameNameRows.length !== 1) return undefined;
+    const keys = Object.keys(activeSessions || {}).filter(k =>
+        String((activeSessions[k] || {}).name || '').trim() === name &&
+        (activeSessions[k] || {}).role === u.role &&
+        !systemUsers.some(o => String(o.uid || '').trim() === k));
+    return keys.length === 1 ? keys[0] : undefined;
+};
 // صاحب الجلسة الحالية: صفّه يُظهر «أنت» بدل زر فك القفل.
-const isSelfUser = (u) => u.uid === currentUserIdRef.current;
+const isSelfUser = (u) => { const key = sessionKeyFor(u); return !!key && key === currentUserIdRef.current; };
 
   return {
     activeSessions,
