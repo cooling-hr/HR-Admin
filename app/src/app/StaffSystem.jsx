@@ -6,7 +6,7 @@ import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields }
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, isShiftOnDutyStatus } from '../domain/water';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, QUICK_STATUS_OPTIONS, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave } from '../domain/periods';
-import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
+import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../core/dates';
 import { SearchCircularProgress } from '../ui/SearchCircularProgress';
 import { ICON_PATHS, Icon, SAFETY_VEST_IMG, SAFETY_BOOT_IMG } from '../ui/Icon';
@@ -1547,13 +1547,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 let filteredStaff = staff.filter(s => {
                     if (periodUnitFilter !== 'all' && s.unit !== periodUnitFilter) return false;
                     if (periodWorkTypeFilter !== 'all' && s.workType !== periodWorkTypeFilter) return false;
-                    if (periodSearchQuery.trim()) {
-                        const normQ = normalizeArabicForSearch(periodSearchQuery);
-                        const normName = normalizeArabicForSearch(s.name || '');
-                        const normJobNum = (s.jobNumber || '').toString();
-                        return normName.includes(normQ) || normJobNum.includes(normQ);
-                    }
-                    return true;
+                    return matchesStaffSearch(s, periodSearchQuery);
                 });
 
                 let totalDutyDaysSum = 0;
@@ -4763,7 +4757,7 @@ return (
                     {/* داخل قسمها. `view` نفسه لم يتغيّر ولا أيٌّ من شروطه في كل الملف —   */}
                     {/* تغيّر من يضبط قيمته فقط، فلا منطق عرض واحد مسّه هذا التعديل.       */}
                     {/* ================================================================= */}
-                    <AppNav ctx={{ observeNavHeight, sectionMemory, setSectionMemory, setUnitsSubView, setView, stats, unitsSubView, view }} />
+                    <AppNav ctx={{ observeNavHeight, periodSearchQuery, sectionMemory, setPeriodSearchQuery, setSectionMemory, setUnitsSubView, setView, stats, unitsSubView, view }} />
                     
                     <main className="container mx-auto p-4">
                         {(periodAlerts.endingSoon.length > 0 || periodAlerts.endedUnconfirmed.length > 0) && <PeriodAlerts ctx={{ periodAlerts }} />}

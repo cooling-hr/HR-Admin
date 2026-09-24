@@ -5,7 +5,7 @@ import { Segmented } from '../../ui/Segmented';
 // شريط التنقل: أقسام في الأعلى وشرائح تصفية داخل القسم. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. يُرسم دائماً.
 export const AppNav = ({ ctx }) => {
-    const { observeNavHeight, sectionMemory, setSectionMemory, setUnitsSubView, setView, stats, unitsSubView, view } = ctx;
+    const { observeNavHeight, periodSearchQuery, sectionMemory, setPeriodSearchQuery, setSectionMemory, setUnitsSubView, setView, stats, unitsSubView, view } = ctx;
     return (() => {
         const sections = [
             { id: 'dashboard', icon: 'sliders-color', label: 'لوحة التحكم',
@@ -112,7 +112,8 @@ export const AppNav = ({ ctx }) => {
         {/* «مصفوفة الأيام» مفتاحاً داخل تقرير الفترة لا وجهة رابعة.        */}
         {/* ============================================================= */}
         {activeSection && activeSection.id === 'attendance' && (
-            <div className="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-100">
+            <div className="max-w-7xl mx-auto mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                <div className="w-full sm:w-auto min-w-0">
                 <Segmented
                     ariaLabel="شاشات الوحدات والموقف"
                     stackBelow="none"
@@ -130,6 +131,26 @@ export const AppNav = ({ ctx }) => {
                     value={unitsSubView}
                     onChange={setUnitsSubView}
                 />
+                </div>
+                {/* بحث واحد للشاشات الثلاث (حالة periodSearchQuery نفسها التي يقرؤها «ضبط الوقت»)،
+                    فيبقى النص عند التنقل بينها. في الملاك يعرض المطابقين من كل الوحدات، وفي الموقف
+                    اليومي يُبقي صفوفهم وحدها — انظر UnitsScreen. */}
+                {/* لون مميّز والبحث فعّال: ما تحته مُصفّى، لا موظفون مفقودون */}
+                <div className={`flex-1 min-w-[12rem] sm:max-w-sm flex items-center gap-2 border rounded-xl px-3 py-2 shadow-sm focus-within:border-indigo-500 ${periodSearchQuery.trim() ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-300'}`}>
+                    <span className="text-slate-400 text-sm">🔍</span>
+                    <input
+                        type="text"
+                        value={periodSearchQuery}
+                        onChange={(e) => setPeriodSearchQuery(e.target.value)}
+                        placeholder="بحث بالاسم أو الرقم الوظيفي..."
+                        aria-label="بحث بالاسم أو الرقم الوظيفي في الوحدات"
+                        className="w-full min-w-0 outline-none font-bold text-slate-800 text-xs md:text-sm bg-transparent"
+                    />
+                    {periodSearchQuery && (
+                        <button onClick={() => setPeriodSearchQuery('')} title="مسح البحث" aria-label="مسح البحث"
+                            className="text-slate-400 hover:text-slate-700 font-black text-sm leading-none cursor-pointer">✕</button>
+                    )}
+                </div>
             </div>
         )}
     </nav>

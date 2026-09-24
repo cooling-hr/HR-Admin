@@ -1,7 +1,7 @@
 import React from 'react';
 import { PageHeader } from '../../ui/PageHeader';
 import { ARABIC_MONTH_NAMES, getArabicDayName, getDaysBetweenDates } from '../../core/dates';
-import { getThreeName, getTripleName } from '../../core/arabic';
+import { getThreeName, getTripleName, matchesStaffSearch } from '../../core/arabic';
 import { getMissingFields } from '../../domain/employees';
 import { isLongOrMaternityLeave } from '../../domain/periods';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
@@ -10,6 +10,13 @@ import { sortByJobTitleHierarchy } from '../../domain/sorting';
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
     const { DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
+    const searchActive = !!periodSearchQuery.trim();
+    // إضافة موظف إلى سلة الإضافي أو إخراجه منها (زر «إضافة / مشمول» في الملاك ونتائج البحث)
+    const toggleOvertime = (id) => {
+        const updated = overtimeIds.includes(id) ? overtimeIds.filter(x => x !== id) : [...overtimeIds, id];
+        setOvertimeIds(updated);
+        safeStorage.setItem('overtimeSelectedIds', JSON.stringify(updated));
+    };
     return (
         <div className="space-y-5 animate-fadeIn">
             {/* شاشات القسم الثلاث انتقلت إلى الشريط الملتصق أعلى الصفحة، في صفّ تحت
@@ -306,14 +313,33 @@ export const UnitsScreen = ({ ctx }) => {
                         </div>
                     </div>
 
+                    {/* البحث من شريط الشاشات يُبقي صفوف المطابقين وحدها */}
+                    {searchActive && (() => {
+                        // يُحسب مما تعرضه القائمة أدناه فعلاً: الوحدات الست الثابتة وحدها
+                        const DAILY_UNITS = ['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'];
+                        const shown = staff.filter(s => DAILY_UNITS.includes(s.unit) && matchesStaffSearch(s, periodSearchQuery)
+                            && !isLongOrMaternityLeave(getEmployeeDailyStatus(s, dailyReportDate))).length;
+                        return (
+                            <div className="no-print bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 text-xs md:text-sm font-bold">
+                                <span>🔍 {shown > 0 ? `يُعرض ${shown} موظف يطابق «${periodSearchQuery.trim()}» من كل الوحدات` : `لا يوجد في الموقف اليومي من يطابق «${periodSearchQuery.trim()}»`}</span>
+                                <button onClick={() => setPeriodSearchQuery('')}
+                                    className="px-3 py-1 bg-white border border-indigo-300 rounded-lg hover:bg-slate-50 cursor-pointer">
+                                    ✕ مسح البحث
+                                </button>
+                            </div>
+                        );
+                    })()}
+
                     {/* كشوفات الموظفين مجمعة حسب الوحدات */}
                     <div className="space-y-6">
                         {['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'].map(unitName => {
-                             if (selectedDailyUnitTab !== 'all' && selectedDailyUnitTab !== unitName) return null;
+                             // البحث يشمل كل الوحدات مهما كان التبويب المختار (حقله فوق التبويبات)
+                             if (!searchActive && selectedDailyUnitTab !== 'all' && selectedDailyUnitTab !== unitName) return null;
                             const unitStaff = staff.filter(s => s.unit === unitName);
                             if (unitStaff.length === 0) return null;
                             
                             const unitDailyStaff = unitStaff.filter(s => {
+                                if (!matchesStaffSearch(s, periodSearchQuery)) return false;
                                 const status = getEmployeeDailyStatus(s, dailyReportDate);
                                 if (isLongOrMaternityLeave(status)) return false;
                                 return true;
@@ -505,7 +531,7 @@ export const UnitsScreen = ({ ctx }) => {
                                 </div>
 
                                 {/* فلتر الوحدة */}
-                                <div className="md:col-span-2 space-y-1.5">
+                                <div className="md:col-span-3 space-y-1.5">
                                     <label className="block text-xs font-black text-slate-700">📍 فلترة حسب الوحدة:</label>
                                     <select
                                         value={periodUnitFilter}
@@ -520,7 +546,7 @@ export const UnitsScreen = ({ ctx }) => {
                                 </div>
 
                                 {/* فلتر طبيعة الدوام — أيام الدوام تُحتسب لكل موظف حسب نمطه (صباحي أو دورة مناوبة) */}
-                                <div className="md:col-span-2 space-y-1.5">
+                                <div className="md:col-span-3 space-y-1.5">
                                     <label className="block text-xs font-black text-slate-700">⏰ طبيعة الدوام:</label>
                                     <select
                                         value={periodWorkTypeFilter}
@@ -533,20 +559,6 @@ export const UnitsScreen = ({ ctx }) => {
                                     </select>
                                 </div>
 
-                                {/* حقل البحث */}
-                                <div className="md:col-span-2 space-y-1.5">
-                                    <label className="block text-xs font-black text-slate-700">🔍 بحث بالاسم/الرقم الوظيفي:</label>
-                                    <div className="relative bg-white border-2 border-slate-300 rounded-xl px-3 py-2 shadow-sm focus-within:border-indigo-500 flex items-center gap-2">
-                                        <span className="text-slate-400 text-sm">🔍</span>
-                                        <input
-                                            type="text"
-                                            placeholder="ابحث..."
-                                            value={periodSearchQuery}
-                                            onChange={(e) => setPeriodSearchQuery(e.target.value)}
-                                            className="w-full outline-none font-bold text-slate-800 text-xs md:text-sm bg-transparent"
-                                        />
-                                    </div>
-                                </div>
                             </div>
 
                             {/* أزرار الفترات السريعة */}
@@ -896,7 +908,68 @@ export const UnitsScreen = ({ ctx }) => {
                     </div>
                 </div>
             )}
-            {!selectedUnit ? (
+            {searchActive ? (
+                // نتائج البحث من كل الوحدات، بترتيب الوحدات ثم الهرمية كما في ملاك كل وحدة
+                (() => {
+                    const UNIT_ORDER = ['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'];
+                    const units = [...UNIT_ORDER, ...[...new Set(staff.map(s => s.unit).filter(u => u && !UNIT_ORDER.includes(u)))]];
+                    const results = units.flatMap(u => sortByJobTitleHierarchy(staff.filter(s => s.unit === u && matchesStaffSearch(s, periodSearchQuery)), u));
+                    return (
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <div className="px-6 pt-6">
+                                <PageHeader icon="building-2" title="نتائج البحث في كل الوحدات"
+                                    description={`${results.length} موظف يطابق «${periodSearchQuery.trim()}» — امسح البحث للعودة إلى الوحدات`} />
+                            </div>
+                            <div className="p-6">
+                                {results.length > 0 ? (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead className="bg-gray-100">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-700">ت</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-700">الرقم الوظيفي</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-700">الاسم</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-700">العنوان الوظيفي</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-700">الوحدة</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-700 w-32 no-print">العمل الإضافي</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {results.map((s, i) => (
+                                                    <tr key={s.id} className={`border-b hover:bg-gray-50 transition ${overtimeIds.includes(s.id) ? 'bg-emerald-100' : ''}`}>
+                                                        <td className="px-4 py-3 text-gray-600">{i + 1}</td>
+                                                        <td className="px-4 py-3 font-mono text-blue-600 font-semibold">{s.jobNumber}</td>
+                                                        <td className="px-4 py-3">
+                                                            <button onClick={() => openEditModal(s)} className="font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-right outline-none">
+                                                                {s.name}
+                                                            </button>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-700">{s.jobTitle}</td>
+                                                        <td className="px-4 py-3 text-gray-700 font-bold">{s.unit || '—'}</td>
+                                                        <td className="px-4 py-3 no-print">
+                                                            <button onClick={() => toggleOvertime(s.id)}
+                                                                className={overtimeIds.includes(s.id)
+                                                                    ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
+                                                                    : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
+                                                                <span>{overtimeIds.includes(s.id) ? '✓ مشمول' : '➕ إضافة'}</span>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="p-12 text-center text-gray-500">
+                                        <div className="text-6xl mb-4">🔍</div>
+                                        <p className="text-xl font-bold">لا يوجد موظف بهذا الاسم أو الرقم</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })()
+            ) : !selectedUnit ? (
                 // عرض الملصقات
                 <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                     <div className="px-6 pt-6">

@@ -27,6 +27,16 @@ export const normalizeJobNumber = (v?: unknown): string => String(v || '').trim(
     .replace(/[٠-٩]/g, (d) => String(ARABIC_INDIC_DIGITS.indexOf(d)))
     .replace(/[۰-۹]/g, (d) => String(EXTENDED_ARABIC_INDIC_DIGITS.indexOf(d)));
 
+// بحث موظف بالاسم أو بالرقم الوظيفي (بحث شاشات الوحدات الثلاث): الاسم بلا فروق الهمزات والتاء المربوطة
+// والمسافات، والرقم بالأرقام العربية أو الهندية سواء. نص بحث فارغ يطابق الجميع.
+export const matchesStaffSearch = (emp: { name?: unknown; jobNumber?: unknown } | null | undefined, query?: unknown): boolean => {
+    const q = normalizeArabicForSearch(query);
+    if (!q) return true;
+    if (!emp) return false;
+    const qNum = normalizeJobNumber(query).replace(/\s+/g, '');
+    return normalizeArabicForSearch(emp.name).includes(q) || (!!qNum && normalizeJobNumber(emp.jobNumber).includes(qNum));
+};
+
 // دالة التخمين الذكي للجنس من الاسم
 export const guessGender = (name?: string | null): string => {
     if (!name) return 'ذكر';
