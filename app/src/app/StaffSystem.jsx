@@ -8,6 +8,12 @@ import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, QUICK_STATUS_OPTIONS, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../core/dates';
+import { SearchCircularProgress } from '../ui/SearchCircularProgress';
+import { ICON_PATHS, Icon, SAFETY_VEST_IMG, SAFETY_BOOT_IMG } from '../ui/Icon';
+import { Segmented } from '../ui/Segmented';
+import { Button } from '../ui/Button';
+import { StatusBadge } from '../ui/StatusBadge';
+import { PageHeader } from '../ui/PageHeader';
 
             // يمنع المتصفح من إعادة موضع التمرير القديم عند إقلاع النظام (فتح الملف أو تحديث
             // الصفحة) — بلا هذا، إعادة تحميل الصفحة وأنت في وسط الجدول تُبقيك هناك بدل بداية الصفحة.
@@ -72,107 +78,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
         const LOCATION_ORDER = ['نهر بن عمر', 'باب الزبير', 'المركز الثقافي النفطي', 'المكينة'];
         const INITIAL_DATA = [];
 
-
-
-        
-        
-        
-
-        // مكون رسم الدوائر الإحصائية التفاعلية للبحث (إصدار V5.1)
-        const SearchCircularProgress = ({ percent, label, color = "text-sky-300", size = 76, strokeWidth = 7 }) => {
-            const radius = (size - strokeWidth) / 2;
-            const circumference = 2 * Math.PI * radius;
-            const offset = circumference - (percent / 100) * circumference;
-            
-            return (
-                <div className="flex flex-col items-center gap-1.5 flex-1 min-w-[70px]">
-                    <div className="relative" style={{ width: size, height: size }}>
-                        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90">
-                            <circle
-                                cx={size / 2}
-                                cy={size / 2}
-                                r={radius}
-                                fill="transparent"
-                                stroke="rgba(255, 255, 255, 0.12)"
-                                strokeWidth={strokeWidth}
-                            />
-                            <circle
-                                cx={size / 2}
-                                cy={size / 2}
-                                r={radius}
-                                fill="transparent"
-                                stroke="currentColor"
-                                className={`${color} transition-all duration-1000 ease-out`}
-                                strokeWidth={strokeWidth}
-                                strokeDasharray={circumference}
-                                strokeDashoffset={offset}
-                                strokeLinecap="round"
-                            />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center text-white">
-                            <span className="text-[13px] font-black tracking-tight">{percent}%</span>
-                        </div>
-                    </div>
-                    <span className="text-[10px] font-extrabold text-blue-100 text-center leading-tight max-w-[85px] line-clamp-2">
-                        {label}
-                    </span>
-                </div>
-            );
-        };
-
-        // أيقونات SVG أحادية اللون (خطوط Lucide، رخصة ISC) بدل الإيموجي — يتصرّف لونها بلون
-        // النص المحيط (currentColor) فيتبع أي سطح فاتح أو داكن بلا أي مدخل جديد في طبقة الليلي.
-        const ICON_PATHS = {
-            'layout-dashboard': <><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></>,
-            'gauge-color': <><path d="M3.34 19a10 10 0 1 1 17.32 0" stroke="#3b82f6"/><path d="m12 14 4-4" stroke="#f97316" strokeWidth="2.5"/><circle cx="12" cy="14" r="1.3" fill="#f97316" stroke="none"/></>,
-            'sliders-color': <><path d="M10 5H3" stroke="#3b82f6"/><path d="M12 19H3" stroke="#3b82f6"/><path d="M21 12h-9" stroke="#3b82f6"/><path d="M21 19h-5" stroke="#3b82f6"/><path d="M21 5h-7" stroke="#3b82f6"/><path d="M8 12H3" stroke="#3b82f6"/><path d="M14 3v4" stroke="#f97316" strokeWidth="3"/><path d="M16 17v4" stroke="#f97316" strokeWidth="3"/><path d="M8 10v4" stroke="#f97316" strokeWidth="3"/></>,
-            'users': <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
-            'building-2': <><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></>,
-            'star': <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
-            'droplet': <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.5-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>,
-            'shield-check': <><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></>,
-            // 2026-09-16: شيرت وأقدام عامّتان لا تمثّلان معدات السلامة تحديداً (ملاحظة مستخدم
-            // مباشرة). المحاولة التالية hard-hat/shield-user وsport-shoe SVG أفضل دلالياً لكن
-            // sport-shoe غير مقروء تحت 64px فعلياً (تحقّق بصري). الحل النهائي: صورتا إيموجي حقيقيتان
-            // (SAFETY_VEST_IMG وSAFETY_BOOT_IMG أسفل تعريف Icon) — انظر التعليق هناك للتفصيل.
-            // الأيقونات الأربع أدناه (shirt/footprints/shield-user لاحقاً) أُبقيت معرَّفة غير
-            // مستخدَمة، لا داعي لحذفها.
-            'shirt': <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>,
-            // أيقونة أقدام Lucide الرسمية: المستخدم رفض محاولة أولى برسم حذاء يدوي (بدا غير متّسق
-            // بجوار أيقونتين حقيقيتين من نفس المكتبة) — لا رسم يدوي بعد اليوم، مصدر Lucide الرسمي دائماً.
-            'footprints': <><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/></>,
-            'shield-user': <><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/></>,
-            'sport-shoe': <><path d="m15 10.42 4.8-5.07"/><path d="M19 18h3"/><path d="M9.5 22 21.414 9.415A2 2 0 0 0 21.2 6.4l-5.61-4.208A1 1 0 0 0 14 3v2a2 2 0 0 1-1.394 1.906L8.677 8.053A1 1 0 0 0 8 9c-.155 6.393-2.082 9-4 9a2 2 0 0 0 0 4h14"/></>,
-            // Lucide الرسمي (رخصة ISC)، جُلب بـcurl لا من الذاكرة. اسم المواصفة الأصلي
-            // `bar-chart-3` حُذف من المكتبة الحالية؛ `chart-column` هو نفس مفهوم الأعمدة
-            // العمودية بالاسم الحديث — تحقّق فعلي عبر curl قبل الاستعمال، لا افتراض.
-            'clipboard-list': <><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></>,
-            'chart-column': <><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>,
-            'eye': <><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></>,
-            'filter': <path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/>,
-            'file-spreadsheet': <><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></>
-        };
-        const Icon = ({ name, className = 'w-4 h-4' }) => (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                 strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 ${className}`} aria-hidden="true" data-icon={name}>
-                {ICON_PATHS[name] || null}
-            </svg>
-        );
-        // 2026-09-16: Lucide لا يملك أيقونة "سترة/بدلة سلامة عاكسة" ولا "بسطار سلامة صناعي"
-        // (بحث Gemini شامل عبر Tabler/Phosphor/Material Symbols/Iconoir/Heroicons/Remix أكّد
-        // غيابها من الكل). shield-user وsport-shoe كانا أفضل بديل SVG متاح لكن sport-shoe غير
-        // مقروء تحت 64px فعلياً (تحقّق بصري مباشر). الحل: صورتا إيموجي حقيقيتان من Noto Emoji
-        // (رخصة Apache 2.0، تناسب استخداماً تجارياً داخلياً بلا قيد نسب) — 🦺 U+1F9BA و🥾 U+1F97E
-        // (لا يوجد إيموجي "safety boot" رسمي في يونيكود؛ hiking boot أقرب بديل حقيقي متاح)، كلتاهما
-        // نُزِّلت بـcurl وتحقَّقتُ بصرياً من محتواها قبل التضمين، لا افتراضاً. SVG مضمَّن base64 كي
-        // يبقى الملف مكتفياً ذاتياً (يعمل النسخة الأوفلاين بلا إنترنت).
-        const SAFETY_VEST_IMG = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI1LjIuMywgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxMjggMTI4IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAxMjggMTI4OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+CjxnPgoJPHBhdGggc3R5bGU9ImZpbGw6I0U2NEExOTsiIGQ9Ik00My44NiwxMS45NGMwLDAsMTMuMzQtNi42OSwyMC4xNC02LjY5czIwLjE0LDYuNjksMjAuMTQsNi42OXYxMDMuNTJjMCwwLTcuODctMy4yMi0yMC4xNC0zLjIyCgkJcy0yMC4xNCwzLjIyLTIwLjE0LDMuMjJWMTEuOTR6Ii8+Cgk8Zz4KCQk8Zz4KCQkJPHBhdGggc3R5bGU9ImZpbGw6I0ZGOTEwMDsiIGQ9Ik01Ny45Miw1Ni40NWMwLTcuNjctMy4zMy0xMi42Ni00LjcyLTE1LjkxYy0yLjI2LTUuMzEtMy4yMi0xMC44MS0zLjQxLTE2LjM4CgkJCQljLTAuMTgtNS4zOSwyLjE1LTEzLjM4LDUuMjMtMTcuODZjLTguMzksMy41NS0yOS4zNCwxNC4zLTI5LjU1LDE0LjU2YzAsMCwwLjYxLDE5LTEuNjgsMjcuODQKCQkJCWMtMy42NywxNC4xOC0xMS41OSwyMC4xNi0xMS41OSwyMC4xNnY0OC40YzYuNzEsMi4yMiwyNC45Niw0LjM1LDM2LjI2LDUuNTJjMi4wNCwwLjIxLDYuNDctMC41NCw4LjA1LTEuODQKCQkJCWMxLjY3LTEuMzcsMi43MS0zLjc3LDIuNzQtNS45M0M1OS40OCw5NS41OSw1Ny45Miw2NC4xMyw1Ny45Miw1Ni40NXoiLz4KCQkJPHBhdGggc3R5bGU9ImZpbGw6I0ZGRkYwMDsiIGQ9Ik0xMi4yMywxMDUuOTRjMTMuODcsNC4xNyw0MS4wOSw1Ljg5LDQ2Ljk1LDQuODZsLTAuMTktOC4xMmMtNS44Ni0wLjAyLTMyLjc0LTAuNDMtNDYuNzctNS4yOAoJCQkJTDEyLjIzLDEwNS45NHoiLz4KCQkJPHBhdGggc3R5bGU9ImZpbGw6I0ZGRkYwMDsiIGQ9Ik01OC45OSw4NC4zNmMwLDAtNy4xNywwLjM1LTE3LjgxLTAuNzFsMS4zMS03MS40NmMtMy4yMSwxLjQ4LTguMzMsNC4xNi04LjMzLDQuMTZsLTAuOTksNjYuNTkKCQkJCWMtNy40Ny0wLjgtMTUuMzYtMi4wNS0yMC45NS0zLjk4djguNTRjMTMuODcsNC4xNyw0MS4xMSw2LjUxLDQ2Ljk2LDUuNDhMNTguOTksODQuMzZ6Ii8+CgkJPC9nPgoJCTxnPgoJCQk8cGF0aCBzdHlsZT0iZmlsbDojNjE2MTYxOyIgZD0iTTExLjYzLDY4LjkxYy0wLjA4LTEuMTktMC4wNS0xLjY2LDAuMzctMi4xM2MwLjM2LTAuNDEsMC43Ny0wLjksMS4xMS0xLjMzCgkJCQljMC45OC0xLjIyLDEuOTMtMi40NiwyLjgzLTMuNzRjMi4wOC0yLjk0LDQuMDYtNi4xLDUuMjMtOS41M2MyLjI0LTYuNiwzLjE1LTEzLjYsMy4zNy0yMC41NmMwLjE3LTUuMi0wLjQ1LTEwLjA0LTAuNDUtMTAuMDQKCQkJCXMtMC4yMS0wLjQ0LDEuMDMtMS4wOWMxLjI0LTAuNjUsMS43Ni0wLjQsMS43Ni0wLjRjMC4zMiwxLjg2LDAuNTgsNS4xOCwwLjY2LDYuOWMwLjc4LDE1LjM4LTIuNjIsMjMuNTgtMy41LDI2LjE3CgkJCQljLTIuNjYsNy44My0xMC4wOSwxNi40OS0xMS44LDE3LjI1QzEyLjI2LDcwLjQsMTEuNzIsNzAuMSwxMS42Myw2OC45MXoiLz4KCQk8L2c+Cgk8L2c+Cgk8Zz4KCQk8Zz4KCQkJPHBhdGggc3R5bGU9ImZpbGw6I0ZGOTEwMDsiIGQ9Ik03MC4wOCw1Ni40NWMwLTcuNjcsMy4zMy0xMi42Niw0LjcyLTE1LjkxYzIuMjYtNS4zMSwzLjIyLTEwLjgxLDMuNDEtMTYuMzgKCQkJCWMwLjE4LTUuMzktMi4xNS0xMy4zOC01LjIzLTE3Ljg2YzguMzksMy41NSwyOS4zNCwxNC4zLDI5LjU1LDE0LjU2YzAsMC0wLjYxLDE5LDEuNjgsMjcuODRjMy42NywxNC4xOCwxMS41OSwyMC4xNiwxMS41OSwyMC4xNgoJCQkJbC0wLjA1LDQ4LjFjLTEyLjg0LDMuMzItMjUuMzIsNS41LTM2LjA2LDUuNzljLTIuMDUsMC4wNS02LjA1LDAuMjMtOC4yMS0xLjgxYy0yLjUyLTIuMzgtMi42My0zLjMyLTIuNjUtNS40OAoJCQkJQzY4LjYxLDk2LjA0LDcwLjA4LDY0LjEzLDcwLjA4LDU2LjQ1eiIvPgoJCQk8cGF0aCBzdHlsZT0iZmlsbDojRkZGRjAwOyIgZD0iTTExNS43MywxMDUuOTRjLTEzLjg3LDQuMTctNDEuMDUsNS44OS00Ni45LDQuODZsMC4xOS04LjEyYzUuODYtMC4wMiwzMi43LTAuNDMsNDYuNzMtNS4yOAoJCQkJTDExNS43MywxMDUuOTR6Ii8+CgkJCTxwYXRoIHN0eWxlPSJmaWxsOiNGRkZGMDA7IiBkPSJNOTQuODQsODIuOTRsLTAuOTktNjYuNTljMCwwLTUuMTItMi42OC04LjMzLTQuMTZsMS4zMSw3MS40NmMtOC40LDEuMS0xNy44MSwxLjIyLTE3LjgxLDEuMjIKCQkJCWwtMC4xOSw4LjEyYzUuMzcsMC42NSwzMy4wNS0xLjMxLDQ2LjkyLTUuNDh2LTguNTRDMTEwLjE1LDgwLjg5LDEwMi4zMSw4Mi4xNCw5NC44NCw4Mi45NHoiLz4KCQk8L2c+CgkJPGc+CgkJCTxwYXRoIHN0eWxlPSJmaWxsOiM2MTYxNjE7IiBkPSJNMTE2LjM3LDY4LjkxYzAuMDgtMS4xOSwwLjA1LTEuNjYtMC4zNy0yLjEzYy0wLjM2LTAuNDEtMC43Ny0wLjktMS4xMS0xLjMzCgkJCQljLTAuOTgtMS4yMi0xLjkzLTIuNDYtMi44My0zLjc0Yy0yLjA4LTIuOTQtNC4wNi02LjEtNS4yMy05LjUzYy0yLjI0LTYuNi0zLjE1LTEzLjYtMy4zNy0yMC41NmMtMC4xNy01LjIsMC40NS0xMC4wNCwwLjQ1LTEwLjA0CgkJCQlzMC4yMS0wLjQ0LTEuMDMtMS4wOWMtMS4yNC0wLjY1LTEuNzYtMC40LTEuNzYtMC40Yy0wLjMyLDEuODYtMC41OCw1LjE4LTAuNjYsNi45Yy0wLjc4LDE1LjM4LDIuNjIsMjMuNTgsMy41LDI2LjE3CgkJCQljMi42Niw3LjgzLDEwLjA5LDE2LjQ5LDExLjgsMTcuMjVDMTE1Ljc0LDcwLjQsMTE2LjI4LDcwLjEsMTE2LjM3LDY4LjkxeiIvPgoJCTwvZz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojNjE2MTYxOyIgZD0iTTExNS43NSwxMTQuOTRjLTAuMzYsMC4xNi0xLjQzLDAuNC0xLjk0LDAuNDhjLTEuNDcsMC4yMi0xOC4zMyw0LjE0LTM0LjQ5LDUuMzEKCQkJYy0xLjYyLDAuMDctNC43OCwwLjE1LTcuMzItMS43NWMtMS4wNy0wLjgtMS40OS0yLjYxLTEuNDgtMy41NmMwLjA3LTYuMjgsMS4yNy01NS45LDEuMjktNTYuNDFjMC0wLjAxLDAuNDUtNi45NywyLjEzLTEyLjEKCQkJYzIuNzItOC4zMyw1Ljk4LTE5Ljc3LDYuMDQtMjYuOTZjMC4wNC01LjIzLTEuMjktOS4yNC0zLjk0LTExLjkxQzczLjM1LDUuMzMsNjguMTQsNCw2NCw0cy05LjM1LDEuMzMtMTIuMDMsNC4wMwoJCQljLTIuNjYsMi42OC0zLjk4LDYuNjktMy45NCwxMS45MWMwLjA2LDcuMTksMy4zMSwxOC42Myw2LjA0LDI2Ljk2YzEuNjgsNS4xMywyLjEyLDEyLjA5LDIuMTMsMTIuMQoJCQljMC4wMSwwLjUxLDEuMjIsNTAuMTMsMS4yOSw1Ni40MWMwLjAxLDAuOTQtMC40MSwyLjc1LTEuNDgsMy41NmMtMi41MywxLjkxLTUuNywxLjgzLTcuMzIsMS43NWMtMTYuMTctMS4xNy0zMy00LjU4LTM0LjQ5LTUKCQkJYy0wLjUtMC4xNC0xLjU4LTAuMzEtMS45NC0wLjQ4YzAsMC0wLjI4LTAuMDMtMC4yMiwxLjI5YzAuMDMsMC43OSwwLjEsMS4yNSwwLjMxLDEuNTFjMC4zLDAuMzgsMC44MiwwLjQ0LDEuNiwwLjcyCgkJCWMxLjczLDAuNjEsOC40MywxLjU3LDE3LjA5LDMuMTFjNS40NiwwLjk3LDEzLjY4LDIuMDQsMTYuNiwyLjA5YzMuODYsMC4wNyw3LjcxLDAuMzMsMTAuOTUtMi43NmMxLjQyLTEuMzUsMS45Ni0zLjAyLDEuOTQtNC43OAoJCQljLTAuMDctNi4zLTEuMjctNTYuOTctMS4yOS01Ny41NGMtMC4wMi0wLjMtMC40Ny03LjQxLTIuMjctMTIuOTJjLTMuODEtMTEuNjUtNS44NS0yMC42Ni01Ljg5LTI2LjA0CgkJCWMtMC4wMy00LjM5LDAuOTktNy42NywzLjA2LTkuNzVjMS45OS0yLjAxLDUuNC0zLjAzLDkuODctMy4xMWM0LjQ3LDAuMDgsNy44NywxLjEsOS44NywzLjExYzIuMDcsMi4wOCwzLjA5LDUuMzYsMy4wNiw5Ljc1CgkJCWMtMC4wNCw1LjM4LTIuMDgsMTQuMzktNS44OSwyNi4wNGMtMS44LDUuNTEtMi4yNSwxMi42Mi0yLjI3LDEyLjkyYy0wLjAxLDAuNTctMS4yMiw1MS4yNC0xLjI5LDU3LjU0CgkJCWMtMC4wMiwxLjc3LDAuNTIsMy40NCwxLjk0LDQuNzhjMy4yNSwzLjA5LDcuMDksMi44MywxMC45NSwyLjc2YzIuOTItMC4wNSwxMS4xNC0xLjEyLDE2LjYtMi4wOWM4LjY2LTEuNTMsMTUuMzUtMi44MywxNy4wOS0zLjM5CgkJCWMwLjktMC4yOSwxLjMtMC4zNCwxLjYtMC43MmMwLjItMC4yNiwwLjI3LTAuNzIsMC4zMS0xLjUxQzExNi4wMywxMTQuOTQsMTE1Ljc1LDExNC45NCwxMTUuNzUsMTE0Ljk0eiIvPgoJPC9nPgo8L2c+Cjwvc3ZnPgo=';
-        const SAFETY_BOOT_IMG = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI1LjIuMywgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkxheWVyXzUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxMjggMTI4IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAxMjggMTI4OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+CjxnPgoJPGc+CgkJPHBhdGggc3R5bGU9ImZpbGw6IzI2MzIzODsiIGQ9Ik0xMi43OCwyOS43NHYtOS4xOWMwLjk4LTEuMTQsMy44Mi0zLjQ4LDEwLjgzLTQuMTZjMS44Ni0wLjE4LDMuNjYtMC4yNyw1LjM1LTAuMjcKCQkJYzYuNjgsMCwxNC44NSwwLjYzLDE4LjE1LDMuMzVjMS43OSwxLjQ4LDMuMjUsMi42NCwzLjgsMy41MkwzNS40OSwzNS4xMkwxMi43OCwyOS43NHoiLz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojNzg0RDMwOyIgZD0iTTExOC45NSw5NC45YzAsMC0zLjctMTMuNDUtOS45NC0xNS4zMmMtNC42Ny0xLjQtOS41Ny0xLjYxLTE0LjQtMS45NAoJCQljLTMuMjUtMC4yMi02LjMtMS4wOS04Ljc1LTMuMzFjLTIuNjItMi4zNy0xNC43OS0xNy4yNC0xOS44OS0yNC42N2MtMS45My0yLjgxLTAuMjUtNy40OSwwLjYzLTEwLjg5YzAuODgtMy40MSwyLTYuODUsMS43Ny0xMC40MgoJCQljLTAuMjYtMy44Ny0yLjItNi40Ny04LjMtNy4yNmMtNC43LTAuNjEtNy4wMy0wLjM4LTcuMDMtMC4zOGMtMy41NC00LjM2LTEzLjgyLTcuMDItMjMuMTctNi40OGMtNi4xNywwLjM2LTE0LjY0LDEuMTktMTkuNDYsNS41MgoJCQljLTMuMDgsMi43Ny00LjE5LDguOTYtMC4yNywxMy4xN2MtMy4yNiwyLjA4LTMuNjQsNi4wNy0yLjc0LDguOTdjMC44OSwyLjg3LDIuOTEsNC4wMiwzLjAxLDQuODZjMC4xLDAuODEsMC40NCw4LjgxLDAuODIsMTEuOTYKCQkJYzAuNDMsMy41OS0xLjM5LDcuMDEtMi41NiwxMC40M2MtMC44NiwyLjUtMS40NSw3LjEzLTEuMjIsMTAuNjJjMC4wNywxLTAuMDMsMS44NCwwLjE5LDIuNThjMC4yMiwwLjczLDAuNzUsMS4zNywxLjE0LDEuNjkKCQkJYzcuOTEsNi40NSwyNC42NiwxMC42MSwyOC4yLDEyLjdjMy41NCwyLjA4LDIxLjAyLDE0LjE1LDMyLjI2LDE2LjAzYzExLjI0LDEuODcsMjUuNywxLjQ3LDM4LjYtNi42NQoJCQlDMTIwLjc0LDk3Ljk2LDExOC45NSw5NC45LDExOC45NSw5NC45eiBNMjUuMDQsMTguNjJjMTQuOTctMC45OCwyMC42OCwyLjA0LDIyLjU0LDMuOTljMCwwLTUuMjksMS4wNy03LjA3LDQuNDkKCQkJYy0wLjc4LDEuNDktMS43NSwzLjE4LTEuNjksNC44N2MtMy41MS0zLjA2LTcuMi0yLjQyLTExLjUyLTIuN2MtNS44My0wLjM4LTEyLjQ4LTIuMTYtMTIuMzEtNS43MgoJCQlDMTUuMTcsMTkuNjEsMjMsMTguNzUsMjUuMDQsMTguNjJ6Ii8+CgkJPHBhdGggc3R5bGU9ImZpbGw6bm9uZTsiIGQ9Ik0zNC44NiwyOS4yNWMtMS4wOCwzLjI5LDAuMTYsNi44NSwxLjQsMTAuMDljMS4zMSwzLjQzLDIuNjIsNi44NywzLjkyLDEwLjMiLz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojQTA2ODQxOyIgZD0iTTkzLjk0LDk2LjM5YzAuODktMC42MSwxLjc2LTEuMzEsMi4yNy0yLjI1czAuNjItMi4xOS0wLjAxLTMuMDZjLTAuNzItMS0yLjE2LTEuMjQtMy4zNi0wLjkzCgkJCWMtMS4yLDAuMzEtMi4yMywxLjA0LTMuMywxLjY2Yy0xLjM5LDAuOC00LjgzLDIuMTItNy45NSwyLjk4Yy0zLjA5LDAuODYtNC45OCwyLjYtNC40OCw0LjQ4YzAuODUsMy4yMSw2LjI4LDEuNzMsOC4wOCwxLjI1CgkJCUM4OC4xOSw5OS43Miw5MS4zNiw5OC4xNiw5My45NCw5Ni4zOXoiLz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojQTA2ODQxOyIgZD0iTTIzLjY2LDY1LjM3YzEuNjMsMi4zNywxLjM0LDYuMDItMC45Myw3Ljc4Yy0xLjIsMC45My0yLjc0LDEuMjctNC4wMywyLjA2CgkJCWMtMC43NywwLjQ3LTIuNzEsMi41MS00LjgxLDEuOThjLTEuMTktMC4zLTEuNy0xLjc0LTEuOTItMi45NGMtMC42Ny0zLjYzLDAuNDctNy41OSwzLjE0LTEwLjI1CgkJCUMxNy41NCw2MS41NywyMS45Nyw2Mi45MSwyMy42Niw2NS4zN3oiLz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojRTJBNjEwOyIgZD0iTTEyMy42MywxMDAuMTZjMC43NS0yLjI2LDAuMjYtNC43Ny0wLjQ2LTYuOThjLTAuNTUtMC45My0yLjA2LTEuMTctMy4wMi0xLjU1CgkJCWMtMC4yNy0wLjA5LTIuNTMtMC41Mi0yLjU5LTAuN2MwLjMsMC45OCwwLjgsMS45MywwLjkxLDIuOTZjMC4wNywxLjQzLTQuMTMsNi45OS0xMi43OCwxMC45OWMtMjEuOTUsMTAuMTQtMzUuNTcsNS45NS0zOS4wMyw1LjM3CgkJCWMtMTAuOTEtMS45OS0yMS45OS05LjM4LTI5LjQzLTE0Yy03Ljg2LTMuNTktMTkuNjEtNi4zMi0yNy4wNi0xMS44M0M5LjI0LDgzLjc2LDguMjEsODMuMTIsNy43OCw4MmMwLDAtMC4xLTAuMjUtMC4xNC0wLjUxCgkJCWMtMC4wNy0wLjUxLTAuMi0xLjc1LTAuMi0xLjc1Yy0xLjU2LDAuOTYtMy4zOSwyLjQtMy4zNyw0LjQzYzAsMC0wLjA3LDYuOTgtMC4wNyw2Ljk4Yy0wLjAxLDAuNywwLjI4LDEuMzcsMC44LDEuODQKCQkJYzEuMTIsMS4wMywzLjEsMi4yOCw0LjU1LDMuMTVjMC44NiwwLjUxLDEuODEsMC4zMiwyLjAyLTAuNzJjMC4wOC0wLjM5LDAuMTgtMC43OCwwLjMtMS4xN2MwLjQxLTEuNDksMS40LTAuNTIsMi40NS0wLjA5CgkJCWMwLjM2LDAuMTcsMC44MSwwLjMyLDAuOCwwLjc4YzAsMCwwLDMuMjIsMCwzLjIyYzAsMC44OCwwLjUyLDEuNjYsMS4zNCwxLjk5YzEuMjksMC4zNSwzLjYzLDIuMSw0Ljk0LDAuNzkKCQkJYzAuNDMtMC45NiwwLjI3LTIuMjcsMC45OC0zLjA4YzAuNTMtMC4zMiwxLjksMC4zOSwyLjQxLDAuNThjMC43OSwwLjMsMC4xOCwzLjE2LDAuMTUsMy41M2MtMC4wNywwLjg5LDAuMzksMS42MiwxLjI1LDEuOTUKCQkJYzAsMCwyLjc0LDEuMDQsMi43NCwxLjA0YzAuNTgsMC4yMiwxLjc1LDAuMjIsMi4xOC0wLjMzYzAuNTMtMC44NywwLjM2LTIuMDQsMC44Ni0yLjkyYzAuNjEtMC44NCwyLjExLDAuMzEsMi43NiwwLjY0CgkJCWMxLjE4LDAuNTcsMi41NCwxLjQsMy42NCwyLjEzYzMuMjQsMi4wOCw1LjAzLDIuOTYsOS45NCw1LjU3YzAuMiwwLjExLDAuMzMsMC4zMSwwLjM0LDAuNTNsMC4xNywzLjE5YzAuMiwyLjEzLDMsMi41Myw0LjUyLDMuNTQKCQkJYzAuNTgsMC4yOSwxLjY5LDAuNDEsMi4xMS0wLjIxYzAuMzctMC42OSwwLjQtMS41MywwLjc5LTIuMjNjMC4zOS0wLjgzLDEuMzQtMC42LDIuMDMtMC4zNGMyLjgzLDAuNzIsMS44LDIuMzcsMS44NSw0LjU1CgkJCWMwLjA1LDAuODEsMC44MywxLjU0LDEuNTksMS43N2MxLjQxLDAuNDIsMy4xNiwwLjg0LDQuMDgsMS4wNWMyLjI0LDAuNTEsMi4xLTEuODgsMi4yNC0zLjJjMC4wNS0wLjU4LDAuMTQtMS42LDAuOTktMS41CgkJCWMwLjc3LDAuMDksMS41NCwwLjE3LDIuMzIsMC4yNGMwLjMyLDAuMDMsMC41NywwLjI4LDAuNTksMC42bDAuMTUsMi44NWMwLjA2LDEuMTIsMC45OCwyLjAyLDIuMDksMi4wNQoJCQljMS41NSwwLjA0LDMuODMsMC4wNiw1LjYsMC4wNGMwLjkxLDAuMDIsMS43NS0wLjc0LDEuNjctMS42OWMwLjA2LTEuNTYtMC45My0zLjI1LDEuMTMtMy43OWMwLjc2LTAuMjQsMi45MS0wLjUxLDMuNzctMC41NQoJCQljMC43NS0wLjAzLDAuODUsMC41NCwwLjk2LDEuNjZjMC4wOCwwLjc2LDAuMDcsMS42NSwwLjYzLDIuMTZjMC40LDAuMzcsMS4wMSwwLjM5LDEuNTUsMC4zMQoJCQlDMTAyLjEyLDExOS4yNCwxMTcuNSwxMTEuNjgsMTIzLjYzLDEwMC4xNnoiLz4KCTwvZz4KCTxwYXRoIHN0eWxlPSJmaWxsOm5vbmU7c3Ryb2tlOiNDNjI4Mjg7c3Ryb2tlLXdpZHRoOjMuMDY3MztzdHJva2UtbGluZWNhcDpyb3VuZDtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiIGQ9Ik00NC4yMSw1MC40OQoJCWMyLjY2LDMuODQsMTkuMDIsMC4yOCwyNC4zNCwyLjc3Ii8+Cgk8cGF0aCBzdHlsZT0iZmlsbDpub25lO3N0cm9rZTojQzYyODI4O3N0cm9rZS13aWR0aDozLjA2NzM7c3Ryb2tlLWxpbmVjYXA6cm91bmQ7c3Ryb2tlLW1pdGVybGltaXQ6MTA7IiBkPSJNNDguODIsNjAuNzEKCQljMS45LDIuODgsMTguODUtMi41OSwyNC42OS0wLjk4Ii8+Cgk8cGF0aCBzdHlsZT0iZmlsbDpub25lO3N0cm9rZTojQzYyODI4O3N0cm9rZS13aWR0aDozLjA2NzM7c3Ryb2tlLWxpbmVjYXA6cm91bmQ7c3Ryb2tlLW1pdGVybGltaXQ6MTA7IiBkPSJNNTUuMDcsNjkuMzgKCQljMi4zNSwyLjcyLDE1Ljk2LTQuNjEsMjMuNjktMy4xNCIvPgoJPHBhdGggc3R5bGU9ImZpbGw6bm9uZTtzdHJva2U6I0M2MjgyODtzdHJva2Utd2lkdGg6My4wNjczO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIgZD0iTTYyLjMxLDc2LjVjMS43MywzLjMsMTUuMzgtNS40NiwyMi45Ni0yLjI0CgkJYzAuODcsMC4zNywxLjc1LDAuOSwwLjg5LDEuMjljLTYuMTIsMi43Ny0xNC4yMyw5LjM3LTE3LjE4LDcuMjciLz4KCTxwYXRoIHN0eWxlPSJmaWxsOm5vbmU7c3Ryb2tlOiNGNDQzMzY7c3Ryb2tlLXdpZHRoOjMuMDY3MztzdHJva2UtbGluZWNhcDpyb3VuZDtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiIGQ9Ik02Ny4zMiw4Mi4yMwoJCWMwLjQ4LTYuNjMsNi41MS0xMi40LDExLjQzLTE1Ljk5Ii8+Cgk8cGF0aCBzdHlsZT0iZmlsbDpub25lO3N0cm9rZTojRjQ0MzM2O3N0cm9rZS13aWR0aDozLjA2NzM7c3Ryb2tlLWxpbmVjYXA6cm91bmQ7c3Ryb2tlLW1pdGVybGltaXQ6MTA7IiBkPSJNNjAuMjksNzUuNTQKCQljMC01Ljc0LDEwLjI2LTE0LjM2LDEzLjIyLTE1LjgxIi8+Cgk8cGF0aCBzdHlsZT0iZmlsbDpub25lO3N0cm9rZTojRjQ0MzM2O3N0cm9rZS13aWR0aDozLjA2NzM7c3Ryb2tlLWxpbmVjYXA6cm91bmQ7c3Ryb2tlLW1pdGVybGltaXQ6MTA7IiBkPSJNNTMuMDIsNjguMTkKCQljMi4zNS02LjQ3LDkuOTUtMTEuODUsMTUuNTItMTQuOTQiLz4KCTxwYXRoIHN0eWxlPSJmaWxsOm5vbmU7c3Ryb2tlOiNGNDQzMzY7c3Ryb2tlLXdpZHRoOjMuMDY3MztzdHJva2UtbGluZWNhcDpyb3VuZDtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiIGQ9Ik00Ny43MSw1OC41MwoJCWMzLjcyLTUuNTksMTEuNjktOS4zNSwxNy40My0xMS4xOSIvPgoJPHBhdGggc3R5bGU9ImZpbGw6bm9uZTtzdHJva2U6I0Y0NDMzNjtzdHJva2Utd2lkdGg6My4wNjczO3N0cm9rZS1saW5lY2FwOnJvdW5kO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIgZD0iTTQ0LjQ3LDQ3LjkKCQljNC44OS01LjUyLDEzLjg4LTYuOTYsMjEuMi02LjA5Ii8+Cgk8cGF0aCBzdHlsZT0iZmlsbDojQTA2ODQxOyIgZD0iTTM5LjU0LDM0Ljk3YzEuMDQsNC4zOCwxLjA0LDkuMTUsMC44NiwxMy41OGM0Ljg0LTQuMTYsNS4wNS0xMS4xNCw0Ljg2LTE3LjA4CgkJYy0wLjExLTEuMjEsMC4xMS0yLjUxLDEuNy0zLjUzYzUuMTYtMy4zMywxMC42OS00LjY0LDE2LjUxLTQuMjZjMi4zMywwLjE2LDQsMS4yMyw0LDEuMjNjLTEuMTUtMi4yNS0zLjUtMy45MS03LjY5LTQuMjYKCQljLTUuNTktMC40Ni0xMi4xNCwwLjA1LTE2LjkzLDMuMjNDMzguODQsMjYuNTYsMzcuNTksMzAuNjYsMzkuNTQsMzQuOTd6Ii8+Cgk8Zz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojNzhBM0FDOyIgZD0iTTQ0LjIxLDUwLjQ5bDMuMjEsMC44OGMwLjUzLDAuMTQsMS4wMS0wLjM0LDAuODctMC44NmwtMS4xOS00LjQ2Yy0wLjE0LTAuNTMtMC44LTAuNy0xLjE5LTAuMzEKCQkJbC0yLjM2LDIuNGwwLDBjLTAuMzctMS4zMy0xLjc0LTIuMTEtMy4wNy0xLjc0bC0wLjk5LDAuMjdjLTEuMTQsMC4zMS0xLjgxLDEuNS0xLjUsMi42NGwwLjg0LDMuMDNjMC4zMSwxLjE0LDEuNSwxLjgxLDIuNjQsMS41CgkJCWwwLjk5LTAuMjdDNDMuOCw1My4xOSw0NC41OCw1MS44Miw0NC4yMSw1MC40OUw0NC4yMSw1MC40OXoiLz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojNzhBM0FDOyIgZD0iTTYzLjcsODYuNjFsMi41NCwxLjg1YzAuOTYsMC43LDIuMywwLjQ5LDMtMC40N2wwLjYxLTAuODNjMC44MS0xLjExLDAuNTctMi42OC0wLjU1LTMuNDkKCQkJbDMuMDYtMS4zMWMwLjUtMC4yMSwwLjU4LTAuODksMC4xNC0xLjIybC0zLjcxLTIuNzVjLTAuNDQtMC4zMy0xLjA3LTAuMDUtMS4xMiwwLjQ5bC0wLjM1LDMuMzVsMCwwCgkJCWMtMS4xMS0wLjgxLTIuNjgtMC41Ny0zLjQ5LDAuNTVsLTAuNjEsMC44M0M2Mi41Myw4NC41Nyw2Mi43NCw4NS45MSw2My43LDg2LjYxeiIvPgoJCTxwYXRoIHN0eWxlPSJmaWxsOiM3OEEzQUM7IiBkPSJNNTUuOTgsNzkuMjVsMi4yLDIuMjVjMC44MywwLjg1LDIuMTksMC44NywzLjA0LDAuMDRsMC43NC0wLjcyYzAuOTktMC45NiwxLjAxLTIuNTQsMC4wNC0zLjUzCgkJCWwzLjI0LTAuNzhjMC41My0wLjEzLDAuNzItMC43OCwwLjM0LTEuMThMNjIuMzksNzJjLTAuMzgtMC40LTEuMDQtMC4yMy0xLjE5LDAuM2wtMC45LDMuMjRsMCwwYy0wLjk2LTAuOTktMi41NC0xLjAxLTMuNTMtMC4wNAoJCQlsLTAuNzQsMC43MkM1NS4xNyw3Ny4wNCw1NS4xNiw3OC40LDU1Ljk4LDc5LjI1eiIvPgoJCTxwYXRoIHN0eWxlPSJmaWxsOiM3OEEzQUM7IiBkPSJNNDguOCw3MC4yMWwxLjc1LDIuNjJjMC42NiwwLjk5LDEuOTksMS4yNSwyLjk4LDAuNTlsMC44Ni0wLjU3YzEuMTUtMC43NywxLjQ1LTIuMzIsMC42OS0zLjQ2CgkJCWwzLjMyLTAuMThjMC41NC0wLjAzLDAuODUtMC42NCwwLjU1LTEuMDlsLTIuNTMtMy44NmMtMC4zLTAuNDYtMC45OS0wLjQyLTEuMjMsMC4wOGwtMS40OCwzLjAybDAsMAoJCQljLTAuNzctMS4xNS0yLjMyLTEuNDUtMy40Ni0wLjY5bC0wLjg2LDAuNTdDNDguNDEsNjcuODksNDguMTQsNjkuMjMsNDguOCw3MC4yMXoiLz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojNzhBM0FDOyIgZD0iTTQyLjUsNjAuODFsMS40NCwyLjhjMC41NCwxLjA1LDEuODQsMS40NywyLjg5LDAuOTNsMC45Mi0wLjQ3YzEuMjMtMC42MywxLjcxLTIuMTMsMS4wOC0zLjM2CgkJCWwzLjMyLDAuMmMwLjU0LDAuMDMsMC45Mi0wLjU0LDAuNjctMS4wMmwtMi4wNy00LjEyYy0wLjI1LTAuNDktMC45My0wLjUzLTEuMjMtMC4wNmwtMS44MiwyLjgzbDAsMAoJCQljLTAuNjMtMS4yMy0yLjEzLTEuNzEtMy4zNi0xLjA4bC0wLjkyLDAuNDdDNDIuMzcsNTguNDYsNDEuOTYsNTkuNzYsNDIuNSw2MC44MXoiLz4KCTwvZz4KCTxnPgoJCTxwYXRoIHN0eWxlPSJmaWxsOiM0RTM0MkU7IiBkPSJNMjguNTEsNDEuMjNjLTcuNzYsMC0xNy40NC0yLjY4LTE4LjkxLTYuMTFjLTAuNjUtMS41MywwLjU1LTIuMjQsMC41NS0yLjI0CgkJCWM0LjE4LDMuNDQsMTEuMDQsNS4zNywxOC44Nyw1LjI4YzAuODQtMC4wMSwxLjU0LDAuNjMsMS41NywxLjQ2djBjMC4wNCwwLjg3LTAuNjUsMS41OS0xLjUyLDEuNgoJCQlDMjguODgsNDEuMjIsMjguNjksNDEuMjMsMjguNTEsNDEuMjN6Ii8+Cgk8L2c+Cgk8Zz4KCQk8cGF0aCBzdHlsZT0iZmlsbDojNEUzNDJFOyIgZD0iTTI4LjE0LDUzLjQ2Yy02LjgsMC0xMi45OC0xLjQ1LTE3LjU3LTQuMDVjMCwwLDAuMTktMi4wMy0wLjQ2LTIuNzQKCQkJYy0wLjk1LTEuMDUtMS42MS0yLjYxLTEuNjEtMi42MWM0LDQuMDUsMTEuMzUsNi4zOCwxOS44Myw2LjMzYzAuODQsMCwxLjUzLDAuNjQsMS41NiwxLjQ3djBjMC4wMywwLjg2LTAuNjUsMS41OS0xLjUsMS41OQoJCQlDMjguMyw1My40NiwyOC4yMiw1My40NiwyOC4xNCw1My40NnoiLz4KCTwvZz4KCTxwYXRoIHN0eWxlPSJmaWxsOiNBMDY4NDE7IiBkPSJNMjMuODcsMTguNzNjLTEuNjgsMC4xMy0zLjU4LDAuNTUtNS4xNiwxLjE0Yy0xLjQsMC41Mi0zLjA2LDEuMzMtMy41MiwyLjc0CgkJYy0wLjU1LDEuNywwLjQ1LDMuMDIsMS42MywzLjkyYzEuNjYsMS40Miw1Ljg2LDEuNTQsNS4xNCw0LjI0Yy0xLjAyLDMuODEtOS4wOSwxLjU2LTExLjAzLTAuMzFjLTYuMDEtNS4zNi0xLjUtMTEuNzQsNC44NS0xMy44NQoJCWMzLjAzLTEuMDEsNi40MS0xLjc4LDkuMTctMS43M2MwLjY3LDAuMDEsMi44NywwLjIxLDIuNjcsMS45MUMyNy40NSwxOC4yNywyNi4wNSwxOC41NiwyMy44NywxOC43M3oiLz4KCTxwYXRoIHN0eWxlPSJmaWxsOiNBMDY4NDE7IiBkPSJNMTIuNDMsMzkuNDJjMS41MiwwLjg1LDQuODcsMS4yOCw1LjA3LDMuMDFjMC4zMSwyLjYxLTQuMjYsMi40Mi02LjAyLDEuNTMKCQljLTEuMzQtMC40Ny0yLjg3LTEuNzItMy4yNi0zLjUzQzcuNzUsMzguMjksOS4xNiwzNy41OSwxMi40MywzOS40MnoiLz4KPC9nPgo8L3N2Zz4K';
-
-        // شريحة مُعمَّمة (segmented control): مسار رمادي بحبّة نشطة مرفوعة، بأعمدة متساوية
-        // (grid-flow-col + auto-cols-fr) عرضُ كلٍّ منها بقدر أطول الخيارات، والمسار بعرضها لا بعرض
-        // الشريط (sm:w-fit) — ممتدّاً كان يُقرأ زراً واحداً (المواصفة §14.2). يتكدّس تحت `sm`.
-        // الفاصل بين الخيارات ولون التحويم في CSS تحت «.seg-opt».
         // مكتبات الاستيراد والتصدير (نحو 2.4MB) تُحمَّل عند أول حاجة إليها لا مع فتح التطبيق: كانت
         // تُنزَّل وتُحلَّل قبل ظهور أي شيء في كل فتح — وهو ما يُبطئ الهاتف تحديداً — وأغلب مرات الفتح
         // لا تصدير فيها. بعد أول تحميل تبقى في ذاكرة المتصفح (روابط بإصدار ثابت، مخزَّنة سنة كاملة).
@@ -209,92 +114,6 @@ import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABI
                 return false;
             }
         };
-
-        const Segmented = ({ options, value, onChange, ariaLabel, stackBelow = 'sm' }) => {
-            const stackClass = stackBelow === 'sm'
-                ? 'grid-cols-2 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr'
-                : 'grid-cols-1 sm:grid-cols-none sm:grid-flow-col sm:auto-cols-fr';
-            return (
-                <div className={`seg-track grid ${stackClass} gap-1 p-1 bg-slate-100 rounded-xl sm:w-fit sm:max-w-full`} aria-label={ariaLabel}>
-                    {options.map(opt => {
-                        const on = value === opt.value;
-                        return (
-                            <button
-                                key={opt.value}
-                                onClick={() => onChange(opt.value)}
-                                aria-pressed={on ? 'true' : 'false'}
-                                title={opt.title}
-                                className={`seg-opt min-w-0 [overflow-wrap:anywhere] flex items-center justify-center text-center gap-1 px-3 py-2 rounded-lg text-xs md:text-sm font-bold leading-snug transition-all duration-200 cursor-pointer ${
-                                    on
-                                        ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-black/5'
-                                        : 'text-slate-500 hover:text-slate-700'
-                                }`}
-                            >
-                                {opt.icon ? <span>{opt.icon}</span> : null}{opt.label}
-                            </button>
-                        );
-                    })}
-                </div>
-            );
-        };
-
-        // الأزرار بأربع درجات (المواصفة §6.2)، وألوانها من رموز التصميم وحدها — فلا تحتاج أي
-        // مدخل في طبقة الوضع الليلي. className للتخطيط فقط (عرض، ترتيب، flex-shrink): فئة تنافس
-        // فئات الدرجة أو المقاس (px-/py-/rounded-/bg-/justify-) لا تفوز بموضعها في النص بل بترتيب
-        // Tailwind الداخلي، فتُهمَل بصمت. شكل جديد يُضاف درجةً أو مقاساً هنا، لا تجاوزاً في الاستعمال.
-        const BUTTON_BASE = 'inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--action)]';
-        const BUTTON_VARIANTS = {
-            primary: 'bg-[var(--action)] hover:bg-[var(--action-hover)] text-white shadow-sm',
-            secondary: 'bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-[color:var(--ink)] border border-[color:var(--border-strong)]',
-            ghost: 'text-[color:var(--ink-2)] hover:text-[color:var(--ink)] hover:bg-[var(--surface-muted)]',
-            danger: 'bg-[var(--danger-tint)] text-[color:var(--danger)] border border-[color:var(--danger-border)]'
-        };
-        const BUTTON_SIZES = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm' };
-        const Button = ({ variant = 'secondary', size = 'md', type = 'button', className = '', children, ...rest }) => (
-            <button type={type} className={`${BUTTON_BASE} ${BUTTON_VARIANTS[variant]} ${BUTTON_SIZES[size]} ${className}`} {...rest}>
-                {children}
-            </button>
-        );
-
-        // شارة حالة دلالية (المواصفة §6.4): ok حضور/نجاح، warn تنبيه، danger غياب/حذف،
-        // action تحديد/إجراء، neutral للأعداد التي لا تحمل دلالة. القاعدة نفسها في className.
-        const BADGE_TONES = {
-            ok: 'bg-[var(--ok-tint)] text-[color:var(--ok)]',
-            warn: 'bg-[var(--warn-tint)] text-[color:var(--warn)]',
-            danger: 'bg-[var(--danger-tint)] text-[color:var(--danger)]',
-            action: 'bg-[var(--action-tint)] text-[color:var(--action-ink)]',
-            neutral: 'bg-[var(--surface-muted)] text-[color:var(--ink-2)]'
-        };
-        const StatusBadge = ({ tone = 'neutral', className = '', children, ...rest }) => (
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${BADGE_TONES[tone]} ${className}`} {...rest}>
-                {children}
-            </span>
-        );
-
-        // ترويسة صفحة موحّدة محايدة (المواصفة §6.1) تحلّ محلّ بانرات التدرّج لكل شاشة.
-        // icon إمّا اسم من ICON_PATHS (الحالة الشائعة) أو عقدة React جاهزة — لهوية ديناميكية
-        // ليست بعد ضمن ICON_PATHS (أيقونة/إيموجي الوحدة في شاشة «الوحدة المختارة»، تحويلها
-        // مهمة المرحلة 3 لا هذه المرحلة). meta لا يفرض تغليف شارة موحّد: بعض الشاشات تحتاج
-        // أكثر من عنصر meta بتنسيقين مختلفين (عدّاد + شارة ملوّنة)، فالمستدعي يغلّف بنفسه.
-        const PageHeader = ({ icon, title, description, meta, actions }) => (
-            <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-6 border-b border-[color:var(--border)]">
-                <div className="min-w-0">
-                    <h1 className="text-lg md:text-xl font-black text-[color:var(--ink)] flex items-center gap-2 flex-wrap">
-                        {icon && (typeof icon === 'string'
-                            ? <Icon name={icon} className="w-5 h-5 text-[color:var(--action)] flex-shrink-0" />
-                            : icon)}
-                        <span>{title}</span>
-                    </h1>
-                    {(description || meta) && (
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                            {description && <p className="text-xs text-[color:var(--ink-2)]">{description}</p>}
-                            {meta}
-                        </div>
-                    )}
-                </div>
-                {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-            </header>
-        );
 
         // المصنع: يُستدعى مرة واحدة في ملف مدخل كل نسخة بطبقة بياناتها ومكوّنات AuthViews الخاصة
         // بها. هذا الملف لا يستورد أي طبقة بيانات — العزل بين النسختين يقوم على هذا وحده، ويُفحص
