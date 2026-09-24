@@ -28,7 +28,6 @@ import { RestoreCenterModal } from '../features/restore/RestoreCenterModal';
 import { StaffListScreen } from '../features/staffList/StaffListScreen';
 import { ShiftConfirmModal } from '../features/shifts/ShiftConfirmModal';
 import { HourlyLeaveModal } from '../features/units/HourlyLeaveModal';
-import { formatHourlyLeaveNote } from '../domain/hourlyLeave';
 import { SquadScheduleModal } from '../features/shifts/SquadScheduleModal';
 import { UserManagementModal } from '../features/users/UserManagementModal';
 import { WaterMemoModal } from '../features/water/WaterMemoModal';
@@ -1828,11 +1827,8 @@ import { buildDatePicker } from '../ui/datePicker';
                                     'الرقم الوظيفي': s.jobNumber || '',
                                     'طبيعة العمل': s.workType || '',
                                     'الموقف اليومي': status,
-                                    'الملاحظات': status === 'إجازة زمنية'
-                                        ? formatHourlyLeaveNote(
-                                            (hourlyLeaveRecords[dailyReportDate] && hourlyLeaveRecords[dailyReportDate][s.id]) || 2,
-                                            hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id])
-                                        : ''
+                                    // توقيت الإجازة الزمنية وحده (بطلب المستخدم)؛ السجل القديم بلا توقيت يبقى فارغاً
+                                    'الملاحظات': (status === 'إجازة زمنية' && hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id]) || ''
                                 });
                             });
                         }
