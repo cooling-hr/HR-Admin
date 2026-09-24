@@ -3,7 +3,7 @@ import React from 'react';
 // نافذة معاينة الجداول وتصديرها. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const PreviewModal = ({ ctx }) => {
-    const { ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printPreview, selectedUnit, setPreviewTitle, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth } = ctx;
+    const { ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printOrientation, printPreview, selectedUnit, setPreviewTitle, setPrintOrientation, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth } = ctx;
     return (
         <div className="preview-overlay">
             <div className="preview-container">
@@ -189,6 +189,15 @@ export const PreviewModal = ({ ctx }) => {
                         <span>📲</span>
                         <span>إرسال عبر واتساب</span>
                     </button>
+
+                    <div className="flex items-stretch rounded-lg overflow-hidden border border-slate-300 shadow-sm" title="اتجاه الورقة عند الطباعة">
+                        {[['portrait', '📄 عمودي'], ['landscape', '📃 أفقي']].map(([val, label]) => (
+                            <button key={val} onClick={() => setPrintOrientation(val)}
+                                className={`px-3 py-3 text-sm font-bold transition ${printOrientation === val ? 'bg-purple-500 text-white' : 'bg-white text-purple-700 hover:bg-slate-50'}`}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
 
                     <button onClick={printPreview}
                         className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 font-bold transition shadow-lg">

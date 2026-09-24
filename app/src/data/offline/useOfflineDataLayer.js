@@ -28,6 +28,7 @@ export function useOfflineDataLayer(deps) {
     dailyStatusOverrides,
     dataEntryOperator,
     hourlyLeaveRecords,
+    hourlyLeaveTimings,
     officialHolidays,
     overtimeHoursRecords,
     overtimeIds,
@@ -36,6 +37,7 @@ export function useOfflineDataLayer(deps) {
     setDailyStatusOverrides,
     setDataEntryOperator,
     setHourlyLeaveRecords,
+    setHourlyLeaveTimings,
     setOfficialHolidays,
     setOvertimeHoursRecords,
     setOvertimeIds,
@@ -330,10 +332,10 @@ const handleLogin = async (e) => {
 
     setCurrentUserRole(targetUser.role);
     setCurrentUserName(targetUser.name);
-    // لا نُعيّن dataEntryOperator تلقائياً هنا — حقل "اسم منظم الموقف" مشترك بين كل
-    // الأجهزة على الشبكة المحلية، لا حالة دخول شخصية. كان يُستبدَل باسم كل من يسجّل
-    // الدخول من أي جهاز فيُبعث للجميع، فيرى إداري اسم زميله يحل محل اسمه على شاشته
-    // (نُقل نفس الإصلاح من index.html — انظر التعليق المقابل هناك).
+    // اسم منظم الموقف = صاحب الحساب (2026-09-24). كان مشتركاً بين الأجهزة فأُوقف تعيينه هنا
+    // لأن اسم كل داخل كان يُبثّ ويحلّ محل أسماء الزملاء؛ صار الآن خاصاً بكل جهاز — لا يُطبَّق
+    // من حزم المزامنة ولا يُطلق البثّ — فتعيينه عند الدخول آمن، ويبقى قابلاً للتعديل يدوياً.
+    setDataEntryOperator(targetUser.name || '');
     setIsCheckingLogin(false);
     setShowWelcome(false);
     setLoginInputPin('');
@@ -484,6 +486,7 @@ const handleSaveUser = (e) => {
         systemUsersList: updatedUsers,
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
+        hourlyLeaveTimings: hourlyLeaveTimings,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
         shiftAnchorDate: anchorDate,
@@ -562,6 +565,7 @@ const handleDeleteUser = (userId) => {
         systemUsersList: updatedUsers,
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
+        hourlyLeaveTimings: hourlyLeaveTimings,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
         shiftAnchorDate: anchorDate,
@@ -591,6 +595,7 @@ const handleToggleUserActive = (userId) => {
         systemUsersList: updatedUsers,
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
+        hourlyLeaveTimings: hourlyLeaveTimings,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
         shiftAnchorDate: anchorDate,
@@ -678,6 +683,7 @@ const pushDataToCloud = async (bundle = null) => {
             systemUsersList: systemUsers,
             officialHolidaysList: officialHolidays,
             hourlyLeaveRecords: hourlyLeaveRecords,
+            hourlyLeaveTimings: hourlyLeaveTimings,
             overtimeHoursRecords: overtimeHoursRecords,
             dailyStatusOverrides: dailyStatusOverrides,
             shiftAnchorDate: anchorDate,
@@ -859,6 +865,7 @@ const pushDataToServer = async (customBundle = null) => {
         systemUsersList: systemUsers,
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
+        hourlyLeaveTimings: hourlyLeaveTimings,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
         shiftAnchorDate: anchorDate,
@@ -926,6 +933,11 @@ const applyDataBundleToState = (bundle) => {
         setHourlyLeaveRecords(bundle.hourlyLeaveRecords);
         safeStorage.setItem('hourlyLeaveRecords', JSON.stringify(bundle.hourlyLeaveRecords));
     }
+    // التوقيتات تُطبَّق حين تصل فقط: حزمة من نسخة أقدم بلا الحقل لا تمحو توقيتات هذا الجهاز
+    if (bundle.hourlyLeaveTimings && typeof bundle.hourlyLeaveTimings === 'object') {
+        setHourlyLeaveTimings(bundle.hourlyLeaveTimings);
+        safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(bundle.hourlyLeaveTimings));
+    }
     if (bundle.overtimeHoursRecords) {
         setOvertimeHoursRecords(bundle.overtimeHoursRecords);
         safeStorage.setItem('overtimeHoursRecords', JSON.stringify(bundle.overtimeHoursRecords));
@@ -949,10 +961,7 @@ const applyDataBundleToState = (bundle) => {
         setTwoShiftAnchorSquad(bundle.twoShiftAnchorSquad);
         safeStorage.setItem('twoShiftAnchorSquad', bundle.twoShiftAnchorSquad);
     }
-    if (bundle.dataEntryOperator) {
-        setDataEntryOperator(bundle.dataEntryOperator);
-        safeStorage.setItem('dataEntryOperator', bundle.dataEntryOperator);
-    }
+    // bundle.dataEntryOperator لا يُطبَّق: اسم منظم الموقف خاص بكل جهاز (يُملأ عند الدخول)
     if (bundle.pendingDeletionRequest !== undefined) {
         setPendingDeletionRequest(bundle.pendingDeletionRequest);
         if (bundle.pendingDeletionRequest) {
@@ -1023,7 +1032,8 @@ React.useEffect(() => {
     if (!isSyncingRef.current && syncStatus.connected) {
         pushDataToServer();
     }
-}, [staff, officialHolidays, hourlyLeaveRecords, overtimeHoursRecords, dailyStatusOverrides, anchorDate, dataEntryOperator]);
+// لا dataEntryOperator هنا: اسم منظم الموقف خاص بكل جهاز ولا يُبثّ (انظر تعيينه عند الدخول)
+}, [staff, officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, overtimeHoursRecords, dailyStatusOverrides, anchorDate]);
 
 
 // ===== بوابات الإجراءات الحسّاسة =====

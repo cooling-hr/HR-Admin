@@ -3,7 +3,7 @@ import React from 'react';
 // نافذة تأكيد إعادة ضبط وتثبيت الوجبة. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const ShiftConfirmModal = ({ ctx }) => {
-    const { dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad } = ctx;
+    const { dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, hourlyLeaveTimings, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad } = ctx;
     return (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-fadeIn no-print">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-scaleUp">
@@ -55,6 +55,7 @@ export const ShiftConfirmModal = ({ ctx }) => {
                                 systemUsersList: systemUsers,
                                 officialHolidaysList: officialHolidays,
                                 hourlyLeaveRecords: hourlyLeaveRecords,
+                                hourlyLeaveTimings: hourlyLeaveTimings,
                                 overtimeHoursRecords: overtimeHoursRecords,
                                 dailyStatusOverrides: dailyStatusOverrides,
                                 shiftAnchorDate: targetDate,

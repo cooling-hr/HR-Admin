@@ -1,6 +1,6 @@
 import React from 'react';
 import { PageHeader } from '../../ui/PageHeader';
-import { getArabicDayName, getDaysBetweenDates } from '../../core/dates';
+import { ARABIC_MONTH_NAMES, getArabicDayName, getDaysBetweenDates } from '../../core/dates';
 import { getThreeName, getTripleName } from '../../core/arabic';
 import { getMissingFields } from '../../domain/employees';
 import { isLongOrMaternityLeave } from '../../domain/periods';
@@ -9,7 +9,7 @@ import { sortByJobTitleHierarchy } from '../../domain/sorting';
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
+    const { DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
     return (
         <div className="space-y-5 animate-fadeIn">
             {/* شاشات القسم الثلاث انتقلت إلى الشريط الملتصق أعلى الصفحة، في صفّ تحت
@@ -848,7 +848,16 @@ export const UnitsScreen = ({ ctx }) => {
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <label className="flex items-center gap-1.5 bg-teal-700/60 px-3 py-1.5 rounded-lg text-xs font-bold" title="شهر الكشف — يظهر في عنوانه">
+                            <span>📅 شهر الكشف:</span>
+                            <input
+                                type="month"
+                                value={overtimeListMonth}
+                                onChange={(e) => setOvertimeListMonth(e.target.value)}
+                                className="bg-white text-teal-800 rounded px-1.5 py-0.5 font-mono font-black outline-none cursor-pointer"
+                            />
+                        </label>
                         <button 
                             onClick={() => {
                                 const selectedEmployees = staff.filter(s => overtimeIds.includes(s.id));
@@ -864,7 +873,9 @@ export const UnitsScreen = ({ ctx }) => {
         
         setPreviewData(exportData);
         setVisiblePreviewColumns(['الرقم الوظيفي', 'الاسم', 'العنوان الوظيفي']);
-                                setPreviewTitle('كشف الساعات الإضافية لشعبة تبريد المركز ومحطة عزل نهر بن عمر');
+                                const [otY, otM] = (overtimeListMonth || '').split('-').map(Number);
+                                const otMonth = otY && otM ? ` لشهر ${ARABIC_MONTH_NAMES[otM - 1]} ${otY}` : '';
+                                setPreviewTitle(`كشف الساعات الإضافية${otMonth} لشعبة تبريد المركز ومحطة عزل نهر بن عمر`);
                                 setShowPreview(true);
                             }}
                             className="bg-white text-teal-700 hover:bg-teal-50 px-4 py-2 font-bold rounded-lg text-xs transition shadow-sm cursor-pointer"

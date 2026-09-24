@@ -27,6 +27,8 @@ import { ReturnPromptModal } from '../features/periods/ReturnPromptModal';
 import { RestoreCenterModal } from '../features/restore/RestoreCenterModal';
 import { StaffListScreen } from '../features/staffList/StaffListScreen';
 import { ShiftConfirmModal } from '../features/shifts/ShiftConfirmModal';
+import { HourlyLeaveModal } from '../features/units/HourlyLeaveModal';
+import { formatHourlyLeaveNote } from '../domain/hourlyLeave';
 import { SquadScheduleModal } from '../features/shifts/SquadScheduleModal';
 import { UserManagementModal } from '../features/users/UserManagementModal';
 import { WaterMemoModal } from '../features/water/WaterMemoModal';
@@ -175,6 +177,8 @@ import { buildDatePicker } from '../ui/datePicker';
                 const saved = safeStorage.getItem('overtimeSelectedIds');
                 return saved ? JSON.parse(saved) : [];
             });
+            // شهر كشف الساعات الإضافية الموحد (YYYY-MM): يظهر في عنوانه، ولا يُحفظ (الشهر الحالي عند كل فتح)
+            const [overtimeListMonth, setOvertimeListMonth] = useState(() => localDateStr().slice(0, 7));
             const [previewTitle, setPreviewTitle] = useState('');
 
             // دالة الإشعارات المخصصة للتنبيهات السريعة
@@ -222,6 +226,15 @@ import { buildDatePicker } from '../ui/datePicker';
                 const saved = safeStorage.getItem('overtimeHoursRecords');
                 return saved ? JSON.parse(saved) : {};
             });
+            // توقيت الإجازة الزمنية (بداية/أثناء/نهاية الدوام) بجانب ساعاتها — انظر domain/hourlyLeave
+            const [hourlyLeaveTimings, setHourlyLeaveTimings] = useState(() => {
+                try {
+                    const saved = JSON.parse(safeStorage.getItem('hourlyLeaveTimings') || '{}');
+                    return saved && typeof saved === 'object' ? saved : {};
+                } catch (e) { return {}; }
+            });
+            // الإجازة الزمنية قيد الإدخال في نافذتها: { empId, dateStr, empName, hours, timing }
+            const [pendingHourlyLeave, setPendingHourlyLeave] = useState(null);
 
             React.useEffect(() => {
                 safeStorage.setItem('hourlyLeaveRecords', JSON.stringify(hourlyLeaveRecords));
@@ -280,6 +293,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         systemUsersList: systemUsers,
                         officialHolidaysList: next,
                         hourlyLeaveRecords: hourlyLeaveRecords,
+                        hourlyLeaveTimings: hourlyLeaveTimings,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
                         shiftAnchorDate: anchorDate,
@@ -325,6 +339,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         systemUsersList: systemUsers,
                         officialHolidaysList: next,
                         hourlyLeaveRecords: hourlyLeaveRecords,
+                        hourlyLeaveTimings: hourlyLeaveTimings,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
                         shiftAnchorDate: anchorDate,
@@ -342,7 +357,20 @@ import { buildDatePicker } from '../ui/datePicker';
                 setHolidayRangeEnd('');
             };
 
-            const setEmployeeHourlyLeave = (empId, dateStr, hours) => {
+            const setEmployeeHourlyLeave = (empId, dateStr, hours, timing) => {
+                // التوقيت يتبع الساعات: يُحذف معها، ويُستبدل إن مُرِّر، ويبقى كما هو إن لم يُمرَّر
+                setHourlyLeaveTimings(prev => {
+                    const cur = prev[dateStr] && prev[dateStr][empId];
+                    const want = !(hours > 0) ? undefined : (timing === undefined ? cur : (timing || undefined));
+                    if (cur === want) return prev;
+                    const next = { ...prev, [dateStr]: { ...(prev[dateStr] || {}) } };
+                    if (want) next[dateStr][empId] = want;
+                    else {
+                        delete next[dateStr][empId];
+                        if (Object.keys(next[dateStr]).length === 0) delete next[dateStr];
+                    }
+                    return next;
+                });
                 setHourlyLeaveRecords(prev => {
                     const next = { ...prev };
                     if (!next[dateStr]) next[dateStr] = {};
@@ -476,11 +504,12 @@ import { buildDatePicker } from '../ui/datePicker';
             React.useEffect(() => {
                 safeStorage.setItem('officialHolidaysList', JSON.stringify(officialHolidays));
                 safeStorage.setItem('hourlyLeaveRecords', JSON.stringify(hourlyLeaveRecords));
+                safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(hourlyLeaveTimings));
                 safeStorage.setItem('overtimeHoursRecords', JSON.stringify(overtimeHoursRecords));
                 if (!isSyncingRef.current && isInitialCloudLoadCompleteRef.current && staff.length > 0) {
                     pushDataToCloud();
                 }
-            }, [officialHolidays, hourlyLeaveRecords, overtimeHoursRecords]);
+            }, [officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, overtimeHoursRecords]);
 
             React.useEffect(() => {
                 safeStorage.setItem('shiftAnchorDate', anchorDate);
@@ -669,6 +698,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 dailyStatusOverrides,
                 dataEntryOperator,
                 hourlyLeaveRecords,
+                hourlyLeaveTimings,
                 officialHolidays,
                 overtimeHoursRecords,
                 overtimeIds,
@@ -679,6 +709,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 setDailyStatusOverrides,
                 setDataEntryOperator,
                 setHourlyLeaveRecords,
+                setHourlyLeaveTimings,
                 setOfficialHolidays,
                 setOvertimeHoursRecords,
                 setOvertimeIds,
@@ -1225,23 +1256,19 @@ import { buildDatePicker } from '../ui/datePicker';
                     } catch(e) {}
                 }
 
+                // سجلات الساعات بعد تعديلها هنا، للبثّ المؤجَّل أدناه — قيم الإغلاق قبل الحفظ
+                let freshRecords = {};
                 if (status === 'default') {
                     revertToDefault();
                     return;
                 } else if (status === 'إجازة زمنية') {
-                    const empName = emp ? emp.name : 'المنتسب';
-                    const inputHours = prompt(`⏰ الإجازة الزمنية للمنتسب (${empName}):\n\nكم عدد ساعات الإجازة الزمنية الممنوحة اليوم؟ (أدخل عدداً من 1 إلى 7 ساعات):`, '2');
-                    if (inputHours !== null) {
-                        const h = parseInt(inputHours.trim());
-                        if (!isNaN(h) && h >= 1 && h <= 7) {
-                            setEmployeeHourlyLeave(empId, dateStr, h);
-                        } else {
-                            setEmployeeHourlyLeave(empId, dateStr, 2);
-                        }
-                    } else {
-                        revertToDefault();
-                        return;
-                    }
+                    // الساعات والتوقيت من نافذتها؛ الموقف يُثبَّت عند «تثبيت» (confirmHourlyLeave)،
+                    // و«إلغاء» يُبقي موقف اليوم كما كان
+                    const oldHours = hourlyLeaveRecords[dateStr] && hourlyLeaveRecords[dateStr][empId];
+                    const oldTiming = hourlyLeaveTimings[dateStr] && hourlyLeaveTimings[dateStr][empId];
+                    setPendingHourlyLeave({ empId, dateStr, empName: emp ? emp.name : 'المنتسب',
+                        hours: oldHours >= 1 && oldHours <= 7 ? oldHours : 2, timing: oldTiming || '' });
+                    return;
                 } else if (status === 'دوام إضافي' || status.includes('إضافي')) {
                     try {
                         const empName = emp ? emp.name : 'المنتسب';
@@ -1255,8 +1282,10 @@ import { buildDatePicker } from '../ui/datePicker';
                             const h = parseInt(inputOt.trim());
                             if (!isNaN(h) && h >= 1 && h <= maxHours) {
                                 setEmployeeOvertimeHours(empId, dateStr, h);
+                                freshRecords = { overtimeHoursRecords: withDayValue(overtimeHoursRecords, dateStr, empId, h) };
                             } else {
                                 setEmployeeOvertimeHours(empId, dateStr, maxHours);
+                                freshRecords = { overtimeHoursRecords: withDayValue(overtimeHoursRecords, dateStr, empId, maxHours) };
                             }
                         } else {
                             revertToDefault();
@@ -1265,6 +1294,28 @@ import { buildDatePicker } from '../ui/datePicker';
                     } catch(e) {}
                 }
 
+                commitDailyStatusOverride(empId, dateStr, status, freshRecords);
+            };
+
+            const confirmHourlyLeave = () => {
+                const p = pendingHourlyLeave;
+                if (!p || !p.timing) return;
+                setEmployeeHourlyLeave(p.empId, p.dateStr, p.hours, p.timing);
+                commitDailyStatusOverride(p.empId, p.dateStr, 'إجازة زمنية', {
+                    hourlyLeaveRecords: withDayValue(hourlyLeaveRecords, p.dateStr, p.empId, p.hours),
+                    hourlyLeaveTimings: withDayValue(hourlyLeaveTimings, p.dateStr, p.empId, p.timing),
+                });
+                setPendingHourlyLeave(null);
+            };
+
+            // نسخة من سجل يومي (تاريخ ← موظف ← قيمة) بقيمة موظف واحد في يوم واحد، دون مسّ الأصل
+            const withDayValue = (records, dateStr, empId, value) =>
+                ({ ...records, [dateStr]: { ...((records && records[dateStr]) || {}), [empId]: value } });
+
+            // تثبيت موقف اليوم وبثّه؛ الساعات (الزمنية/الإضافي) تُحفظ قبله كلٌّ في سجله، وتصل هنا
+            // محدَّثةً في fresh: البثّ المؤجَّل بقيم الإغلاق قد يصل السحابة بعد البثّ الصحيح فيكتب فوقه
+            const commitDailyStatusOverride = (empId, dateStr, status, fresh = {}) => {
+                const emp = staff.find(s => s.id === empId);
                 // إدخال موقف لليوم يُزيل تذكرة حذفه
                 if (emp) updateTombstones({ removeDays: [tombstoneKeyOfDay(dateStr, emp.jobNumber)] });
                 let nextOverrides;
@@ -1283,6 +1334,7 @@ import { buildDatePicker } from '../ui/datePicker';
                             systemUsersList: systemUsers,
                             officialHolidaysList: officialHolidays,
                             hourlyLeaveRecords: hourlyLeaveRecords,
+                            hourlyLeaveTimings: hourlyLeaveTimings,
                             overtimeHoursRecords: overtimeHoursRecords,
                             dailyStatusOverrides: nextOverrides,
                             shiftAnchorDate: anchorDate,
@@ -1291,7 +1343,8 @@ import { buildDatePicker } from '../ui/datePicker';
                             dataEntryOperator: dataEntryOperator,
                             overtimeSelectedIds: overtimeIds,
                             lastCloudUpdate: new Date().toISOString(),
-                            pendingDeletionRequest: pendingDeletionRequest
+                            pendingDeletionRequest: pendingDeletionRequest,
+                            ...fresh
                         });
                     }
                 }, 50);
@@ -1374,6 +1427,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         systemUsersList: systemUsers,
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
+                        hourlyLeaveTimings: hourlyLeaveTimings,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: updatedOverrides,
                         shiftAnchorDate: anchorDate,
@@ -1397,6 +1451,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     systemUsersList: systemUsers,
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
+                    hourlyLeaveTimings: hourlyLeaveTimings,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
                     shiftAnchorDate: dailyReportDate,
@@ -1419,6 +1474,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     systemUsersList: systemUsers,
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
+                    hourlyLeaveTimings: hourlyLeaveTimings,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
                     shiftAnchorDate: dailyReportDate,
@@ -1778,7 +1834,11 @@ import { buildDatePicker } from '../ui/datePicker';
                                     'الرقم الوظيفي': s.jobNumber || '',
                                     'طبيعة العمل': s.workType || '',
                                     'الموقف اليومي': status,
-                                    'الملاحظات': ''
+                                    'الملاحظات': status === 'إجازة زمنية'
+                                        ? formatHourlyLeaveNote(
+                                            (hourlyLeaveRecords[dailyReportDate] && hourlyLeaveRecords[dailyReportDate][s.id]) || 2,
+                                            hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id])
+                                        : ''
                                 });
                             });
                         }
@@ -1929,6 +1989,10 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (bundle.hourlyLeaveRecords) {
                     setHourlyLeaveRecords(bundle.hourlyLeaveRecords);
                     safeStorage.setItem('hourlyLeaveRecords', JSON.stringify(bundle.hourlyLeaveRecords));
+                    // ملف أقدم بلا توقيتات: السجل يتبع ساعاته فيُفرَّغ معها
+                    const timings = bundle.hourlyLeaveTimings && typeof bundle.hourlyLeaveTimings === 'object' ? bundle.hourlyLeaveTimings : {};
+                    setHourlyLeaveTimings(timings);
+                    safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(timings));
                 }
                 if (bundle.overtimeHoursRecords) {
                     setOvertimeHoursRecords(bundle.overtimeHoursRecords);
@@ -1950,10 +2014,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     setTwoShiftAnchorSquad(bundle.twoShiftAnchorSquad);
                     safeStorage.setItem('twoShiftAnchorSquad', bundle.twoShiftAnchorSquad);
                 }
-                if (bundle.dataEntryOperator) {
-                    setDataEntryOperator(bundle.dataEntryOperator);
-                    safeStorage.setItem('dataEntryOperator', bundle.dataEntryOperator);
-                }
+                // bundle.dataEntryOperator لا يُستعاد: اسم منظم الموقف خاص بكل جهاز (يُملأ عند الدخول)
             };
 
             // selection: خريطة "رقم::حقل" ← منطقي. addSelection: خريطة رقم ← منطقي للموظفين الجدد.
@@ -3159,6 +3220,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         staffData: staff,
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
+                        hourlyLeaveTimings: hourlyLeaveTimings,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
                         shiftAnchorDate: anchorDate,
@@ -3481,6 +3543,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     systemUsersList: systemUsers,
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
+                    hourlyLeaveTimings: hourlyLeaveTimings,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
                     shiftAnchorDate: anchorDate,
@@ -3597,6 +3660,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         systemUsersList: systemUsers,
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
+                        hourlyLeaveTimings: hourlyLeaveTimings,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
                         shiftAnchorDate: anchorDate,
@@ -3623,6 +3687,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 setStaff([]);
                 setDailyStatusOverrides({});
                 setHourlyLeaveRecords({});
+                setHourlyLeaveTimings({});
                 setOvertimeHoursRecords({});
                 setPendingDeletionRequest(null);
                 safeStorage.setItem('staffData', JSON.stringify([]));
@@ -3633,6 +3698,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     systemUsersList: systemUsers,
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: {},
+                    hourlyLeaveTimings: {},
                     overtimeHoursRecords: {},
                     dailyStatusOverrides: {},
                     shiftAnchorDate: anchorDate,
@@ -3656,6 +3722,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     systemUsersList: systemUsers,
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
+                    hourlyLeaveTimings: hourlyLeaveTimings,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
                     shiftAnchorDate: anchorDate,
@@ -4279,7 +4346,31 @@ import { buildDatePicker } from '../ui/datePicker';
                 }
             };
 
+            // اتجاه ورقة طباعة المعاينة، يتذكّره الجهاز. القالب يفرض A4 عمودية في @page فتختفي قائمة
+            // الاتجاه من نافذة طباعة المتصفح؛ الأفقي يُحقَن قبل الطباعة ويُزال بعدها كطباعة مصفوفة الأيام.
+            const [printOrientation, setPrintOrientation] = useState(() =>
+                safeStorage.getItem('previewPrintOrientation') === 'landscape' ? 'landscape' : 'portrait');
+            React.useEffect(() => {
+                safeStorage.setItem('previewPrintOrientation', printOrientation);
+            }, [printOrientation]);
+
             const printPreview = () => {
+                const old = document.getElementById('previewOrientationStyle');
+                if (old) old.remove();
+                if (printOrientation !== 'landscape') {
+                    window.print();
+                    return;
+                }
+                const styleEl = document.createElement('style');
+                styleEl.id = 'previewOrientationStyle';
+                styleEl.textContent = '@media print { @page { size: A4 landscape; margin: 6mm 5mm 6mm 5mm; } }';
+                document.head.appendChild(styleEl);
+                // يُزال عند afterprint لا بمؤقّت: المؤقّت يسابق الطباعة في متصفحات الهاتف التي لا تحجب
+                // عند window.print. وإن لم يُطلَق الحدث، تُزيله الطباعة التالية في أول هذه الدالة.
+                window.addEventListener('afterprint', () => {
+                    const el = document.getElementById('previewOrientationStyle');
+                    if (el) el.remove();
+                }, { once: true });
                 window.print();
             };
             
@@ -4708,7 +4799,7 @@ return (
                             </div>
 
 ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
+                            <UnitsScreen ctx={{ DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
@@ -4723,14 +4814,15 @@ return (
                     {/* قالب طباعة مصفوفة الأيام — يظهر أثناء الطباعة فقط (body.printing-matrix) */}
                     <DayMatrixPrint ctx={{ DAY_MATRIX_LEGEND, getDayMatrixCell, periodEndDate, periodReportData, periodReportRows, periodStartDate, periodUnitFilter, periodWorkTypeFilter }} />
 
-                    {showPreview && <PreviewModal ctx={{ ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printPreview, selectedUnit, setPreviewTitle, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth }} />}
+                    {showPreview && <PreviewModal ctx={{ ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printOrientation, printPreview, selectedUnit, setPreviewTitle, setPrintOrientation, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth }} />}
                     
                     
             {/* نافذة تأكيد إعادة ضبط وتثبيت الوجبة الرئيسية */}
             {/* نافذة إدارة العطل الرسمية والأعياد */}
             {showHolidaysModal && <HolidaysModal ctx={{ addOfficialHolidayRange, dailyReportDate, holidayRangeEnd, holidayRangeStart, officialHolidays, setHolidayRangeEnd, setHolidayRangeStart, setShowHolidaysModal, toggleOfficialHolidayDate }} />}
 
-            {pendingShiftConfirm && <ShiftConfirmModal ctx={{ dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad }} />}
+            {pendingHourlyLeave && <HourlyLeaveModal ctx={{ confirmHourlyLeave, pendingHourlyLeave, setPendingHourlyLeave }} />}
+            {pendingShiftConfirm && <ShiftConfirmModal ctx={{ dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, hourlyLeaveTimings, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad }} />}
 
             {pendingReturnPrompt && <ReturnPromptModal ctx={{ confirmReturn, pendingReturnPrompt }} />}
 
