@@ -1819,7 +1819,10 @@ const sessionKeyFor = (u) => {
     // الصف الوحيد بلا uid بهذا الاسم في الجدول، والجلسة الوحيدة بالاسم والدور نفسيهما
     const sameNameRows = systemUsers.filter(o => !String(o.uid || '').trim() && String(o.name || '').trim() === name);
     if (sameNameRows.length !== 1) return undefined;
+    // الحيّة فقط (نفس حدّ الـ15 ثانية في الجدول): عقد جلسات ميتة قديمة بالاسم نفسه
+    // (usr_1 من زمن المعرّف المحلي) كانت تجعل التطابق مزدوجاً فيُلغى
     const keys = Object.keys(activeSessions || {}).filter(k =>
+        (() => { const age = Date.now() - Number((activeSessions[k] || {}).lastSeen); return age > -60000 && age < 15000; })() &&
         String((activeSessions[k] || {}).name || '').trim() === name &&
         (activeSessions[k] || {}).role === u.role &&
         !systemUsers.some(o => String(o.uid || '').trim() === k));
