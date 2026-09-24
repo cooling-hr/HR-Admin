@@ -35,8 +35,7 @@ export const UserMenuItems = ({ ctx }) => {
 
 // حقول نافذة الدخول: رمز واحد. الغلاف <form> مشترك ويبقى في الجسم.
 export const LoginFields = ({ ctx }) => {
-    const { loginInputPin, setLoginInputPin, loginError, isCheckingLogin,
-        setShowLoginModal, setShowWelcome, setCurrentUserRole, safeStorage } = ctx;
+    const { loginInputPin, setLoginInputPin, loginError, isCheckingLogin, safeStorage } = ctx;
     return (
         <>
         <div className="space-y-1.5">
@@ -69,20 +68,6 @@ export const LoginFields = ({ ctx }) => {
             <span>{isCheckingLogin ? '⏳' : '🔓'}</span>
             <span>{isCheckingLogin ? 'جارٍ التحقق من الجلسة والصلاحية...' : 'دخول للنظام'}</span>
         </button>
-
-        <div className="text-center pt-2">
-            <button
-                type="button"
-                onClick={() => {
-                    setCurrentUserRole('viewer');
-                    setShowWelcome(false);
-                    setShowLoginModal(false);
-                }}
-                className="text-xs font-bold text-slate-500 hover:text-indigo-600 hover:underline transition cursor-pointer"
-            >
-                👁️ استمرار كـ (مستعرض فقط) دون كلمة سر
-            </button>
-        </div>
 
         <div className="pt-3 mt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
             <span>الإصدار: <strong className="text-slate-600 font-mono">v9.5 Enterprise</strong></span>

@@ -5495,7 +5495,7 @@ return (
                         </div>
 
                         <form onSubmit={handleLogin} className="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
-                            <AuthViews.LoginFields ctx={{ loginInputPin, setLoginInputPin, loginEmail, setLoginEmail, loginPassword, setLoginPassword, showLoginPassword, setShowLoginPassword, loginError, isCheckingLogin, pendingTakeover, confirmSessionTakeover, cancelSessionTakeover, setShowLoginModal, setShowWelcome, setCurrentUserRole, safeStorage }} />
+                            <AuthViews.LoginFields ctx={{ loginInputPin, setLoginInputPin, loginEmail, setLoginEmail, loginPassword, setLoginPassword, showLoginPassword, setShowLoginPassword, loginError, isCheckingLogin, pendingTakeover, confirmSessionTakeover, cancelSessionTakeover, safeStorage }} />
                         </form>
                     </div>
                 </div>
