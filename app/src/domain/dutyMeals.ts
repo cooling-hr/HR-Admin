@@ -58,16 +58,16 @@ export const buildDutyMealDay = ({ staff, dateStr, authorizations, getEmployeeDa
         const main = byId(pick.main), alt = byId(pick.alt);
         // الغائب من الاثنين يُسدّ مكانه: البديل يصعد إلى خانة المخول، والخانة الفارغة يشغلها حاضر آخر
         // من الوجبة نفسها بترتيب القائمة — فلا تخرج الاستمارة ناقصة. التنبيه يبيّن الاستبدال على الشاشة.
-        const chosen = [main, alt].filter((e): e is Emp => !!e && present(e));
+        const chosen = [main, alt].filter((e, i, arr): e is Emp => !!e && present(e) && arr.indexOf(e) === i);
         if (!main && !alt) {
             return { squad, count: presentMembers.length, main: null, alt: null, warning: `لم يُحدَّد مخول للوجبة ${squad}` };
         }
         const filled = [...chosen, ...presentMembers.filter(e => !chosen.includes(e))].slice(0, 2);
+        // كل خانة لم يشغلها صاحبها المحدَّد تُذكر: غائب، أو غير محدَّد أصلاً
         let warning = '';
         if (filled.length === 0) warning = `لا حاضر من الوجبة ${squad}`;
-        else if (chosen.length === 0) warning = `المخول والبديل للوجبة ${squad} غائبان — اختير غيرهما`;
-        else if (main && !present(main)) warning = 'المخول غائب — حلّ البديل محلّه';
-        else if (alt && !present(alt)) warning = 'البديل غائب — اختير غيره';
+        else if (filled[0] !== main) warning = main ? 'المخول غائب — حلّ محلّه غيره' : 'المخول غير محدَّد — اختير من الحاضرين';
+        else if (filled[1] !== alt) warning = alt ? 'البديل غائب — اختير غيره' : 'البديل غير محدَّد — اختير من الحاضرين';
         return { squad, count: presentMembers.length, main: person(filled[0]), alt: person(filled[1]), warning };
     };
 
