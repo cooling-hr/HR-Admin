@@ -29,6 +29,7 @@ export function useOfflineDataLayer(deps) {
     dataEntryOperator,
     hourlyLeaveRecords,
     hourlyLeaveTimings,
+    mealAuthorizations,
     officialHolidays,
     overtimeHoursRecords,
     overtimeIds,
@@ -38,6 +39,7 @@ export function useOfflineDataLayer(deps) {
     setDataEntryOperator,
     setHourlyLeaveRecords,
     setHourlyLeaveTimings,
+    setMealAuthorizations,
     setOfficialHolidays,
     setOvertimeHoursRecords,
     setOvertimeIds,
@@ -487,6 +489,7 @@ const handleSaveUser = (e) => {
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
         hourlyLeaveTimings: hourlyLeaveTimings,
+        mealAuthorizations: mealAuthorizations,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
         shiftAnchorDate: anchorDate,
@@ -566,6 +569,7 @@ const handleDeleteUser = (userId) => {
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
         hourlyLeaveTimings: hourlyLeaveTimings,
+        mealAuthorizations: mealAuthorizations,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
         shiftAnchorDate: anchorDate,
@@ -596,6 +600,7 @@ const handleToggleUserActive = (userId) => {
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
         hourlyLeaveTimings: hourlyLeaveTimings,
+        mealAuthorizations: mealAuthorizations,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
         shiftAnchorDate: anchorDate,
@@ -684,6 +689,7 @@ const pushDataToCloud = async (bundle = null) => {
             officialHolidaysList: officialHolidays,
             hourlyLeaveRecords: hourlyLeaveRecords,
             hourlyLeaveTimings: hourlyLeaveTimings,
+            mealAuthorizations: mealAuthorizations,
             overtimeHoursRecords: overtimeHoursRecords,
             dailyStatusOverrides: dailyStatusOverrides,
             shiftAnchorDate: anchorDate,
@@ -866,6 +872,7 @@ const pushDataToServer = async (customBundle = null) => {
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
         hourlyLeaveTimings: hourlyLeaveTimings,
+        mealAuthorizations: mealAuthorizations,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
         shiftAnchorDate: anchorDate,
@@ -937,6 +944,11 @@ const applyDataBundleToState = (bundle) => {
     if (bundle.hourlyLeaveTimings && typeof bundle.hourlyLeaveTimings === 'object') {
         setHourlyLeaveTimings(bundle.hourlyLeaveTimings);
         safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(bundle.hourlyLeaveTimings));
+    }
+    // المخولون كذلك: حزمة من نسخة أقدم بلا الحقل لا تمحو اختيارات هذا الجهاز
+    if (bundle.mealAuthorizations && typeof bundle.mealAuthorizations === 'object') {
+        setMealAuthorizations(bundle.mealAuthorizations);
+        safeStorage.setItem('mealAuthorizations', JSON.stringify(bundle.mealAuthorizations));
     }
     if (bundle.overtimeHoursRecords) {
         setOvertimeHoursRecords(bundle.overtimeHoursRecords);
@@ -1033,7 +1045,7 @@ React.useEffect(() => {
         pushDataToServer();
     }
 // لا dataEntryOperator هنا: اسم منظم الموقف خاص بكل جهاز ولا يُبثّ (انظر تعيينه عند الدخول)
-}, [staff, officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, overtimeHoursRecords, dailyStatusOverrides, anchorDate]);
+}, [staff, officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, overtimeHoursRecords, dailyStatusOverrides, anchorDate]);
 
 
 // ===== بوابات الإجراءات الحسّاسة =====

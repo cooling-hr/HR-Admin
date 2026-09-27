@@ -126,7 +126,9 @@ export const AppNav = ({ ctx }) => {
                         { value: 'dailyStatus', icon: '📋', label: 'الموقف اليومي',
                           title: 'موقف وحضور اليوم' },
                         { value: 'periodReport', icon: '📊', label: 'ضبط الوقت',
-                          title: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' }
+                          title: 'موقف الحضور والدوام لفترة محددة — ومنه مصفوفة الأيام' },
+                        { value: 'dutyMeals', icon: '🍽️', label: 'إطعام المناوبين',
+                          title: 'جدول وجبات المناوبين الشهري بمخولي كل موقع — Excel بهيكل استمارة القسم' }
                     ]}
                     value={unitsSubView}
                     onChange={setUnitsSubView}
@@ -135,8 +137,8 @@ export const AppNav = ({ ctx }) => {
                 {/* بحث واحد للشاشات الثلاث (حالة periodSearchQuery نفسها التي يقرؤها «ضبط الوقت»)،
                     فيبقى النص عند التنقل بينها. في الملاك يعرض المطابقين من كل الوحدات، وفي الموقف
                     اليومي يُبقي صفوفهم وحدها — انظر UnitsScreen. */}
-                {/* لون مميّز والبحث فعّال: ما تحته مُصفّى، لا موظفون مفقودون */}
-                <div className={`flex-1 min-w-[12rem] sm:max-w-sm flex items-center gap-2 border rounded-xl px-3 py-2 shadow-sm focus-within:border-indigo-500 ${periodSearchQuery.trim() ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-300'}`}>
+                {/* لون مميّز والبحث فعّال: ما تحته مُصفّى، لا موظفون مفقودون. لا بحث في جدول الإطعام */}
+                {unitsSubView !== 'dutyMeals' && <div className={`flex-1 min-w-[12rem] sm:max-w-sm flex items-center gap-2 border rounded-xl px-3 py-2 shadow-sm focus-within:border-indigo-500 ${periodSearchQuery.trim() ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-300'}`}>
                     <span className="text-slate-400 text-sm">🔍</span>
                     <input
                         type="text"
@@ -150,7 +152,7 @@ export const AppNav = ({ ctx }) => {
                         <button onClick={() => setPeriodSearchQuery('')} title="مسح البحث" aria-label="مسح البحث"
                             className="text-slate-400 hover:text-slate-700 font-black text-sm leading-none cursor-pointer">✕</button>
                     )}
-                </div>
+                </div>}
             </div>
         )}
     </nav>

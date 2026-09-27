@@ -27,6 +27,7 @@ import { ReturnPromptModal } from '../features/periods/ReturnPromptModal';
 import { RestoreCenterModal } from '../features/restore/RestoreCenterModal';
 import { StaffListScreen } from '../features/staffList/StaffListScreen';
 import { ShiftConfirmModal } from '../features/shifts/ShiftConfirmModal';
+import { DutyMealsScreen } from '../features/units/DutyMealsScreen';
 import { HourlyLeaveModal } from '../features/units/HourlyLeaveModal';
 import { SquadScheduleModal } from '../features/shifts/SquadScheduleModal';
 import { UserManagementModal } from '../features/users/UserManagementModal';
@@ -232,6 +233,13 @@ import { buildDatePicker } from '../ui/datePicker';
                     return saved && typeof saved === 'object' ? saved : {};
                 } catch (e) { return {}; }
             });
+            // مخولو استلام وجبات المناوبين لكل موقع ووجبة — انظر domain/dutyMeals
+            const [mealAuthorizations, setMealAuthorizations] = useState(() => {
+                try {
+                    const saved = JSON.parse(safeStorage.getItem('mealAuthorizations') || '{}');
+                    return saved && typeof saved === 'object' ? saved : {};
+                } catch (e) { return {}; }
+            });
             // الإجازة الزمنية قيد الإدخال في نافذتها: { empId, dateStr, empName, hours, timing }
             const [pendingHourlyLeave, setPendingHourlyLeave] = useState(null);
 
@@ -293,6 +301,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: next,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
                         shiftAnchorDate: anchorDate,
@@ -339,6 +348,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: next,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
                         shiftAnchorDate: anchorDate,
@@ -504,11 +514,12 @@ import { buildDatePicker } from '../ui/datePicker';
                 safeStorage.setItem('officialHolidaysList', JSON.stringify(officialHolidays));
                 safeStorage.setItem('hourlyLeaveRecords', JSON.stringify(hourlyLeaveRecords));
                 safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(hourlyLeaveTimings));
+                safeStorage.setItem('mealAuthorizations', JSON.stringify(mealAuthorizations));
                 safeStorage.setItem('overtimeHoursRecords', JSON.stringify(overtimeHoursRecords));
                 if (!isSyncingRef.current && isInitialCloudLoadCompleteRef.current && staff.length > 0) {
                     pushDataToCloud();
                 }
-            }, [officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, overtimeHoursRecords]);
+            }, [officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, overtimeHoursRecords]);
 
             React.useEffect(() => {
                 safeStorage.setItem('shiftAnchorDate', anchorDate);
@@ -698,6 +709,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 dataEntryOperator,
                 hourlyLeaveRecords,
                 hourlyLeaveTimings,
+                mealAuthorizations,
                 officialHolidays,
                 overtimeHoursRecords,
                 overtimeIds,
@@ -709,6 +721,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 setDataEntryOperator,
                 setHourlyLeaveRecords,
                 setHourlyLeaveTimings,
+                setMealAuthorizations,
                 setOfficialHolidays,
                 setOvertimeHoursRecords,
                 setOvertimeIds,
@@ -1334,6 +1347,7 @@ import { buildDatePicker } from '../ui/datePicker';
                             officialHolidaysList: officialHolidays,
                             hourlyLeaveRecords: hourlyLeaveRecords,
                             hourlyLeaveTimings: hourlyLeaveTimings,
+                            mealAuthorizations: mealAuthorizations,
                             overtimeHoursRecords: overtimeHoursRecords,
                             dailyStatusOverrides: nextOverrides,
                             shiftAnchorDate: anchorDate,
@@ -1427,6 +1441,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: updatedOverrides,
                         shiftAnchorDate: anchorDate,
@@ -1451,6 +1466,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     hourlyLeaveTimings: hourlyLeaveTimings,
+                    mealAuthorizations: mealAuthorizations,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
                     shiftAnchorDate: dailyReportDate,
@@ -1474,6 +1490,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     hourlyLeaveTimings: hourlyLeaveTimings,
+                    mealAuthorizations: mealAuthorizations,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
                     shiftAnchorDate: dailyReportDate,
@@ -1983,6 +2000,10 @@ import { buildDatePicker } from '../ui/datePicker';
                     const timings = bundle.hourlyLeaveTimings && typeof bundle.hourlyLeaveTimings === 'object' ? bundle.hourlyLeaveTimings : {};
                     setHourlyLeaveTimings(timings);
                     safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(timings));
+                }
+                if (bundle.mealAuthorizations && typeof bundle.mealAuthorizations === 'object') {
+                    setMealAuthorizations(bundle.mealAuthorizations);
+                    safeStorage.setItem('mealAuthorizations', JSON.stringify(bundle.mealAuthorizations));
                 }
                 if (bundle.overtimeHoursRecords) {
                     setOvertimeHoursRecords(bundle.overtimeHoursRecords);
@@ -3211,6 +3232,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
                         shiftAnchorDate: anchorDate,
@@ -3534,6 +3556,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     hourlyLeaveTimings: hourlyLeaveTimings,
+                    mealAuthorizations: mealAuthorizations,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
                     shiftAnchorDate: anchorDate,
@@ -3651,6 +3674,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
                         shiftAnchorDate: anchorDate,
@@ -3678,6 +3702,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 setDailyStatusOverrides({});
                 setHourlyLeaveRecords({});
                 setHourlyLeaveTimings({});
+                setMealAuthorizations({});
                 setOvertimeHoursRecords({});
                 setPendingDeletionRequest(null);
                 safeStorage.setItem('staffData', JSON.stringify([]));
@@ -3689,6 +3714,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: {},
                     hourlyLeaveTimings: {},
+                    mealAuthorizations: {},
                     overtimeHoursRecords: {},
                     dailyStatusOverrides: {},
                     shiftAnchorDate: anchorDate,
@@ -3713,6 +3739,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     hourlyLeaveTimings: hourlyLeaveTimings,
+                    mealAuthorizations: mealAuthorizations,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
                     shiftAnchorDate: anchorDate,
@@ -4788,7 +4815,9 @@ return (
 
                             </div>
 
-) : view === 'units' ? (
+) : view === 'units' && unitsSubView === 'dutyMeals' ? (
+                            <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, setMealAuthorizations, staff }} />
+                        ) : view === 'units' ? (
                             <UnitsScreen ctx={{ DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
@@ -4812,7 +4841,7 @@ return (
             {showHolidaysModal && <HolidaysModal ctx={{ addOfficialHolidayRange, dailyReportDate, holidayRangeEnd, holidayRangeStart, officialHolidays, setHolidayRangeEnd, setHolidayRangeStart, setShowHolidaysModal, toggleOfficialHolidayDate }} />}
 
             {pendingHourlyLeave && <HourlyLeaveModal ctx={{ confirmHourlyLeave, pendingHourlyLeave, setPendingHourlyLeave }} />}
-            {pendingShiftConfirm && <ShiftConfirmModal ctx={{ dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, hourlyLeaveTimings, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad }} />}
+            {pendingShiftConfirm && <ShiftConfirmModal ctx={{ dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad }} />}
 
             {pendingReturnPrompt && <ReturnPromptModal ctx={{ confirmReturn, pendingReturnPrompt }} />}
 

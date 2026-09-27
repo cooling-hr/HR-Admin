@@ -410,6 +410,40 @@
             body.printing-matrix .matrix-print-only tr { page-break-inside: avoid !important; }
         }
 
+        /* طباعة جدول إطعام المناوبين: العزل نفسه بـvisibility كمصفوفة الأيام، ويومان في كل صفحة */
+        @media print {
+            body.printing-meals { background: white !important; }
+            body.printing-meals #root > * { visibility: hidden !important; }
+            body.printing-meals .meals-print-only,
+            body.printing-meals .meals-print-only * { visibility: visible !important; }
+            body.printing-meals .meals-print-only {
+                display: block !important;
+                position: absolute !important;
+                top: 0 !important; right: 0 !important; left: 0 !important;
+                background: white !important;
+                color: black !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            body.printing-meals .meals-print-day { width: 100% !important; border-collapse: collapse !important; margin-bottom: 5mm !important; page-break-inside: avoid !important; }
+            body.printing-meals .meals-print-day th,
+            body.printing-meals .meals-print-day td {
+                border: 1px solid #000 !important;
+                padding: 3px 2px !important;
+                height: 7mm !important;
+                text-align: center !important;
+                vertical-align: middle !important;
+                font-family: Arial, sans-serif !important;
+                font-weight: 700 !important;
+                font-size: 9pt !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            body.printing-meals .meals-print-day .meals-print-title { border: none !important; font-size: 11pt !important; }
+            body.printing-meals .meals-print-day .meals-print-head th { background: #ffff00 !important; }
+        }
+
         /* طباعة بطاقة المنتسب من نافذة المعاينة (زرّ «طباعة بطاقة المنتسب A4»).
            النافذة مرسومة عبر ReactDOM.createPortal مباشرة تحت body، خارج #root —
            فيُخفى كل ما سواها من أبناء body بـdisplay:none، وتبقى البطاقة وحدها على الورق.
