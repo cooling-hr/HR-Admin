@@ -29,6 +29,7 @@ import { StaffListScreen } from '../features/staffList/StaffListScreen';
 import { ShiftConfirmModal } from '../features/shifts/ShiftConfirmModal';
 import { DutyMealsScreen } from '../features/units/DutyMealsScreen';
 import { HourlyLeaveModal } from '../features/units/HourlyLeaveModal';
+import { dailyStatusNote } from '../domain/hourlyLeave';
 import { SquadScheduleModal } from '../features/shifts/SquadScheduleModal';
 import { UserManagementModal } from '../features/users/UserManagementModal';
 import { WaterMemoModal } from '../features/water/WaterMemoModal';
@@ -1278,8 +1279,13 @@ import { buildDatePicker } from '../ui/datePicker';
                     // و«إلغاء» يُبقي موقف اليوم كما كان
                     const oldHours = hourlyLeaveRecords[dateStr] && hourlyLeaveRecords[dateStr][empId];
                     const oldTiming = hourlyLeaveTimings[dateStr] && hourlyLeaveTimings[dateStr][empId];
-                    setPendingHourlyLeave({ empId, dateStr, empName: emp ? emp.name : 'المنتسب',
+                    setPendingHourlyLeave({ empId, dateStr, empName: emp ? emp.name : 'المنتسب', status: 'إجازة زمنية',
                         hours: oldHours >= 1 && oldHours <= 7 ? oldHours : 2, timing: oldTiming || '' });
+                    return;
+                } else if (status === 'ورقة عمل') {
+                    // ورقة العمل توقيت بلا ساعات، من النافذة نفسها؛ الموقف يُثبَّت عند «تثبيت» كالزمنية
+                    const oldTiming = hourlyLeaveTimings[dateStr] && hourlyLeaveTimings[dateStr][empId];
+                    setPendingHourlyLeave({ empId, dateStr, empName: emp ? emp.name : 'المنتسب', status: 'ورقة عمل', timing: oldTiming || '' });
                     return;
                 } else if (status === 'دوام إضافي' || status.includes('إضافي')) {
                     try {
@@ -1312,6 +1318,14 @@ import { buildDatePicker } from '../ui/datePicker';
             const confirmHourlyLeave = () => {
                 const p = pendingHourlyLeave;
                 if (!p || !p.timing) return;
+                if (p.status === 'ورقة عمل') {
+                    setHourlyLeaveTimings(prev => withDayValue(prev, p.dateStr, p.empId, p.timing));
+                    commitDailyStatusOverride(p.empId, p.dateStr, 'ورقة عمل', {
+                        hourlyLeaveTimings: withDayValue(hourlyLeaveTimings, p.dateStr, p.empId, p.timing),
+                    });
+                    setPendingHourlyLeave(null);
+                    return;
+                }
                 setEmployeeHourlyLeave(p.empId, p.dateStr, p.hours, p.timing);
                 commitDailyStatusOverride(p.empId, p.dateStr, 'إجازة زمنية', {
                     hourlyLeaveRecords: withDayValue(hourlyLeaveRecords, p.dateStr, p.empId, p.hours),
@@ -1844,8 +1858,9 @@ import { buildDatePicker } from '../ui/datePicker';
                                     'الرقم الوظيفي': s.jobNumber || '',
                                     'طبيعة العمل': s.workType || '',
                                     'الموقف اليومي': status,
-                                    // توقيت الإجازة الزمنية وحده (بطلب المستخدم)؛ السجل القديم بلا توقيت يبقى فارغاً
-                                    'الملاحظات': (status === 'إجازة زمنية' && hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id]) || ''
+                                    'الملاحظات': dailyStatusNote(status,
+                                        hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id],
+                                        overtimeHoursRecords[dailyReportDate] && overtimeHoursRecords[dailyReportDate][s.id])
                                 });
                             });
                         }
