@@ -29,7 +29,7 @@ import { StaffListScreen } from '../features/staffList/StaffListScreen';
 import { ShiftConfirmModal } from '../features/shifts/ShiftConfirmModal';
 import { DutyMealsScreen } from '../features/units/DutyMealsScreen';
 import { HourlyLeaveModal } from '../features/units/HourlyLeaveModal';
-import { dailyStatusNote } from '../domain/hourlyLeave';
+import { dailyReportStatusLabel, dailyStatusNote } from '../domain/hourlyLeave';
 import { SquadScheduleModal } from '../features/shifts/SquadScheduleModal';
 import { UserManagementModal } from '../features/users/UserManagementModal';
 import { WaterMemoModal } from '../features/water/WaterMemoModal';
@@ -1857,7 +1857,7 @@ import { buildDatePicker } from '../ui/datePicker';
                                     'الاسم الكامل': getTripleName(s.name),
                                     'الرقم الوظيفي': s.jobNumber || '',
                                     'طبيعة العمل': s.workType || '',
-                                    'الموقف اليومي': status,
+                                    'الموقف اليومي': dailyReportStatusLabel(status, s.workType, isOffDay),
                                     'الملاحظات': dailyStatusNote(status,
                                         hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id],
                                         overtimeHoursRecords[dailyReportDate] && overtimeHoursRecords[dailyReportDate][s.id])

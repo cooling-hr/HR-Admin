@@ -18,3 +18,8 @@ export const dailyStatusNote = (status: string, timing?: string | null, overtime
     }
     return '';
 };
+
+// إضافي الصباحي في يوم دوام اعتيادي يُكتب في الكشف «دوام صباحي حضور فعلي» (بطلب المستخدم): حضر دوامه
+// كاملاً وزاد عليه، وساعات الزيادة في الملاحظات. في الجمعة والسبت والعطلة الرسمية يبقى «دوام إضافي».
+export const dailyReportStatusLabel = (status: string, workType?: string, isOffDay?: boolean): string =>
+    workType === 'صباحي' && !isOffDay && String(status || '').includes('إضافي') ? 'دوام صباحي حضور فعلي' : status;
