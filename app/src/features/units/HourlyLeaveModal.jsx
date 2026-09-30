@@ -7,12 +7,13 @@ export const HourlyLeaveModal = ({ ctx }) => {
     const { confirmHourlyLeave, pendingHourlyLeave, setPendingHourlyLeave } = ctx;
     const { empName, hours, timing, status } = pendingHourlyLeave;
     const isWorkPaper = status === 'ورقة عمل';
-    const pickedCls = isWorkPaper ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-amber-500 text-white border-amber-500 shadow-sm';
+    // الألوان ألوان الاستمارتين الرسميتين: ورقة العمل برتقالية، والإجازة الزمنية خضراء
+    const pickedCls = isWorkPaper ? 'bg-amber-500 text-white border-amber-500 shadow-sm' : 'bg-emerald-600 text-white border-emerald-600 shadow-sm';
     const set = (patch) => setPendingHourlyLeave(prev => prev && ({ ...prev, ...patch }));
     return (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-fadeIn no-print">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden animate-scaleUp">
-                <div className={`${isWorkPaper ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600' : 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600'} p-5 text-white flex items-center gap-3 flex-shrink-0`}>
+                <div className={`${isWorkPaper ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600' : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600'} p-5 text-white flex items-center gap-3 flex-shrink-0`}>
                     <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner border border-white/30">
                         {isWorkPaper ? '📝' : '⏰'}
                     </div>
@@ -55,7 +56,7 @@ export const HourlyLeaveModal = ({ ctx }) => {
                         إلغاء
                     </button>
                     <button onClick={confirmHourlyLeave} disabled={!timing}
-                        className={`px-6 py-2.5 ${isWorkPaper ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'} text-white rounded-xl text-sm font-black shadow-sm transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}>
+                        className={`px-6 py-2.5 ${isWorkPaper ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'} text-white rounded-xl text-sm font-black shadow-sm transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}>
                         ✅ تثبيت
                     </button>
                 </div>
