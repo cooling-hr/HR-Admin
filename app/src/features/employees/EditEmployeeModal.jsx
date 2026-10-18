@@ -196,21 +196,21 @@ export const EditEmployeeModal = ({ ctx }) => {
                                         type="tel" 
                                         value={editingEmployee.mobile}
                                         onChange={(e) => {
-                                            const value = e.target.value;
-                                            // السماح فقط بالأرقام
-                                            if (value === '' || /^[0-9]*$/.test(value)) {
+                                            // المسافات تُحذف ليُقبل رقم ملصوق بمجموعات كالمثال، ثم الأرقام وحدها
+                                            const value = e.target.value.replace(/\s/g, '');
+                                            if (value === '' || /^[0-9]{0,11}$/.test(value)) {
                                                 updateEditField('mobile', value);
                                             }
                                         }}
                                         pattern="^07[0-9]{9}$"
-                                        maxLength="11"
+                                        maxLength="13"
                                         placeholder="07XXXXXXXXX"
                                         title="يجب أن يبدأ الرقم بـ 07 ويتكون من 11 رقم"
                                         className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none"
                                         dir="ltr"
                                     />
                                     <div className="text-xs text-gray-500 mt-1">
-                                        مثال: 0780 123 4567 (11 رقم يبدأ بـ 07)
+                                        مثال: <span dir="ltr" className="inline-block whitespace-nowrap">0780 123 4567</span> (11 رقم يبدأ بـ 07)
                                     </div>
                                 </div>
 
@@ -220,18 +220,18 @@ export const EditEmployeeModal = ({ ctx }) => {
                                         type="tel" 
                                         value={editingEmployee.relativePhone || ''}
                                         onChange={(e) => {
-                                            const value = e.target.value;
-                                            if (value === '' || /^[0-9]*$/.test(value)) {
+                                            const value = e.target.value.replace(/\s/g, '');
+                                            if (value === '' || /^[0-9]{0,11}$/.test(value)) {
                                                 updateEditField('relativePhone', value);
                                             }
                                         }}
-                                        maxLength="11"
+                                        maxLength="13"
                                         placeholder="07XXXXXXXXX"
                                         className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none"
                                         dir="ltr"
                                     />
                                     <div className="text-xs text-gray-500 mt-1">
-                                        مثال: 0780 123 4567 (11 رقم يبدأ بـ 07)
+                                        مثال: <span dir="ltr" className="inline-block whitespace-nowrap">0780 123 4567</span> (11 رقم يبدأ بـ 07)
                                     </div>
                                 </div>
 

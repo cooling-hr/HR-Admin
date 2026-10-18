@@ -27,7 +27,7 @@ export const StaffListScreen = ({ ctx }) => {
                     icon={{ all: 'users', morning: 'users', shift: 'users', contract: 'users', evaluation: 'star', maa: 'droplet', maaMorning: 'droplet', maaShift: 'droplet', safety: 'shield-check' }[view]}
                     title={{ all: 'الملاك', morning: 'الملاك', shift: 'الملاك', contract: 'الملاك', evaluation: 'التقييم', maa: 'الماء', maaMorning: 'الماء', maaShift: 'الماء', safety: 'تجهيزات السلامة' }[view]}
                     description={
-                        (view === 'maa' && 'استبعاد من كان في دورة أو إيفاد الشهر السابق، ومن غاب نصف الشهر فأكثر بإجازة طويلة أو أمومة، ومن استُثني دائماً') ||
+                        (view === 'maa' && 'استبعاد من كان في دورة أو إيفاد الشهر السابق، ومن بلغت إجازته أو غيابه نصف أيام العمل في الشهر، ومن استُثني دائماً') ||
                         (view === 'evaluation' && 'استبعاد الإجازات الطويلة طويلة وأمومة') ||
                         (view === 'morning' && 'الاسم الثلاثي فقط') ||
                         (view === 'contract' && `عقود 315: ${stats.contract315} · عقود المحافظة: ${stats.contractGov}${stats.contractUnclassified ? ` · غير مصنّف: ${stats.contractUnclassified}` : ''}`) ||
