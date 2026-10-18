@@ -27,7 +27,7 @@ export const StaffListScreen = ({ ctx }) => {
                     icon={{ all: 'users', morning: 'users', shift: 'users', contract: 'users', evaluation: 'star', maa: 'droplet', maaMorning: 'droplet', maaShift: 'droplet', safety: 'shield-check' }[view]}
                     title={{ all: 'الملاك', morning: 'الملاك', shift: 'الملاك', contract: 'الملاك', evaluation: 'التقييم', maa: 'الماء', maaMorning: 'الماء', maaShift: 'الماء', safety: 'تجهيزات السلامة' }[view]}
                     description={
-                        (view === 'maa' && 'استبعاد من في دورة، ومن غاب نصف الشهر فأكثر بإجازة طويلة أو أمومة، ومن استُثني دائماً') ||
+                        (view === 'maa' && 'استبعاد من كان في دورة أو إيفاد الشهر السابق، ومن غاب نصف الشهر فأكثر بإجازة طويلة أو أمومة، ومن استُثني دائماً') ||
                         (view === 'evaluation' && 'استبعاد الإجازات الطويلة طويلة وأمومة') ||
                         (view === 'morning' && 'الاسم الثلاثي فقط') ||
                         (view === 'contract' && `عقود 315: ${stats.contract315} · عقود المحافظة: ${stats.contractGov}${stats.contractUnclassified ? ` · غير مصنّف: ${stats.contractUnclassified}` : ''}`) ||
@@ -78,7 +78,7 @@ export const StaffListScreen = ({ ctx }) => {
                             className="border border-cyan-300 rounded-lg px-3 py-1.5 text-xs font-mono font-bold outline-none focus:border-cyan-600"
                         />
                         <span className="text-[11px] text-cyan-800 font-bold">
-                            يُستبعد من كان في دورة أو إيفاد يمسّ هذا الشهر مهما قصر، ومن بلغت أيام إجازته أو غيابه نصف أيام العمل الفعلية في الشهر فأكثر.
+                            يُستبعد من كان في دورة أو إيفاد في الشهر السابق مهما قصر، ومن بلغت أيام إجازته أو غيابه نصف أيام العمل الفعلية في الشهر فأكثر.
                         </span>
                     </div>
                 )}

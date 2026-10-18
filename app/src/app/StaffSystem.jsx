@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';   // لـcreatePortal في بطاقة المو
 import { FIELD_NAMES_AR, mergeKeyOf, ownKey, ATTENDANCE_PARTS, isValidAttendanceValue, analyzeMergePeriods, analyzeMergeAttendance, analyzeMerge } from '../domain/merge';
 import { getJobRank, sortByJobNumber, sortByJobTitleHierarchy, ensureTopTwo, sortByUnit } from '../domain/sorting';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
-import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, isShiftOnDutyStatus } from '../domain/water';
+import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, QUICK_STATUS_OPTIONS, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
@@ -1083,7 +1083,8 @@ import { buildDatePicker } from '../ui/datePicker';
 
 
             // استثناء ثنائي المرحلة، وفق النموذج الرسمي لاستمارة تجهيز المياه المعدنية:
-            //  • في دورة / إيفاد → أي تماس مع الشهر يستبعد فوراً، ولو يوماً واحداً.
+            //  • في دورة / إيفاد → أي تماس مع الشهر السابق يستبعد من قائمة هذا الشهر، ولو يوماً واحداً
+            //    (قائمة الشهر تُرفع قبل بدايته، فيُخصم صاحب الدورة من القائمة التي تليها).
             //  • إجازة طويلة/بدون راتب/أمومة/غياب (وإجازة اعتيادية إن طالت) → تُجمَع أيام العمل
             //    الفعلية المشمولة بها من الفترات المؤرَّخة ومن تعديلات "الموقف" اليومية معاً (قد تكون
             //    متفرقة غير متتالية)، فإن بلغت نصف أيام العمل في الشهر أو تجاوزته يُستبعد كلياً —
@@ -1098,13 +1099,13 @@ import { buildDatePicker } from '../ui/datePicker';
                     return !!(emp.status && emp.status !== 'نشط');
                 }
                 const total = daysInMonth(monthStr);
-                const monthStart = monthStr + '-01';
-                const monthEnd = monthStr + '-' + String(total).padStart(2, '0');
+                const prevMonth = previousMonthStr(monthStr);
+                const prevStart = prevMonth + '-01';
+                const prevEnd = prevMonth + '-' + String(daysInMonth(prevMonth)).padStart(2, '0');
                 for (const p of periodsOf(emp)) {
-                    if (!p || !p.from) continue;
+                    if (!p || !p.from || !WATER_NEXT_MONTH_TYPES.includes(p.type)) continue;
                     const pEnd = p.to || '9999-12-31';
-                    if (p.from > monthEnd || pEnd < monthStart) continue; // لا تماس
-                    if (p.type === 'في دورة' || p.type === 'إيفاد') return true;
+                    if (p.from <= prevEnd && pEnd >= prevStart) return true; // تماس مع الشهر السابق
                 }
                 let leaveDays = 0;
                 let workDays = 0;
