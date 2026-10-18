@@ -203,7 +203,6 @@ export const EditEmployeeModal = ({ ctx }) => {
                                             }
                                         }}
                                         pattern="^07[0-9]{9}$"
-                                        maxLength="13"
                                         placeholder="07XXXXXXXXX"
                                         title="يجب أن يبدأ الرقم بـ 07 ويتكون من 11 رقم"
                                         className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none"
@@ -225,7 +224,6 @@ export const EditEmployeeModal = ({ ctx }) => {
                                                 updateEditField('relativePhone', value);
                                             }
                                         }}
-                                        maxLength="13"
                                         placeholder="07XXXXXXXXX"
                                         className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none"
                                         dir="ltr"
