@@ -3522,7 +3522,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (editingEmployee.mobile && editingEmployee.mobile.length > 0) {
                     const mobilePattern = /^07[0-9]{9}$/;
                     if (!mobilePattern.test(editingEmployee.mobile)) {
-                        alert('⚠️ رقم النقال غير صحيح!\n\nيجب أن يبدأ بـ 07 ويتكون من 11 رقم.\nمثال: ⁦0780 123 4567⁩');
+                        alert('⚠️ رقم النقال غير صحيح!\n\nيجب أن يبدأ بـ 07 ويتكون من 11 رقم.\nمثال: \u20660780 123 4567\u2069');
                         return;
                     }
                 }
