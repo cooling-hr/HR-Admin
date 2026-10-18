@@ -210,7 +210,7 @@ export const EditEmployeeModal = ({ ctx }) => {
                                         dir="ltr"
                                     />
                                     <div className="text-xs text-gray-500 mt-1">
-                                        مثال: 07801234567 (11 رقم يبدأ بـ 07)
+                                        مثال: 0780 123 4567 (11 رقم يبدأ بـ 07)
                                     </div>
                                 </div>
 
@@ -231,7 +231,7 @@ export const EditEmployeeModal = ({ ctx }) => {
                                         dir="ltr"
                                     />
                                     <div className="text-xs text-gray-500 mt-1">
-                                        مثال: 07801234567 (11 رقم يبدأ بـ 07)
+                                        مثال: 0780 123 4567 (11 رقم يبدأ بـ 07)
                                     </div>
                                 </div>
 
