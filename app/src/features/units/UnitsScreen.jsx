@@ -1,6 +1,6 @@
 import React from 'react';
 import { PageHeader } from '../../ui/PageHeader';
-import { ARABIC_MONTH_NAMES, getArabicDayName, getDaysBetweenDates } from '../../core/dates';
+import { ARABIC_MONTH_NAMES, getArabicDayName, getDaysBetweenDates, localDateStr } from '../../core/dates';
 import { getThreeName, getTripleName, matchesStaffSearch } from '../../core/arabic';
 import { getMissingFields } from '../../domain/employees';
 import { isLongOrMaternityLeave } from '../../domain/periods';
@@ -27,11 +27,36 @@ const DailyCountChips = ({ counts }) => DAILY_COUNT_CHIPS.filter(c => c.always |
     </span>
 ));
 
+// الوجبات العاملة في تاريخ ما: دالة صافية بلا React يستعملها بيان الشريط والبطاقة المطوية وأزرار المطابقة.
+// s24 الوجبة المستلمة للثلاثية (24 ساعة)، وday12/night12 الصباحية والمسائية للثنائية (12 ساعة)
+const computeDailyShifts = (dateStr, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad) => {
+    const diffDays = getDaysBetweenDates(dateStr, anchorDate);
+    const idxAnchor = ['A', 'B', 'C', 'D'].indexOf(threeShiftAnchorSquad);
+    const idxActive = (idxAnchor + (diffDays % 4) + 4) % 4;
+    const squadToDayMap = { 'A': 1, 'C': 2, 'D': 3, 'B': 4 };
+    const anchorDay = squadToDayMap[twoShiftAnchorSquad] || 1;
+    const cycleDay = ((anchorDay - 1 + diffDays) % 4 + 4) % 4 + 1;
+    const dayShiftMap = { 1: 'A', 2: 'C', 3: 'D', 4: 'B' };
+    const nightShiftMap = { 1: 'B', 2: 'A', 3: 'C', 4: 'D' };
+    return { s24: ['A', 'B', 'C', 'D'][idxActive], day12: dayShiftMap[cycleDay], night12: nightShiftMap[cycleDay] };
+};
+
+// حبوب الوجبات الثلاث (عرض فقط بلا نقر)
+const ShiftPills = ({ shifts }) => (<>
+    <span title="الوجبة العاملة 24 ساعة في تاريخ الموقف" className="bg-purple-600 text-white rounded-lg px-2 py-1 text-xs font-black whitespace-nowrap">🕒 24س: {shifts.s24}</span>
+    <span title="الوجبة الصباحية (12 ساعة) العاملة في تاريخ الموقف" className="bg-amber-500 text-white rounded-lg px-2 py-1 text-xs font-black whitespace-nowrap">☀️ صباحي {shifts.day12}</span>
+    <span title="الوجبة المسائية (12 ساعة) العاملة في تاريخ الموقف" className="bg-indigo-700 text-white rounded-lg px-2 py-1 text-xs font-black whitespace-nowrap">🌙 مسائي {shifts.night12}</span>
+</>);
+
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
+    const { showShiftEditor, setShowShiftEditor, DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
     const searchActive = !!periodSearchQuery.trim();
+    // اليوم بالتوقيت المحلي (لا toISOString) لتمييز منقّل الشريط حين يكون التاريخ غير اليوم
+    const todayStr = localDateStr();
+    const isToday = dailyReportDate === todayStr;
+    const dailyShifts = computeDailyShifts(dailyReportDate, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad);
     // إضافة موظف إلى سلة الإضافي أو إخراجه منها (زر «إضافة / مشمول» في الملاك ونتائج البحث)
     const toggleOvertime = (id) => {
         const updated = overtimeIds.includes(id) ? overtimeIds.filter(x => x !== id) : [...overtimeIds, id];
@@ -68,42 +93,8 @@ export const UnitsScreen = ({ ctx }) => {
                     </div>
 
                         <div className="p-6 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                            {/* منتقي التاريخ - 4 أعمدة يمين في RTL */}
+                            {/* زر إدارة العطل الرسمية والأعياد المستقل - 4 أعمدة */}
                             <div className="md:col-span-4 space-y-1.5">
-                                <label className="block text-xs font-black text-slate-800">📅 تاريخ الموقف اليومي:</label>
-                                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border-2 border-slate-300 shadow-sm focus-within:border-blue-500">
-                                    <button
-                                        onClick={() => changeReportDateByDays(-1)}
-                                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-amber-400 font-black rounded-lg text-xs transition cursor-pointer border border-slate-700 active:scale-95 flex items-center gap-1 whitespace-nowrap"
-                                        title="اليوم السابق"
-                                    >
-                                        <span>◀️</span>
-                                        <span>السابق</span>
-                                    </button>
-
-                                    <div className="relative flex-1 flex items-center gap-1.5 px-1">
-                                        <span className="text-slate-400 text-sm">📅</span>
-                                        <input 
-                                            type="date"
-                                            value={dailyReportDate}
-                                            onChange={(e) => setDailyReportDate(e.target.value)}
-                                            className="w-full outline-none font-black text-slate-800 text-xs bg-transparent cursor-pointer font-mono text-center"
-                                        />
-                                    </div>
-
-                                    <button
-                                        onClick={() => changeReportDateByDays(1)}
-                                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-amber-400 font-black rounded-lg text-xs transition cursor-pointer border border-slate-700 active:scale-95 flex items-center gap-1 whitespace-nowrap"
-                                        title="اليوم التالي"
-                                    >
-                                        <span>التالي</span>
-                                        <span>▶️</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* زر إدارة العطل الرسمية والأعياد المستقل - عمودان */}
-                            <div className="md:col-span-2 space-y-1.5">
                                 <label className="block text-xs font-black text-amber-900">🎉 العطل والأعياد:</label>
                                 <button
                                     onClick={() => setShowHolidaysModal(true)}
@@ -119,8 +110,8 @@ export const UnitsScreen = ({ ctx }) => {
                                 </button>
                             </div>
 
-                            {/* اسم منظم الموقف / مدخل البيانات - 3 أعمدة */}
-                            <div className="md:col-span-3 space-y-1.5">
+                            {/* اسم منظم الموقف / مدخل البيانات - 4 أعمدة */}
+                            <div className="md:col-span-4 space-y-1.5">
                                 <label className="block text-xs font-black text-slate-800">👤 اسم منظم الموقف / مدخل البيانات:</label>
                                 <div className="bg-white border-2 border-slate-300 rounded-xl px-3 py-1.5 shadow-sm flex items-center gap-2 focus-within:border-blue-500">
                                     <span className="text-slate-400 text-sm">✍️</span>
@@ -134,8 +125,8 @@ export const UnitsScreen = ({ ctx }) => {
                                 </div>
                             </div>
 
-                            {/* زر محرك تقارير موقف الفترة - 3 أعمدة يسار في RTL */}
-                            <div className="md:col-span-3 space-y-1.5">
+                            {/* زر محرك تقارير موقف الفترة - 4 أعمدة يسار في RTL */}
+                            <div className="md:col-span-4 space-y-1.5">
                                 <label className="block text-xs font-black text-blue-900">📊 موقف فترة زمنية (من - إلى):</label>
                                 <button 
                                     onClick={() => setUnitsSubView('periodReport')}
@@ -147,8 +138,21 @@ export const UnitsScreen = ({ ctx }) => {
                                 </button>
                             </div>
                             
-                            {/* مطابقة الوجبات */}
-                            <div className="md:col-span-8 bg-white border border-slate-150 p-4 rounded-xl shadow-sm space-y-3">
+                            {/* مطابقة الوجبات: مطويّة افتراضياً في سطر واحد بالحبوب الثلاث، وزر التعديل يفتح الصفّين A–D */}
+                            <div className="md:col-span-12 bg-white border border-slate-150 p-4 rounded-xl shadow-sm space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-xs font-black text-slate-800">⚙️ الوجبات العاملة لتاريخ الموقف:</span>
+                                        <ShiftPills shifts={dailyShifts} />
+                                    </div>
+                                    <button
+                                        onClick={() => setShowShiftEditor(v => !v)}
+                                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg text-xs font-black cursor-pointer active:scale-95 whitespace-nowrap"
+                                    >
+                                        {showShiftEditor ? 'إخفاء' : '⚙️ تعديل الوجبات'}
+                                    </button>
+                                </div>
+                                {showShiftEditor && (<>
                                 <h4 className="text-xs font-black text-slate-800 flex items-center gap-1.5 border-b pb-2">
                                     <span>⚙️</span>
                                     <span>مطابقة وجبات الدوام لتاريخ الموقف المحدد:</span>
@@ -158,18 +162,15 @@ export const UnitsScreen = ({ ctx }) => {
                                         <span className="block text-slate-500 text-[10px]">الوجبة المستلمة للوجبة الثلاثية (24 ساعة) اليوم:</span>
                                         <div className="flex gap-1">
                                             {['A', 'B', 'C', 'D'].map(sq => {
-                                                const diffDays = getDaysBetweenDates(dailyReportDate, anchorDate);
-                                                const idxAnchor = ['A', 'B', 'C', 'D'].indexOf(threeShiftAnchorSquad);
-                                                const idxActive = (idxAnchor + (diffDays % 4) + 4) % 4;
-                                                const isCurrentActive = sq === ['A', 'B', 'C', 'D'][idxActive];
-                                                
+                                                const isCurrentActive = sq === dailyShifts.s24;
+
                                                 return (
-                                                    <button 
+                                                    <button
                                                         key={sq}
                                                         onClick={() => { setPendingShiftConfirm({ type: '24h', squad: sq, date: dailyReportDate }); }}
                                                         title={isCurrentActive ? 'الوجبة المستلمة للدوام اليوم (24 ساعة)' : 'وجبة استراحة (انقر لتثبيتها كمستلمة اليوم)'}
                                                         className={`flex-1 py-1 px-1 rounded-lg border-2 text-center transition cursor-pointer flex flex-col items-center justify-center ${
-                                                            isCurrentActive 
+                                                            isCurrentActive
                                                                 ? 'bg-purple-600 border-purple-600 text-white shadow-sm font-black'
                                                                 : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
                                                         }`}
@@ -185,25 +186,17 @@ export const UnitsScreen = ({ ctx }) => {
                                             })}
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-1.5">
                                         <span className="block text-slate-500 text-[10px]">وجبات الدوام الثنائية (12 ساعة) اليوم (صباحي + مسائي):</span>
                                         <div className="flex gap-1">
                                             {['A', 'B', 'C', 'D'].map(sq => {
-                                                const diffDays = getDaysBetweenDates(dailyReportDate, anchorDate);
-                                                const squadToDayMap = { 'A': 1, 'C': 2, 'D': 3, 'B': 4 };
-                                                const anchorDay = squadToDayMap[twoShiftAnchorSquad] || 1;
-                                                const cycleDay = ((anchorDay - 1 + diffDays) % 4 + 4) % 4 + 1;
-                                                
-                                                const dayShiftMap = { 1: 'A', 2: 'C', 3: 'D', 4: 'B' };
-                                                const nightShiftMap = { 1: 'B', 2: 'A', 3: 'C', 4: 'D' };
-                                                
-                                                const isMorning = sq === dayShiftMap[cycleDay];
-                                                const isNight = sq === nightShiftMap[cycleDay];
-                                                
+                                                const isMorning = sq === dailyShifts.day12;
+                                                const isNight = sq === dailyShifts.night12;
+
                                                 let btnStyle = 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100';
                                                 let badge = <span className="text-[9px] text-slate-400 mt-0.5 block">🏖️ استراحة</span>;
-                                                
+
                                                 if (isMorning) {
                                                     btnStyle = 'bg-amber-500 border-amber-500 text-white shadow-sm font-black';
                                                     badge = <span className="text-[9px] bg-amber-600/70 px-1 py-0.2 rounded mt-0.5 block font-bold">☀️ صباحي (12س)</span>;
@@ -211,9 +204,9 @@ export const UnitsScreen = ({ ctx }) => {
                                                     btnStyle = 'bg-indigo-700 border-indigo-700 text-white shadow-sm font-black';
                                                     badge = <span className="text-[9px] bg-indigo-800/70 px-1 py-0.2 rounded mt-0.5 block font-bold">🌙 مسائي (12س)</span>;
                                                 }
-                                                
+
                                                 return (
-                                                    <button 
+                                                    <button
                                                         key={sq}
                                                         onClick={() => { setPendingShiftConfirm({ type: '12h', squad: sq, date: dailyReportDate }); }}
                                                         title={isMorning ? 'الوجبة الصباحية العاملة اليوم' : isNight ? 'الوجبة المسائية العاملة اليوم' : 'وجبة استراحة (انقر لتثبيتها كصباحي اليوم)'}
@@ -227,46 +220,42 @@ export const UnitsScreen = ({ ctx }) => {
                                         </div>
                                     </div>
                                 </div>
+                                </>)}
                             </div>
                             </div>
                         </div>
 
-                    {/* لوحة إحصاءات الدوام لليوم */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 no-print">
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
-                            <div className="text-2xl mb-1">🏢</div>
-                            <div className="text-[10px] font-bold text-slate-400">الدوام الفعلي للشعبة</div>
-                            <div className="text-xl font-black text-slate-800 mt-1">{dailyStats.onDuty} موظف</div>
+
+                    {/* شريط الأرقام المدمج: إحصاء الشعبة كلها (لا الوحدة المختارة) من المصنِّف نفسه الذي تعتمده شارات «كافة الوحدات» */}
+                    <div className="text-xs font-black text-slate-600 no-print">📊 إحصاء الشعبة كلها ليوم {getArabicDayName(dailyReportDate)} {dailyReportDate}</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 no-print">
+                        <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2">
+                            <span className="text-[11px] font-bold text-slate-500">🏢 الدوام الفعلي للشعبة</span>
+                            <span className="text-lg font-black text-slate-800">{dailyStats.onDuty}</span>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
-                            <div className="text-2xl mb-1">☀️</div>
-                            <div className="text-[10px] font-bold text-slate-400">الدوام الصباحي</div>
-                            <div className="text-xl font-black text-blue-600 mt-1">{dailyStats.morningOnDuty} موظف</div>
+                        <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2" title="يشمل ورقة العمل والمكلف بواجب والإجازة الزمنية">
+                            <span className="text-[11px] font-bold text-slate-500">☀️ الدوام الصباحي</span>
+                            <span className="text-lg font-black text-blue-600">{dailyStats.morningOnDuty}</span>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
-                            <div className="text-2xl mb-1">⏱️</div>
-                            <div className="text-[10px] font-bold text-slate-400">مناوب صباحي (12س)</div>
-                            <div className="text-xl font-black text-orange-600 mt-1">{dailyStats.dayShift12h} موظف</div>
+                        <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2">
+                            <span className="text-[11px] font-bold text-slate-500">⏱️ مناوب صباحي (12س)</span>
+                            <span className="text-lg font-black text-orange-600">{dailyStats.dayShift12h}</span>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
-                            <div className="text-2xl mb-1">🌙</div>
-                            <div className="text-[10px] font-bold text-slate-400">مناوب مسائي (12س)</div>
-                            <div className="text-xl font-black text-slate-700 mt-1">{dailyStats.nightShift12h} موظف</div>
+                        <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2">
+                            <span className="text-[11px] font-bold text-slate-500">🌙 مناوب مسائي (12س)</span>
+                            <span className="text-lg font-black text-slate-700">{dailyStats.nightShift12h}</span>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
-                            <div className="text-2xl mb-1">🕒</div>
-                            <div className="text-[10px] font-bold text-slate-400">مناوب 24 ساعة</div>
-                            <div className="text-xl font-black text-purple-600 mt-1">{dailyStats.shift24h} موظف</div>
+                        <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2">
+                            <span className="text-[11px] font-bold text-slate-500">🕒 مناوب 24 ساعة</span>
+                            <span className="text-lg font-black text-purple-600">{dailyStats.shift24h}</span>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
-                            <div className="text-2xl mb-1">⚡</div>
-                            <div className="text-[10px] font-bold text-slate-400">الدوام الإضافي</div>
-                            <div className="text-xl font-black text-emerald-700 mt-1">{dailyStats.overtimeDuty} موظف</div>
+                        <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2">
+                            <span className="text-[11px] font-bold text-slate-500">⚡ الدوام الإضافي</span>
+                            <span className="text-lg font-black text-emerald-700">{dailyStats.overtimeDuty}</span>
                         </div>
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
-                            <div className="text-2xl mb-1">🏖️</div>
-                            <div className="text-[10px] font-bold text-slate-400">الإجازات والاستراحات</div>
-                            <div className="text-xl font-black text-slate-500 mt-1">{dailyStats.rest + dailyStats.off} موظف</div>
+                        <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2">
+                            <span className="text-[11px] font-bold text-slate-500">🚫 غير الحاضرين</span>
+                            <span className="text-lg font-black text-slate-500">{dailyStats.notPresent}</span>
                         </div>
                     </div>
 
@@ -275,24 +264,37 @@ export const UnitsScreen = ({ ctx }) => {
                         حين صار الشريط سطرين في هذا القسم دفن ذلك الرقم 37px من اللوحة خلفه (مقيس). */}
                     <div id="dailyUnitPickerBar" className="sticky z-20 bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border-2 border-slate-700 space-y-2 no-print my-4 transition-all" style={{ top: 'calc(var(--nav-h, 62px) + 6px)' }}>
                         <div className="flex flex-wrap justify-between items-center gap-2 px-1">
-                            <span className="text-xs md:text-sm font-black text-amber-400 flex items-center gap-1.5">
-                                <span>📍</span>
-                                <span>اختر الوحدة لتصفية وتسجيل الموقف المباشر:</span>
-                            </span>
-                            {/* منقّل الأيام في الشريط الثابت: تتغيّر الأعداد أدناه أمامك مع اليوم دون الصعود إلى أعلى الشاشة */}
-                            <div className="flex items-center gap-1.5">
-                                <button onClick={() => changeReportDateByDays(-1)} title="اليوم السابق"
-                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 font-black rounded-lg text-xs border border-slate-700 cursor-pointer active:scale-95 whitespace-nowrap">
-                                    ◀️ السابق
-                                </button>
-                                <span className="text-xs font-black text-amber-300 whitespace-nowrap">{getArabicDayName(dailyReportDate)}</span>
-                                <input type="date" value={dailyReportDate} onChange={(e) => setDailyReportDate(e.target.value)}
-                                    style={{ colorScheme: 'dark' }}
-                                    className="bg-slate-800 text-white border border-slate-700 rounded-lg px-2 py-1 text-xs font-black font-mono cursor-pointer outline-none" />
-                                <button onClick={() => changeReportDateByDays(1)} title="اليوم التالي"
-                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 font-black rounded-lg text-xs border border-slate-700 cursor-pointer active:scale-95 whitespace-nowrap">
-                                    التالي ▶️
-                                </button>
+                            {/* منقّل اليوم الوحيد في الشاشة: بارز في أول الشريط، ويتلوّن بالبرتقالي حين لا يكون التاريخ هو اليوم */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className={`flex items-center gap-1.5 border-2 rounded-xl p-1 ${isToday ? 'border-slate-600' : 'border-orange-400'}`}>
+                                    <button onClick={() => changeReportDateByDays(-1)} title="اليوم السابق"
+                                        className="h-9 md:h-10 px-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-black rounded-lg text-xs border border-slate-700 cursor-pointer active:scale-95 whitespace-nowrap">
+                                        ◀️ السابق
+                                    </button>
+                                    <span className="text-amber-300 font-black text-sm md:text-base whitespace-nowrap px-1">{getArabicDayName(dailyReportDate)}</span>
+                                    <input type="date" value={dailyReportDate} onChange={(e) => setDailyReportDate(e.target.value)}
+                                        style={{ colorScheme: 'dark' }}
+                                        className="h-9 md:h-10 bg-slate-800 text-white border border-slate-700 rounded-lg px-2 text-xs font-black font-mono cursor-pointer outline-none" />
+                                    <button onClick={() => changeReportDateByDays(1)} title="اليوم التالي"
+                                        className="h-9 md:h-10 px-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-black rounded-lg text-xs border border-slate-700 cursor-pointer active:scale-95 whitespace-nowrap">
+                                        التالي ▶️
+                                    </button>
+                                </div>
+                                {!isToday && (
+                                    <>
+                                        <span className="bg-orange-500 text-white rounded-full px-2.5 py-0.5 text-xs font-black whitespace-nowrap">
+                                            {dailyReportDate < todayStr ? '⚠️ تعديل يوم سابق' : '⚠️ يوم قادم'}
+                                        </span>
+                                        <button onClick={() => setDailyReportDate(localDateStr())}
+                                            className="h-9 md:h-10 px-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-black rounded-lg text-xs border border-slate-700 cursor-pointer active:scale-95 whitespace-nowrap">
+                                            📅 اليوم
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                            {/* بيان الوجبات العاملة لتاريخ الموقف: للعرض فقط */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <ShiftPills shifts={dailyShifts} />
                             </div>
                         </div>
 
@@ -350,7 +352,7 @@ export const UnitsScreen = ({ ctx }) => {
                             })}
                         </div>
 
-                        <div className="flex items-center gap-1.5 flex-wrap px-1">
+                        <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible px-1">
                             <span className="text-xs font-black text-slate-300 whitespace-nowrap">
                                 {selectedDailyUnitTab === 'all' ? 'موقف الشعبة كلها:' : `موقف ${selectedDailyUnitTab}:`}
                             </span>
