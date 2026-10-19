@@ -6,18 +6,25 @@ import { getMissingFields } from '../../domain/employees';
 import { isLongOrMaternityLeave } from '../../domain/periods';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
 
-// شارات أعداد الموقف اليومي في رأس كشف الوحدة: مجموعها عدد الوحدة. حاضر ومجاز يظهران دائماً،
-// والإضافي عدد فرعي من الحاضرين، والبقية عند وجودها فقط
+// شارات أعداد الموقف اليومي: مجموعها عدد الوحدة، والإضافي عدد فرعي من الحاضرين. الحاضر والإضافي
+// والمجاز والدورة تظهر دائماً (طلب أسامة 2026-10-19)، والبقية عند وجودها فقط
 const DAILY_COUNT_CHIPS = [
     { key: 'present', label: '✅ حاضر', className: 'bg-emerald-50 text-emerald-800 border-emerald-300', always: true },
-    { key: 'overtime', label: '⚡ منهم إضافي', className: 'bg-emerald-50 text-emerald-700 border-emerald-300' },
+    { key: 'overtime', label: '⚡ منهم إضافي', className: 'bg-emerald-50 text-emerald-700 border-emerald-300', always: true },
     { key: 'leave', label: '🏖️ مجاز', className: 'bg-rose-50 text-rose-700 border-rose-200', always: true },
-    { key: 'course', label: '🎓 دورة وإيفاد', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+    { key: 'course', label: '🎓 دورة', className: 'bg-indigo-50 text-indigo-700 border-indigo-200', always: true },
+    { key: 'mission', label: '✈️ إيفاد', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
     { key: 'rest', label: '🌙 استراحة', className: 'bg-slate-100 text-slate-600 border-slate-200' },
     { key: 'excused', label: '🚧 تعذر حضور', className: 'bg-amber-100 text-amber-900 border-amber-300' },
     { key: 'absent', label: '❌ غياب', className: 'bg-red-600 text-white border-red-600' },
     { key: 'other', label: '❔ غير مصنّف', className: 'bg-white text-slate-700 border-slate-200' },
 ];
+
+const DailyCountChips = ({ counts }) => DAILY_COUNT_CHIPS.filter(c => c.always || (counts || {})[c.key] > 0).map(c => (
+    <span key={c.key} className={`border font-black px-2.5 py-0.5 rounded-full text-xs whitespace-nowrap ${c.className}`}>
+        {c.label} {(counts || {})[c.key] || 0}
+    </span>
+));
 
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
@@ -266,14 +273,26 @@ export const UnitsScreen = ({ ctx }) => {
                         موضعه من ارتفاع الشريط الحيّ (--nav-h) + 6px، لا من top-[68px] الثابتة:
                         حين صار الشريط سطرين في هذا القسم دفن ذلك الرقم 37px من اللوحة خلفه (مقيس). */}
                     <div id="dailyUnitPickerBar" className="sticky z-20 bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border-2 border-slate-700 space-y-2 no-print my-4 transition-all" style={{ top: 'calc(var(--nav-h, 62px) + 6px)' }}>
-                        <div className="flex justify-between items-center px-1">
+                        <div className="flex flex-wrap justify-between items-center gap-2 px-1">
                             <span className="text-xs md:text-sm font-black text-amber-400 flex items-center gap-1.5">
                                 <span>📍</span>
                                 <span>اختر الوحدة لتصفية وتسجيل الموقف المباشر:</span>
                             </span>
-                            <span className="text-[11px] text-slate-300 font-bold">
-                                {selectedDailyUnitTab === 'all' ? 'عرض جميع الوحدات' : `وحدة: ${selectedDailyUnitTab}`}
-                            </span>
+                            {/* منقّل الأيام في الشريط الثابت: تتغيّر الأعداد أدناه أمامك مع اليوم دون الصعود إلى أعلى الشاشة */}
+                            <div className="flex items-center gap-1.5">
+                                <button onClick={() => changeReportDateByDays(-1)} title="اليوم السابق"
+                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 font-black rounded-lg text-xs border border-slate-700 cursor-pointer active:scale-95 whitespace-nowrap">
+                                    ◀️ السابق
+                                </button>
+                                <span className="text-xs font-black text-amber-300 whitespace-nowrap">{getArabicDayName(dailyReportDate)}</span>
+                                <input type="date" value={dailyReportDate} onChange={(e) => setDailyReportDate(e.target.value)}
+                                    style={{ colorScheme: 'dark' }}
+                                    className="bg-slate-800 text-white border border-slate-700 rounded-lg px-2 py-1 text-xs font-black font-mono cursor-pointer outline-none" />
+                                <button onClick={() => changeReportDateByDays(1)} title="اليوم التالي"
+                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-400 font-black rounded-lg text-xs border border-slate-700 cursor-pointer active:scale-95 whitespace-nowrap">
+                                    التالي ▶️
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
@@ -287,7 +306,6 @@ export const UnitsScreen = ({ ctx }) => {
                                 { id: 'تبريد المركز الثقافي', name: '🏛️ المركز الثقافي', count: staff.filter(s => s.unit === 'تبريد المركز الثقافي').length }
                             ].map(u => {
                                 const isActive = selectedDailyUnitTab === u.id;
-                                const presentCount = (dailyUnitCounts[u.id] || {}).present || 0;
                                 return (
                                     <button
                                         key={u.id}
@@ -323,15 +341,19 @@ export const UnitsScreen = ({ ctx }) => {
                                         }`}
                                     >
                                         <span>{u.name}</span>
-                                        <span className="px-2 py-0.5 rounded-full text-xs font-black bg-emerald-600 text-white" title={`حاضر ${presentCount} من ${u.count}`}>
-                                            ✅ {presentCount}
-                                        </span>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-900 text-slate-300'}`} title="عدد موظفي الوحدة">
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-900 text-slate-300'}`}>
                                             {u.count}
                                         </span>
                                     </button>
                                 );
                             })}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap px-1">
+                            <span className="text-xs font-black text-slate-300 whitespace-nowrap">
+                                {selectedDailyUnitTab === 'all' ? 'موقف الشعبة كلها:' : `موقف ${selectedDailyUnitTab}:`}
+                            </span>
+                            <DailyCountChips counts={dailyUnitCounts[selectedDailyUnitTab]} />
                         </div>
                     </div>
 
@@ -383,14 +405,7 @@ export const UnitsScreen = ({ ctx }) => {
                                             <span className="bg-slate-200 text-slate-700 font-black px-2.5 py-0.5 rounded-full text-xs">
                                                 {unitStaff.length} موظف
                                             </span>
-                                            {(() => {
-                                                const counts = dailyUnitCounts[unitName] || {};
-                                                return DAILY_COUNT_CHIPS.filter(c => c.always || counts[c.key] > 0).map(c => (
-                                                    <span key={c.key} className={`border font-black px-2.5 py-0.5 rounded-full text-xs whitespace-nowrap ${c.className}`}>
-                                                        {c.label} {counts[c.key] || 0}
-                                                    </span>
-                                                ));
-                                            })()}
+                                            <DailyCountChips counts={dailyUnitCounts[unitName]} />
                                         </div>
 
                                         {/* أزرار الإجراء السريع الجماعي لموقع / وحدة الدوام */}
