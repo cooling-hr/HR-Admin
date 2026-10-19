@@ -1552,7 +1552,9 @@ import { buildDatePicker } from '../ui/datePicker';
                 });
                 
                 return { onDuty, morningOnDuty, dayShift12h, nightShift12h, shift24h, overtimeDuty, rest, off };
-            }, [staff, dailyReportDate, dailyStatusOverrides, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
+                // officialHolidays: إعلان عطلة يغيّر موقف الصباحي، فبدونها تبقى البطاقات على رقمها القديم
+                // بينما شارات الوحدات (dailyUnitCounts) تتحدّث (Kimi 2026-10-19)
+            }, [staff, dailyReportDate, dailyStatusOverrides, officialHolidays, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
             // أعداد الموقف اليومي لكل وحدة (حاضر، مجاز...) لرأس كشفها وزرّها في الشريط الكحلي. تُحسب على كل
             // موظفي الوحدة لا على المعروضين: صاحب الإجازة الطويلة مخفي من الكشف ومحسوب مجازاً، والبحث لا يغيّرها.
             const dailyUnitCounts = useMemo(() => {
