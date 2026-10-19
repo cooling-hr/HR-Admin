@@ -6,10 +6,23 @@ import { getMissingFields } from '../../domain/employees';
 import { isLongOrMaternityLeave } from '../../domain/periods';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
 
+// شارات أعداد الموقف اليومي في رأس كشف الوحدة: مجموعها عدد الوحدة. حاضر ومجاز يظهران دائماً،
+// والإضافي عدد فرعي من الحاضرين، والبقية عند وجودها فقط
+const DAILY_COUNT_CHIPS = [
+    { key: 'present', label: '✅ حاضر', className: 'bg-emerald-50 text-emerald-800 border-emerald-300', always: true },
+    { key: 'overtime', label: '⚡ منهم إضافي', className: 'bg-emerald-50 text-emerald-700 border-emerald-300' },
+    { key: 'leave', label: '🏖️ مجاز', className: 'bg-rose-50 text-rose-700 border-rose-200', always: true },
+    { key: 'course', label: '🎓 دورة وإيفاد', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+    { key: 'rest', label: '🌙 استراحة', className: 'bg-slate-100 text-slate-600 border-slate-200' },
+    { key: 'excused', label: '🚧 تعذر حضور', className: 'bg-amber-100 text-amber-900 border-amber-300' },
+    { key: 'absent', label: '❌ غياب', className: 'bg-red-600 text-white border-red-600' },
+    { key: 'other', label: '❔ غير مصنّف', className: 'bg-white text-slate-700 border-slate-200' },
+];
+
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
+    const { DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
     const searchActive = !!periodSearchQuery.trim();
     // إضافة موظف إلى سلة الإضافي أو إخراجه منها (زر «إضافة / مشمول» في الملاك ونتائج البحث)
     const toggleOvertime = (id) => {
@@ -211,7 +224,7 @@ export const UnitsScreen = ({ ctx }) => {
                         </div>
 
                     {/* لوحة إحصاءات الدوام لليوم */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 no-print">
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 no-print">
                         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
                             <div className="text-2xl mb-1">🏢</div>
                             <div className="text-[10px] font-bold text-slate-400">الدوام الفعلي للشعبة</div>
@@ -236,6 +249,11 @@ export const UnitsScreen = ({ ctx }) => {
                             <div className="text-2xl mb-1">🕒</div>
                             <div className="text-[10px] font-bold text-slate-400">مناوب 24 ساعة</div>
                             <div className="text-xl font-black text-purple-600 mt-1">{dailyStats.shift24h} موظف</div>
+                        </div>
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
+                            <div className="text-2xl mb-1">⚡</div>
+                            <div className="text-[10px] font-bold text-slate-400">الدوام الإضافي</div>
+                            <div className="text-xl font-black text-emerald-700 mt-1">{dailyStats.overtimeDuty} موظف</div>
                         </div>
                         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 text-center">
                             <div className="text-2xl mb-1">🏖️</div>
@@ -269,6 +287,7 @@ export const UnitsScreen = ({ ctx }) => {
                                 { id: 'تبريد المركز الثقافي', name: '🏛️ المركز الثقافي', count: staff.filter(s => s.unit === 'تبريد المركز الثقافي').length }
                             ].map(u => {
                                 const isActive = selectedDailyUnitTab === u.id;
+                                const presentCount = (dailyUnitCounts[u.id] || {}).present || 0;
                                 return (
                                     <button
                                         key={u.id}
@@ -304,7 +323,10 @@ export const UnitsScreen = ({ ctx }) => {
                                         }`}
                                     >
                                         <span>{u.name}</span>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-900 text-slate-300'}`}>
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-black bg-emerald-600 text-white" title={`حاضر ${presentCount} من ${u.count}`}>
+                                            ✅ {presentCount}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-900 text-slate-300'}`} title="عدد موظفي الوحدة">
                                             {u.count}
                                         </span>
                                     </button>
@@ -353,7 +375,7 @@ export const UnitsScreen = ({ ctx }) => {
                             return (
                                 <div key={unitName} id={'unitSection-' + unitName} className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
                                     <div className="bg-slate-50/90 px-4 md:px-5 py-3 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2">
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <h3 className="font-black text-slate-800 text-sm md:text-base flex items-center gap-2">
                                                 <span>📍</span>
                                                 <span>{unitName}</span>
@@ -361,6 +383,14 @@ export const UnitsScreen = ({ ctx }) => {
                                             <span className="bg-slate-200 text-slate-700 font-black px-2.5 py-0.5 rounded-full text-xs">
                                                 {unitStaff.length} موظف
                                             </span>
+                                            {(() => {
+                                                const counts = dailyUnitCounts[unitName] || {};
+                                                return DAILY_COUNT_CHIPS.filter(c => c.always || counts[c.key] > 0).map(c => (
+                                                    <span key={c.key} className={`border font-black px-2.5 py-0.5 rounded-full text-xs whitespace-nowrap ${c.className}`}>
+                                                        {c.label} {counts[c.key] || 0}
+                                                    </span>
+                                                ));
+                                            })()}
                                         </div>
 
                                         {/* أزرار الإجراء السريع الجماعي لموقع / وحدة الدوام */}

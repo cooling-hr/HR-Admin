@@ -30,6 +30,7 @@ import { ShiftConfirmModal } from '../features/shifts/ShiftConfirmModal';
 import { DutyMealsScreen } from '../features/units/DutyMealsScreen';
 import { HourlyLeaveModal } from '../features/units/HourlyLeaveModal';
 import { dailyReportStatusLabel, dailyStatusNote } from '../domain/hourlyLeave';
+import { dailyStatusCategory, countDailyCategories } from '../domain/dailyCounts';
 import { SquadScheduleModal } from '../features/shifts/SquadScheduleModal';
 import { UserManagementModal } from '../features/users/UserManagementModal';
 import { WaterMemoModal } from '../features/water/WaterMemoModal';
@@ -1530,30 +1531,41 @@ import { buildDatePicker } from '../ui/datePicker';
                 
                 staff.forEach(s => {
                     const status = getEmployeeDailyStatus(s, dailyReportDate);
+                    // الدوام الفعلي من تصنيف أعداد الوحدات نفسه، فيطابق مجموع «حاضر» فيها: ورقة العمل
+                    // والتكليف بواجب والإجازة الزمنية حضور (قرار أسامة 2026-10-19)
+                    if (dailyStatusCategory(status) === 'present') onDuty++;
                     if (status === 'دوام صباحي' || status === 'حضور فعلي') {
-                        onDuty++;
                         morningOnDuty++;
                     } else if (status === 'دوام صباحي (12 ساعة)') {
-                        onDuty++;
                         dayShift12h++;
                     } else if (status === 'دوام مسائي (12 ساعة)') {
-                        onDuty++;
                         nightShift12h++;
                     } else if (status === 'دوام 24 ساعة') {
-                        onDuty++;
                         shift24h++;
                     } else if (status === 'دوام إضافي' || status.includes('إضافي')) {
-                        onDuty++;
                         overtimeDuty++;
                     } else if (status.includes('استراحة') || status.includes('عطلة') || status === 'عطلة رسمية') {
                         rest++;
-                    } else if (status.includes('إجازة') || status.includes('غياب') || status === 'سحب يد' || status.includes('دورة') || status.includes('إيفاد') || status.includes('مرضية') || status.includes('زمنية')) {
+                    } else if (!status.includes('زمنية') && (status.includes('إجازة') || status.includes('غياب') || status === 'سحب يد' || status.includes('دورة') || status.includes('إيفاد') || status.includes('مرضية'))) {
                         off++;
                     }
                 });
                 
                 return { onDuty, morningOnDuty, dayShift12h, nightShift12h, shift24h, overtimeDuty, rest, off };
             }, [staff, dailyReportDate, dailyStatusOverrides, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
+            // أعداد الموقف اليومي لكل وحدة (حاضر، مجاز...) لرأس كشفها وزرّها في الشريط الكحلي. تُحسب على كل
+            // موظفي الوحدة لا على المعروضين: صاحب الإجازة الطويلة مخفي من الكشف ومحسوب مجازاً، والبحث لا يغيّرها.
+            const dailyUnitCounts = useMemo(() => {
+                const statusesByUnit = { all: [] };
+                staff.forEach(s => {
+                    const status = getEmployeeDailyStatus(s, dailyReportDate);
+                    statusesByUnit.all.push(status);
+                    (statusesByUnit[s.unit] = statusesByUnit[s.unit] || []).push(status);
+                });
+                const out = {};
+                Object.keys(statusesByUnit).forEach(u => { out[u] = countDailyCategories(statusesByUnit[u]); });
+                return out;
+            }, [staff, dailyReportDate, dailyStatusOverrides, officialHolidays, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
             const periodReportData = useMemo(() => {
                 if (!periodStartDate || !periodEndDate) return { datesList: [], employees: [], summary: { totalStaff: 0, totalDutyDays: 0, totalOvertimeDays: 0, totalLeaveDays: 0, totalAbsenceDays: 0, totalDaysCount: 0 } };
                 
@@ -4834,7 +4846,7 @@ return (
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
                             <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, setMealAuthorizations, staff }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
+                            <UnitsScreen ctx={{ DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
