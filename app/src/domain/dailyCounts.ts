@@ -4,9 +4,9 @@ import { isLongOrMaternityLeave } from './periods.js';
 // و«أخرى» تكشف موقفاً لم يُصنَّف (مناوب بلا وجبة مثلاً) بدل أن يسقط من العدّ بصمت.
 // قرار أسامة 2026-10-19: ورقة العمل والتكليف بواجب حضور، وتعذر الحضور فئة مستقلة لا غياب
 // (من يحضر رغمه يُغيَّر موقفه إلى دوام صباحي). والإجازة الزمنية حضور لأنه داوم جزءاً من اليوم.
-export type DailyCategory = 'present' | 'leave' | 'course' | 'mission' | 'rest' | 'excused' | 'absent' | 'other';
+export type DailyCategory = 'present' | 'leave' | 'course' | 'mission' | 'rest' | 'excused' | 'absent' | 'suspended' | 'other';
 
-export const DAILY_CATEGORY_ORDER: DailyCategory[] = ['present', 'leave', 'course', 'mission', 'rest', 'excused', 'absent', 'other'];
+export const DAILY_CATEGORY_ORDER: DailyCategory[] = ['present', 'leave', 'course', 'mission', 'rest', 'excused', 'absent', 'suspended', 'other'];
 
 const PRESENT_STATUSES = ['دوام صباحي', 'حضور فعلي', 'دوام صباحي (12 ساعة)', 'دوام مسائي (12 ساعة)', 'دوام 24 ساعة', 'ورقة عمل', 'مكلف بواجب', 'إجازة زمنية'];
 
@@ -14,7 +14,9 @@ export const dailyStatusCategory = (status?: string | null): DailyCategory => {
     const s = String(status || '');
     if (!s) return 'other';
     if (PRESENT_STATUSES.includes(s) || isOvertimeStatus(s) || s.includes('زمنية')) return 'present';
-    if (s.includes('غياب') || s === 'سحب يد') return 'absent';
+    // سحب اليد يُعامَل كالغياب في الإحصائيات، لكنه يُعدّ ويُسمّى باسمه في الشارات
+    if (s === 'سحب يد') return 'suspended';
+    if (s.includes('غياب')) return 'absent';
     if (s.includes('تعذر') || s.includes('توقف موقع')) return 'excused';
     if (s.includes('دورة')) return 'course';
     if (s.includes('إيفاد')) return 'mission';
@@ -29,7 +31,7 @@ export const isOvertimeStatus = (status?: string | null): boolean => String(stat
 export type DailyCounts = Record<DailyCategory, number> & { total: number; overtime: number };
 
 export const countDailyCategories = (statuses: Array<string | null | undefined>): DailyCounts => {
-    const counts = { present: 0, leave: 0, course: 0, mission: 0, rest: 0, excused: 0, absent: 0, other: 0, total: 0, overtime: 0 };
+    const counts = { present: 0, leave: 0, course: 0, mission: 0, rest: 0, excused: 0, absent: 0, suspended: 0, other: 0, total: 0, overtime: 0 };
     statuses.forEach(st => {
         counts[dailyStatusCategory(st)]++;
         counts.total++;

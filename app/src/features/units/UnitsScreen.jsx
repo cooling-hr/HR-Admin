@@ -17,6 +17,7 @@ const DAILY_COUNT_CHIPS = [
     { key: 'rest', label: '🌙 استراحة', className: 'bg-slate-100 text-slate-600 border-slate-200' },
     { key: 'excused', label: '🚧 تعذر حضور', className: 'bg-amber-100 text-amber-900 border-amber-300' },
     { key: 'absent', label: '❌ غياب', className: 'bg-red-600 text-white border-red-600' },
+    { key: 'suspended', label: '✋ سحب يد', className: 'bg-red-800 text-white border-red-800' },
     { key: 'other', label: '❔ غير مصنّف', className: 'bg-white text-slate-700 border-slate-200' },
 ];
 
