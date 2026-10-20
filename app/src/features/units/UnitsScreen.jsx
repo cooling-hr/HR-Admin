@@ -523,6 +523,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                             <td className="px-4 py-3.5 text-center w-1/3">
                                                                 <select 
                                                                     value={selectValue}
+                                                                    aria-label={`الموقف اليومي — ${getTripleName(emp.name)}`}
                                                                     onChange={(e) => setEmployeeDailyStatusOverride(emp.id, dailyReportDate, e.target.value)}
                                                                     className={`w-full text-xs md:text-sm font-black rounded-xl px-3.5 py-2.5 border shadow-sm outline-none cursor-pointer transition-all ${statusBadgeColor}`}
                                                                 >
@@ -537,23 +538,25 @@ export const UnitsScreen = ({ ctx }) => {
                                                                         </optgroup>
                                                                     ))}
                                                                 </select>
-                                                                <div className="mt-1.5 flex flex-wrap justify-center gap-1">
+                                                                <div role="group" aria-label={`حالات سريعة — ${getTripleName(emp.name)}`} className="mt-1.5 flex flex-wrap justify-center gap-1">
                                                                     {QUICK_DAILY_STATUSES.map(q => {
                                                                         const active = status === q.value;
                                                                         // الضغط على الزر المفعَّل لا يعيد الافتراضي (القائمة لذلك)، والزمنية وورقة العمل
                                                                         // يفتح نافذة توقيتها للتعديل. والحالة الآتية من فترة مؤرَّخة لا تُكرَّر تعديلاً لليوم
                                                                         const reopensTiming = q.value === 'إجازة زمنية' || q.value === 'ورقة عمل';
+                                                                        const inert = active && !(isOverride && reopensTiming);
                                                                         return (
                                                                             <button
                                                                                 key={q.value}
                                                                                 type="button"
                                                                                 aria-pressed={active}
+                                                                                aria-label={`${q.value} — ${getTripleName(emp.name)}`}
                                                                                 onClick={() => {
-                                                                                    if (active && !(isOverride && reopensTiming)) return;
+                                                                                    if (inert) return;
                                                                                     setEmployeeDailyStatusOverride(emp.id, dailyReportDate, q.value);
                                                                                 }}
                                                                                 title={active ? (reopensTiming && isOverride ? `تعديل توقيت ${q.value}` : `الموقف الحالي: ${q.value}`) : `تسجيل ${q.value} لهذا اليوم`}
-                                                                                className={`px-2 py-1 rounded-lg border text-[11px] md:text-xs font-black transition cursor-pointer active:scale-95 ${active ? statusBadgeColor : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                                                                                className={`px-2 py-1 rounded-lg border text-[11px] md:text-xs font-black whitespace-nowrap transition ${inert ? 'cursor-default' : 'cursor-pointer active:scale-95'} ${active ? statusBadgeColor : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                                                                             >
                                                                                 {q.label}
                                                                             </button>
