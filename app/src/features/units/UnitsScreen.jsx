@@ -6,6 +6,42 @@ import { getMissingFields } from '../../domain/employees';
 import { isLongOrMaternityLeave } from '../../domain/periods';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
 
+// خيارات قائمة الموقف اليومي مرتّبة بتكرارها كما ذكرها أسامة (2026-10-20). الأمومة والطويلة ليستا
+// هنا عمداً: تُسجَّلان فترة مؤرَّخة، ويختفي صاحبها من قائمة اليوم
+const DAILY_STATUS_GROUPS = [
+    { label: 'الأكثر تكراراً', options: [
+        { value: 'إجازة اعتيادية', label: '🏖️ إجازة اعتيادية', className: 'bg-white text-rose-700 font-bold' },
+        { value: 'إجازة زمنية', label: '⏰ إجازة زمنية', className: 'bg-white text-amber-700 font-bold' },
+        { value: 'ورقة عمل', label: '📝 ورقة عمل', className: 'bg-white text-emerald-700 font-bold' },
+        { value: 'إجازة مرضية', label: '🏥 إجازة مرضية', className: 'bg-white text-rose-700 font-bold' },
+        { value: 'في دورة', label: '🎓 في دورة', className: 'bg-white text-indigo-700 font-bold' },
+    ] },
+    { label: 'أقل تكراراً', options: [
+        { value: 'غياب', label: '❌ غياب', className: 'bg-white text-red-700 font-bold' },
+        { value: 'إجازة بدون راتب', label: '💸 إجازة بدون راتب', className: 'bg-white text-orange-800 font-bold' },
+    ] },
+    { label: 'باقي الحالات', options: [
+        { value: 'دوام صباحي', label: '🟢 دوام صباحي (حضور فعلي)', className: 'bg-white text-blue-700 font-bold' },
+        { value: 'دوام إضافي', label: '⚡ دوام إضافي', className: 'bg-white text-emerald-800 font-bold' },
+        { value: 'إجازة خارج العراق', label: '🌍 إجازة خارج العراق', className: 'bg-white text-cyan-800 font-bold' },
+        { value: 'إيفاد داخل العراق', label: '🇮🇶 إيفاد داخل العراق', className: 'bg-white text-purple-700 font-bold' },
+        { value: 'إيفاد خارج العراق', label: '🌐 إيفاد خارج العراق', className: 'bg-white text-indigo-900 font-bold' },
+        { value: 'مكلف بواجب', label: '🛠️ مكلف بواجب', className: 'bg-white text-sky-700 font-bold' },
+        { value: 'تعذر حضور', label: '🚧 تعذر حضور', className: 'bg-white text-amber-800 font-bold' },
+        { value: 'استراحة ذوي الاحتياجات الخاصة', label: '♿ استراحة ذوي الاحتياجات الخاصة', className: 'bg-white text-teal-800 font-bold' },
+        { value: 'سحب يد', label: '✋ سحب يد', className: 'bg-white text-red-700 font-bold' },
+    ] },
+];
+
+// أزرار سريعة تحت القائمة للحالات الخمس الأكثر تكراراً
+const QUICK_DAILY_STATUSES = [
+    { value: 'إجازة اعتيادية', label: '🏖️ اعتيادية' },
+    { value: 'إجازة زمنية', label: '⏰ زمنية' },
+    { value: 'ورقة عمل', label: '📝 ورقة عمل' },
+    { value: 'إجازة مرضية', label: '🏥 مرضية' },
+    { value: 'في دورة', label: '🎓 دورة' },
+];
+
 // شارات أعداد الموقف اليومي: مجموعها عدد الوحدة، والإضافي عدد فرعي من الحاضرين. الحاضر والإضافي
 // والمجاز والدورة تظهر دائماً (طلب أسامة 2026-10-19)، والبقية عند وجودها فقط
 const DAILY_COUNT_CHIPS = [
@@ -493,23 +529,37 @@ export const UnitsScreen = ({ ctx }) => {
                                                                     <option value="default" className="bg-white text-slate-800 font-bold">
                                                                         ⚙️ الافتراضي ({getEmployeeDefaultNaturalStatus(emp, dailyReportDate)})
                                                                     </option>
-                                                                    <option value="دوام صباحي" className="bg-white text-blue-700 font-bold">🟢 دوام صباحي (حضور فعلي)</option>
-                                                                    <option value="دوام إضافي" className="bg-white text-emerald-800 font-bold">⚡ دوام إضافي</option>
-                                                                    <option value="إجازة اعتيادية" className="bg-white text-rose-700 font-bold">🏖️ إجازة اعتيادية</option>
-                                                                    <option value="إجازة بدون راتب" className="bg-white text-orange-800 font-bold">💸 إجازة بدون راتب</option>
-                                                                    <option value="إجازة خارج العراق" className="bg-white text-cyan-800 font-bold">🌍 إجازة خارج العراق</option>
-                                                                    <option value="إجازة مرضية" className="bg-white text-rose-700 font-bold">🏥 إجازة مرضية</option>
-                                                                    <option value="إجازة زمنية" className="bg-white text-amber-700 font-bold">⏰ إجازة زمنية</option>
-                                                                    <option value="في دورة" className="bg-white text-indigo-700 font-bold">🎓 في دورة</option>
-                                                                    <option value="إيفاد داخل العراق" className="bg-white text-purple-700 font-bold">🇮🇶 إيفاد داخل العراق</option>
-                                                                    <option value="إيفاد خارج العراق" className="bg-white text-indigo-900 font-bold">🌐 إيفاد خارج العراق</option>
-                                                                    <option value="ورقة عمل" className="bg-white text-emerald-700 font-bold">📝 ورقة عمل</option>
-                                                                    <option value="مكلف بواجب" className="bg-white text-sky-700 font-bold">🛠️ مكلف بواجب</option>
-                                                                    <option value="تعذر حضور" className="bg-white text-amber-800 font-bold">🚧 تعذر حضور</option>
-                                                                    <option value="استراحة ذوي الاحتياجات الخاصة" className="bg-white text-teal-800 font-bold">♿ استراحة ذوي الاحتياجات الخاصة</option>
-                                                                    <option value="سحب يد" className="bg-white text-red-700 font-bold">✋ سحب يد</option>
-                                                                    <option value="غياب" className="bg-white text-red-700 font-bold">❌ غياب</option>
+                                                                    {DAILY_STATUS_GROUPS.map(group => (
+                                                                        <optgroup key={group.label} label={group.label} className="bg-white text-slate-500">
+                                                                            {group.options.map(opt => (
+                                                                                <option key={opt.value} value={opt.value} className={opt.className}>{opt.label}</option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                    ))}
                                                                 </select>
+                                                                <div className="mt-1.5 flex flex-wrap justify-center gap-1">
+                                                                    {QUICK_DAILY_STATUSES.map(q => {
+                                                                        const active = status === q.value;
+                                                                        // الضغط على الزر المفعَّل لا يعيد الافتراضي (القائمة لذلك)، والزمنية وورقة العمل
+                                                                        // يفتح نافذة توقيتها للتعديل. والحالة الآتية من فترة مؤرَّخة لا تُكرَّر تعديلاً لليوم
+                                                                        const reopensTiming = q.value === 'إجازة زمنية' || q.value === 'ورقة عمل';
+                                                                        return (
+                                                                            <button
+                                                                                key={q.value}
+                                                                                type="button"
+                                                                                aria-pressed={active}
+                                                                                onClick={() => {
+                                                                                    if (active && !(isOverride && reopensTiming)) return;
+                                                                                    setEmployeeDailyStatusOverride(emp.id, dailyReportDate, q.value);
+                                                                                }}
+                                                                                title={active ? (reopensTiming && isOverride ? `تعديل توقيت ${q.value}` : `الموقف الحالي: ${q.value}`) : `تسجيل ${q.value} لهذا اليوم`}
+                                                                                className={`px-2 py-1 rounded-lg border text-[11px] md:text-xs font-black transition cursor-pointer active:scale-95 ${active ? statusBadgeColor : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                                                                            >
+                                                                                {q.label}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     );
