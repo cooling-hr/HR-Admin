@@ -550,13 +550,14 @@ export const UnitsScreen = ({ ctx }) => {
                                                                                 key={q.value}
                                                                                 type="button"
                                                                                 aria-pressed={active}
-                                                                                aria-label={`${q.value} — ${getTripleName(emp.name)}`}
+                                                                                aria-disabled={inert}
+                                                                                aria-label={`${active && reopensTiming && isOverride ? `تعديل توقيت ${q.value}` : q.value} — ${getTripleName(emp.name)}`}
                                                                                 onClick={() => {
                                                                                     if (inert) return;
                                                                                     setEmployeeDailyStatusOverride(emp.id, dailyReportDate, q.value);
                                                                                 }}
                                                                                 title={active ? (reopensTiming && isOverride ? `تعديل توقيت ${q.value}` : `الموقف الحالي: ${q.value}`) : `تسجيل ${q.value} لهذا اليوم`}
-                                                                                className={`px-2 py-1 rounded-lg border text-[11px] md:text-xs font-black whitespace-nowrap transition ${inert ? 'cursor-default' : 'cursor-pointer active:scale-95'} ${active ? statusBadgeColor : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                                                                                className={`px-2 py-1 rounded-lg border text-[11px] md:text-xs font-black whitespace-nowrap transition ${inert ? 'cursor-default' : 'cursor-pointer active:scale-95'} ${active ? (inert ? statusBadgeColor.replace(/\bhover:\S+/g, '') : statusBadgeColor) : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                                                                             >
                                                                                 {q.label}
                                                                             </button>
