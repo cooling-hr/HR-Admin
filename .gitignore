@@ -3,3 +3,6 @@ scratch/
 *.log
 *.tmp
 __pycache__/
+
+# صفحات العرض المؤقتة لجلسات التصميم
+.superpowers/
