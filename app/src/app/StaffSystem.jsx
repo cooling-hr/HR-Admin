@@ -7,6 +7,7 @@ import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, 
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
+import { resolveCodeTable, timeFormCodeFor, UNKNOWN_CODE } from '../domain/timeForm';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../core/dates';
 import { SearchCircularProgress } from '../ui/SearchCircularProgress';
 import { ICON_PATHS, Icon, SAFETY_VEST_IMG, SAFETY_BOOT_IMG } from '../ui/Icon';
@@ -974,9 +975,10 @@ import { buildDatePicker } from '../ui/datePicker';
                 return 'دوام صباحي';
             };
 
-            const getEmployeeDailyStatus = (emp, dateStr) => {
+            // ignoreOverride: الموقف الطبيعي بلا التعديل اليومي، لرمز المناوب في استمارة ضبط الوقت (المواصفة 6.5)
+            const getEmployeeDailyStatus = (emp, dateStr, ignoreOverride = false) => {
                 // 1. التعديلات الاستثنائية المباشرة للموظف
-                if (dailyStatusOverrides[dateStr] && dailyStatusOverrides[dateStr][emp.id]) {
+                if (!ignoreOverride && dailyStatusOverrides[dateStr] && dailyStatusOverrides[dateStr][emp.id]) {
                     const ov = dailyStatusOverrides[dateStr][emp.id];
                     // تعذر الحضور يشمل موظفي الصباحي فقط ولا يشمل المناوبين نهائياً
                     if (emp.workType === 'مناوب' && (ov === 'تعذر حضور' || (typeof ov === 'string' && ov.includes('تعذر')))) {
@@ -1646,7 +1648,14 @@ import { buildDatePicker } from '../ui/datePicker';
                         const todayStr = `${tY}-${tM}-${tD}`;
                         const isPastOrToday = dateStr <= todayStr;
 
-                        dailyLog.push({ dateStr, dayName, status, isOverride: !!isOverride, hourlyHours, otHours, isFuture: !isPastOrToday });
+                        // لاستمارة ضبط الوقت: هل جاء الموقف من فترة مؤرَّخة (فالجمعة والسبت المربوطان بإجازة يومية
+                        // ليسا منها)، والساعات المسجَّلة فعلاً بلا افتراض 2 أو 3، وموقف المناوب الطبيعي تحت إضافيه
+                        const activePeriod = getActivePeriod(emp, dateStr);
+                        const fromPeriod = !!activePeriod && activePeriod.type === status && isOverride !== status;
+                        const otRaw = overtimeHoursRecords[dateStr] && overtimeHoursRecords[dateStr][emp.id];
+                        const otRecordedHours = (otRaw != null && otRaw !== '' && isFinite(Number(otRaw))) ? Number(otRaw) : null;
+                        const naturalStatus = (emp.workType === 'مناوب' && status.includes('إضافي')) ? getEmployeeDailyStatus(emp, dateStr, true) : status;
+                        dailyLog.push({ dateStr, dayName, status, isOverride: !!isOverride, hourlyHours, otHours, isFuture: !isPastOrToday, fromPeriod, otRecordedHours, naturalStatus });
 
                         // احتساب أيام الحضور والإحصائيات فقط للأيام المنقضية واليوم الحالي
                         if (isPastOrToday) {
@@ -1707,6 +1716,55 @@ import { buildDatePicker } from '../ui/datePicker';
                     }
                 };
             }, [staff, periodStartDate, periodEndDate, periodUnitFilter, periodWorkTypeFilter, periodSearchQuery, dailyStatusOverrides, officialHolidays, overtimeHoursRecords, hourlyLeaveRecords, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
+
+            // استمارة ضبط الوقت (المواصفة 3 و4) لشهر بداية الفترة: رمز كل يوم وساعات إضافيه المسجَّلة.
+            // 31 خانة لكل صف دائماً، والصفوف استمارتان (الملاك والعقود) مرتّبتان بالرقم الوظيفي.
+            // التنبيه يجمع خانات «؟» في الأيام المنقضية وحدها، فالأيام القادمة تُعرض نقطة.
+            const timeFormData = useMemo(() => {
+                const [year, month] = (periodStartDate || localDateStr()).split('-').map(Number);
+                const ym = `${year}-${String(month).padStart(2, '0')}`;
+                const monthDays = daysInMonth(ym);
+                const table = resolveCodeTable(null);
+                const itemById = {};
+                periodReportData.employees.forEach(item => { itemById[item.employee.id] = item; });
+
+                const buildRow = (item) => {
+                    const logByDate = {};
+                    item.dailyLog.forEach(d => { logByDate[d.dateStr] = d; });
+                    const isShift = item.employee.workType === 'مناوب';
+                    const cells = [];
+                    let totalHours = 0;
+                    for (let day = 1; day <= 31; day++) {
+                        const dateStr = `${ym}-${String(day).padStart(2, '0')}`;
+                        const log = day <= monthDays ? logByDate[dateStr] : null;
+                        if (!log) {
+                            cells.push({ day, code: '', hours: null, inMonth: day <= monthDays, isFuture: false });
+                            continue;
+                        }
+                        const code = timeFormCodeFor({ status: log.status, dateStr, fromPeriod: log.fromPeriod, isShift, naturalStatus: log.naturalStatus }, table);
+                        const hours = log.status.includes('إضافي') ? log.otRecordedHours : null;
+                        if (hours) totalHours += hours;
+                        cells.push({ day, code, hours, inMonth: true, isFuture: log.isFuture });
+                    }
+                    return { employee: item.employee, cells, totalHours };
+                };
+
+                const buildForm = (items) => {
+                    const rows = sortByJobNumber(items.map(i => i.employee)).map(emp => buildRow(itemById[emp.id]));
+                    const unknown = rows
+                        .map(r => ({ name: r.employee.name, days: r.cells.filter(c => c.code === UNKNOWN_CODE && !c.isFuture).map(c => c.day) }))
+                        .filter(u => u.days.length > 0);
+                    return { rows, warning: { unknown } };
+                };
+
+                const staffForm = buildForm(periodReportData.employees.filter(i => !isContractEmployee(i.employee)));
+                const contractForm = buildForm(periodReportData.employees.filter(i => isContractEmployee(i.employee)));
+                return {
+                    year, month, daysInMonth: monthDays,
+                    staffRows: staffForm.rows, contractRows: contractForm.rows,
+                    warnings: { staff: staffForm.warning, contracts: contractForm.warning },
+                };
+            }, [periodReportData, periodStartDate]);
 
             // ترميز خانة اليوم في مصفوفة الموقف: رمز مختصر ولون لكل حالة يومية ممكنة.
             // الحالات مأخوذة من getEmployeeDailyStatus وأنواع الفترات السبعة والتعديلات اليدوية —
