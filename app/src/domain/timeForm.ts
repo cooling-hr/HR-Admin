@@ -117,7 +117,8 @@ export const resolveCodeTable = (edits?: TimeFormCodeEdits | null): ResolvedCode
     const custom = (edits?.custom || []).map(c => ({ ...c }));
     const list = [...officialList, ...custom];
     const byId: Record<string, TimeCode> = Object.fromEntries(list.map(c => [c.id, c]));
-    const extraByMeaning: Record<string, TimeCode> = {};
+    // بلا نموذج أصلي: المعنى نص يكتبه المستخدم، فـ«constructor» أو «__proto__» يبقى مفتاحاً عادياً
+    const extraByMeaning: Record<string, TimeCode> = Object.create(null);
     for (const c of officialList) if (activated.has(c.id) && !linkedStatusesOf(c.id).length) extraByMeaning[c.meaning] = c;
     for (const c of custom) extraByMeaning[c.meaning] = c;
     return { list, byId, extraByMeaning };
