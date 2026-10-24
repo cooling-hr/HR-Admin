@@ -23,7 +23,7 @@ const STICKY_ROW_EDGE = 'shadow-[inset_1px_0_0_0_#94a3b8,inset_0_-2px_0_0_#64748
 
 // استمارة ضبط الوقت على الشاشة: صفّان لكل موظف (الرموز ثم الساعات الإضافية)، استمارة الملاك أو العقود
 export const TimeFormView = ({ ctx }) => {
-    const { timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth } = ctx;
+    const { printTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth } = ctx;
     const isContracts = timeFormKind === 'contracts';
     const rows = isContracts ? timeFormData.contractRows : timeFormData.staffRows;
     const unknown = (isContracts ? timeFormData.warnings.contracts : timeFormData.warnings.staff).unknown;
@@ -54,6 +54,13 @@ export const TimeFormView = ({ ctx }) => {
                     onChange={e => { if (e.target.value) selectTimeFormMonth(e.target.value); }}
                     className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold bg-white"
                 />
+                <button
+                    onClick={printTimeForm}
+                    disabled={rows.length === 0}
+                    className={`px-3 py-1.5 rounded-xl text-[11px] font-black shadow-sm transition ${rows.length === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-700 hover:bg-slate-800 text-white cursor-pointer'}`}
+                >
+                    🖨️ طباعة الاستمارة
+                </button>
             </div>
 
             {!timeFormData.coversMonth && (

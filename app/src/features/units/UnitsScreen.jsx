@@ -89,7 +89,7 @@ const ShiftPills = ({ shifts }) => (<>
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
+    const { printTimeForm, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
     const searchActive = !!periodSearchQuery.trim();
     // اليوم بالتوقيت المحلي (لا toISOString) لتمييز منقّل الشريط حين يكون التاريخ غير اليوم
     const todayStr = localDateStr();
@@ -758,7 +758,7 @@ export const UnitsScreen = ({ ctx }) => {
                         </div>
 
                         {periodView === 'timeForm' ? (
-                            <TimeFormView ctx={{ timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth }} />
+                            <TimeFormView ctx={{ printTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth }} />
                         ) : (
                         <div className="overflow-x-auto w-full">
                             <table className="w-full text-right border-collapse text-xs md:text-sm">

@@ -43,7 +43,7 @@ import { DeletionRequestBanner } from '../features/shell/DeletionRequestBanner';
 import { PasteJsonModal } from '../features/backup/PasteJsonModal';
 import { MergeModal } from '../features/merge/MergeModal';
 import { PreviewModal } from '../features/preview/PreviewModal';
-import { DayMatrixPrint } from '../features/units/DayMatrixPrint';
+import { TimeFormPrint } from '../features/units/TimeFormPrint';
 import { safeStorage } from '../core/safeStorage';
 
 // أنواع تُحتسب إجازة في تقرير الفترة (إجازة بدون راتب كانت لا تُعدّ في أي عمود)
@@ -1784,60 +1784,11 @@ import { buildDatePicker } from '../ui/datePicker';
             // فتح الاستمارة: إن لم تكن الفترة شهراً كاملاً من أوله انتقلت إلى شهر بدايتها
             const showTimeForm = () => {
                 setPeriodView('timeForm');
-                if (!timeFormData.coversMonth || !(periodStartDate || '').endsWith('-01')) {
+                const startYm = (periodStartDate || '').slice(0, 7);
+                if (!timeFormData.coversMonth || !(periodStartDate || '').endsWith('-01') || (periodEndDate || '') !== `${startYm}-${String(daysInMonth(startYm)).padStart(2, '0')}`) {
                     selectTimeFormMonth((periodStartDate || localDateStr()).slice(0, 7));
                 }
             };
-
-            // ترميز خانة اليوم في مصفوفة الموقف: رمز مختصر ولون لكل حالة يومية ممكنة.
-            // الحالات مأخوذة من getEmployeeDailyStatus وأنواع الفترات السبعة والتعديلات اليدوية —
-            // وأي حالة غير متوقَّعة تظهر بأول حرفٍ منها ولونٍ محايد بدل أن تختفي بصمت.
-            const getDayMatrixCell = (status, isFuture) => {
-                if (isFuture) return { code: '·', cls: 'text-slate-300', label: 'يوم لم يحن بعد' };
-                const s = status || '';
-                if (s === 'دوام صباحي' || s === 'حضور فعلي' || s === 'دوام صباحي (12 ساعة)') return { code: 'ص', cls: 'bg-emerald-100 text-emerald-800', label: s };
-                if (s === 'دوام مسائي (12 ساعة)') return { code: 'م', cls: 'bg-teal-100 text-teal-800', label: s };
-                if (s === 'دوام 24 ساعة') return { code: '٢٤', cls: 'bg-emerald-200 text-emerald-900', label: s };
-                if (s === 'ورقة عمل') return { code: 'و', cls: 'bg-blue-100 text-blue-800', label: s };
-                if (s === 'مكلف بواجب') return { code: 'ك', cls: 'bg-sky-100 text-sky-800', label: s };
-                if (s === 'إجازة زمنية') return { code: 'ز', cls: 'bg-cyan-100 text-cyan-800', label: s };
-                if (s.includes('إضافي')) return { code: 'إض', cls: 'bg-violet-100 text-violet-800', label: s };
-                if (s.includes('تعذر')) return { code: 'ت', cls: 'bg-yellow-100 text-yellow-800', label: s };
-                if (s === 'استراحة مناوبة') return { code: 'ر', cls: 'bg-slate-100 text-slate-500', label: s };
-                if (s === 'استراحة نهاية الأسبوع') return { code: 'ع', cls: 'bg-slate-100 text-slate-400', label: s };
-                if (s === 'عطلة رسمية') return { code: 'ر.س', cls: 'bg-slate-200 text-slate-600', label: s };
-                if (s === 'غياب') return { code: 'غ', cls: 'bg-red-100 text-red-800', label: s };
-                if (s === 'سحب يد') return { code: 'س', cls: 'bg-red-200 text-red-800', label: s };
-                if (s === 'في دورة') return { code: 'د', cls: 'bg-indigo-100 text-indigo-800', label: s };
-                if (s === 'إيفاد') return { code: 'ف', cls: 'bg-purple-100 text-purple-800', label: s };
-                if (s === 'إجازة أمومة') return { code: 'أم', cls: 'bg-pink-100 text-pink-800', label: s };
-                if (s === 'إجازة بدون راتب') return { code: 'ب', cls: 'bg-orange-100 text-orange-800', label: s };
-                if (s === 'إجازة طويلة') return { code: 'ط', cls: 'bg-orange-100 text-orange-900', label: s };
-                if (s.includes('إجازة')) return { code: 'إ', cls: 'bg-amber-100 text-amber-800', label: s };
-                return { code: (s.trim()[0] || '؟'), cls: 'bg-slate-100 text-slate-500', label: s || 'غير محدد' };
-            };
-
-            const DAY_MATRIX_LEGEND = [
-                { code: 'ص', label: 'دوام صباحي', cls: 'bg-emerald-100 text-emerald-800' },
-                { code: 'م', label: 'دوام مسائي', cls: 'bg-teal-100 text-teal-800' },
-                { code: '٢٤', label: 'دوام 24 ساعة', cls: 'bg-emerald-200 text-emerald-900' },
-                { code: 'إض', label: 'دوام إضافي', cls: 'bg-violet-100 text-violet-800' },
-                { code: 'و', label: 'ورقة عمل', cls: 'bg-blue-100 text-blue-800' },
-                { code: 'ك', label: 'مكلف بواجب', cls: 'bg-sky-100 text-sky-800' },
-                { code: 'ز', label: 'إجازة زمنية', cls: 'bg-cyan-100 text-cyan-800' },
-                { code: 'ت', label: 'تعذر حضور', cls: 'bg-yellow-100 text-yellow-800' },
-                { code: 'ر', label: 'استراحة مناوبة', cls: 'bg-slate-100 text-slate-500' },
-                { code: 'ع', label: 'عطلة أسبوعية', cls: 'bg-slate-100 text-slate-400' },
-                { code: 'ر.س', label: 'عطلة رسمية', cls: 'bg-slate-200 text-slate-600' },
-                { code: 'إ', label: 'إجازة اعتيادية', cls: 'bg-amber-100 text-amber-800' },
-                { code: 'ب', label: 'بدون راتب', cls: 'bg-orange-100 text-orange-800' },
-                { code: 'ط', label: 'إجازة طويلة', cls: 'bg-orange-100 text-orange-900' },
-                { code: 'أم', label: 'إجازة أمومة', cls: 'bg-pink-100 text-pink-800' },
-                { code: 'د', label: 'في دورة', cls: 'bg-indigo-100 text-indigo-800' },
-                { code: 'ف', label: 'إيفاد', cls: 'bg-purple-100 text-purple-800' },
-                { code: 'غ', label: 'غياب', cls: 'bg-red-100 text-red-800' },
-                { code: 'س', label: 'سحب يد', cls: 'bg-red-200 text-red-800' }
-            ];
 
             const exportPeriodReportExcel = () => {
                 try {
@@ -2455,20 +2406,24 @@ import { buildDatePicker } from '../ui/datePicker';
                 alert(`⚠️ تم استبدال قاعدة البيانات بالكامل بنجاح. إجمالي الموظفين الحاليين: ${incoming.length} موظف.`);
             };
 
-            // طباعة مصفوفة الأيام: القالب المخصص أدناه يحلّ محلّ الشاشة أثناء الطباعة فقط.
+            // طباعة استمارة ضبط الوقت: القالب المخصص (TimeFormPrint) يحلّ محلّ الشاشة أثناء الطباعة فقط.
             // اتجاه الصفحة يُحقَن ديناميكياً لأن التطبيق يفرض A4 عمودية عالمياً في @page،
             // و@page لا يمكن ربطه بصنف على body — فالحقن والإزالة هما الطريق الموثوق الوحيد.
-            const printDayMatrix = () => {
+            // الخانات بلا رمز (؟) تُنبَّه قبل الطباعة، فلا تصل ورقة ناقصة إلى جهة رسمية دون علم المستخدم.
+            const printTimeForm = () => {
+                const unknownList = timeFormData.warnings[timeFormKind === 'contracts' ? 'contracts' : 'staff'].unknown;
+                const unknownTotal = unknownList.reduce((sum, u) => sum + u.days.length, 0);
+                if (unknownTotal > 0 && !window.confirm(`في الاستمارة ${unknownTotal} خانة بلا رمز (؟). هل تطبعها كما هي؟`)) return;
                 const styleEl = document.createElement('style');
-                styleEl.id = 'matrixLandscapeStyle';
+                styleEl.id = 'timeFormLandscapeStyle';
                 styleEl.textContent = '@media print { @page { size: A4 landscape; margin: 8mm; } }';
                 document.head.appendChild(styleEl);
-                document.body.classList.add('printing-matrix');
+                document.body.classList.add('printing-timeform');
                 setTimeout(() => {
                     window.print();
                     setTimeout(() => {
-                        document.body.classList.remove('printing-matrix');
-                        const el = document.getElementById('matrixLandscapeStyle');
+                        document.body.classList.remove('printing-timeform');
+                        const el = document.getElementById('timeFormLandscapeStyle');
                         if (el) el.remove();
                     }, 1000);
                 }, 250);
@@ -4925,7 +4880,7 @@ return (
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
                             <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, setMealAuthorizations, staff }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
+                            <UnitsScreen ctx={{ printTimeForm, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
@@ -4937,8 +4892,8 @@ return (
                     {/* نافذة استيراد النص المنسوخ JSON (للهواتف) */}
                     {showPasteModal && <PasteJsonModal ctx={{ pastedJsonText, setIncomingBundle, setIncomingStaff, setPastedJsonText, setShowMergeModal, setShowPasteModal }} />}
 
-                    {/* قالب طباعة مصفوفة الأيام — يظهر أثناء الطباعة فقط (body.printing-matrix) */}
-                    <DayMatrixPrint ctx={{ DAY_MATRIX_LEGEND, getDayMatrixCell, periodEndDate, periodReportData, periodReportRows, periodStartDate, periodUnitFilter, periodWorkTypeFilter }} />
+                    {/* قالب طباعة استمارة ضبط الوقت — يظهر أثناء الطباعة فقط (body.printing-timeform) */}
+                    <TimeFormPrint ctx={{ timeFormData, timeFormKind }} />
 
                     {showPreview && <PreviewModal ctx={{ ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printOrientation, printPreview, selectedUnit, setPreviewTitle, setPrintOrientation, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth }} />}
                     
