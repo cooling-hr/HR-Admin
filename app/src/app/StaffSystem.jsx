@@ -5,7 +5,7 @@ import { getJobRank, sortByJobNumber, sortByJobTitleHierarchy, ensureTopTwo, sor
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
-import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave } from '../domain/periods';
+import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../core/dates';
 import { SearchCircularProgress } from '../ui/SearchCircularProgress';
@@ -44,6 +44,9 @@ import { MergeModal } from '../features/merge/MergeModal';
 import { PreviewModal } from '../features/preview/PreviewModal';
 import { DayMatrixPrint } from '../features/units/DayMatrixPrint';
 import { safeStorage } from '../core/safeStorage';
+
+// أنواع تُحتسب إجازة في تقرير الفترة (إجازة بدون راتب كانت لا تُعدّ في أي عمود)
+const PERIOD_REPORT_EXTRA_LEAVES = ['إجازة بدون راتب', 'إجازة دراسية', 'إجازة ولادة', 'إجازة أربع أو خمس سنوات', 'أيام العدة', 'إصابة عمل'];
 import { ensureLibs } from '../core/lazyLibs';
 import { buildDatePicker } from '../ui/datePicker';
 
@@ -1602,6 +1605,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     let leaves = 0;
                     let courses = 0;
                     let deputations = 0;
+                    let detached = 0;
                     let absence = 0;
                     let rest = 0;
                     let monthlyHourlyLeaveSum = 0;
@@ -1650,7 +1654,9 @@ import { buildDatePicker } from '../ui/datePicker';
                                 regularDuty++;
                             } else if (status === 'دوام إضافي' || status.includes('إضافي')) {
                                 overtimeDuty++;
-                            } else if (status.includes('إجازة اعتيادية') || status.includes('مرضية') || status.includes('خارج العراق') || isLongOrMaternityLeave(status)) {
+                            } else if (dailyStatusCategory(status) === 'detached') {
+                                detached++;
+                            } else if (status.includes('إجازة اعتيادية') || status.includes('مرضية') || (status.includes('خارج العراق') && !status.includes('إيفاد')) || isLongOrMaternityLeave(status) || PERIOD_REPORT_EXTRA_LEAVES.includes(status)) {
                                 leaves++;
                             } else if (status.includes('تعذر') || status.includes('توقف موقع')) {
                                 rest++;
@@ -1681,6 +1687,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         leaves,
                         courses,
                         deputations,
+                        detached,
                         absence,
                         rest,
                         dailyLog
@@ -1699,7 +1706,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         totalDaysCount: datesList.length
                     }
                 };
-            }, [staff, periodStartDate, periodEndDate, periodUnitFilter, periodWorkTypeFilter, periodSearchQuery, dailyStatusOverrides, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
+            }, [staff, periodStartDate, periodEndDate, periodUnitFilter, periodWorkTypeFilter, periodSearchQuery, dailyStatusOverrides, officialHolidays, overtimeHoursRecords, hourlyLeaveRecords, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
 
             // ترميز خانة اليوم في مصفوفة الموقف: رمز مختصر ولون لكل حالة يومية ممكنة.
             // الحالات مأخوذة من getEmployeeDailyStatus وأنواع الفترات السبعة والتعديلات اليدوية —
@@ -1769,13 +1776,14 @@ import { buildDatePicker } from '../ui/datePicker';
                             'الدوام الإضافي (يوم)': item.overtimeDuty,
                             'الإجازات (يوم)': item.leaves,
                             'الدورات والإيفاد (يوم)': item.coursesOrDeputation,
+                            'خارج الشعبة (يوم)': item.detached,
                             'الغياب (يوم)': item.absence,
                             'أيام الاستراحة (يوم)': item.rest
                         });
                     });
 
                     setPreviewData(exportData);
-                    setVisiblePreviewColumns(['الرقم الوظيفي', 'الوحدة', 'طبيعة العمل', 'الدوام الاعتيادي (يوم)', 'الدوام الإضافي (يوم)', 'الإجازات (يوم)', 'الغياب (يوم)']);
+                    setVisiblePreviewColumns(['الرقم الوظيفي', 'الوحدة', 'طبيعة العمل', 'الدوام الاعتيادي (يوم)', 'الدوام الإضافي (يوم)', 'الإجازات (يوم)', 'خارج الشعبة (يوم)', 'الغياب (يوم)']);
                     // الفلاتر تُذكَر في العنوان: تقريران بعنوان واحد ومحتوى مختلف التباس خطر في مستند رسمي
                     const scopeParts = [];
                     if (periodUnitFilter !== 'all') scopeParts.push(periodUnitFilter);
@@ -2651,7 +2659,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 evaluation: staff.filter(s => {
                     if (isContractEmployee(s)) return false;
                     const p = getActivePeriod(s, localDateStr());
-                    return !(p && (p.type === 'إجازة طويلة' || p.type === 'إجازة أمومة'));
+                    return !(p && (LONG_ABSENCE_TYPES.includes(p.type)));
                 }).length,
                 active: staff.filter(s => s.status === 'نشط').length,
                 inCourse: staff.filter(s => s.status === 'في دورة').length,
@@ -2793,7 +2801,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     result = data.filter(s => {
                         if (isContractEmployee(s)) return false;
                         const p = getActivePeriod(s, evalDate);
-                        return !(p && (p.type === 'إجازة طويلة' || p.type === 'إجازة أمومة'));
+                        return !(p && (LONG_ABSENCE_TYPES.includes(p.type)));
                     });
                     result = sortByJobNumber(result); // ترتيب حسب الأرقام الوظيفية
                 }

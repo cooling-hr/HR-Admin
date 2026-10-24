@@ -50,6 +50,7 @@ const DAILY_COUNT_CHIPS = [
     { key: 'leave', label: '🏖️ مجاز', className: 'bg-rose-50 text-rose-700 border-rose-200', always: true },
     { key: 'course', label: '🎓 دورة', className: 'bg-indigo-50 text-indigo-700 border-indigo-200', always: true },
     { key: 'mission', label: '✈️ إيفاد', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+    { key: 'detached', label: '🏢 خارج الشعبة', className: 'bg-teal-50 text-teal-700 border-teal-200' },
     { key: 'rest', label: '🌙 استراحة', className: 'bg-slate-100 text-slate-600 border-slate-200' },
     { key: 'excused', label: '🚧 تعذر حضور', className: 'bg-amber-100 text-amber-900 border-amber-300' },
     { key: 'absent', label: '❌ غياب', className: 'bg-red-600 text-white border-red-600' },
@@ -841,6 +842,7 @@ export const UnitsScreen = ({ ctx }) => {
                                         <th className="px-3 py-3.5 text-center text-rose-700">إجازات</th>
                                         <th className="px-3 py-3.5 text-center text-purple-700">دورات</th>
                                         <th className="px-3 py-3.5 text-center text-indigo-700">إيفادات</th>
+                                        <th className="px-3 py-3.5 text-center text-teal-700">خارج الشعبة</th>
                                         <th className="px-3 py-3.5 text-center text-red-700">غياب</th>
                                         <th className="px-3 py-3.5 text-center">سجل الأيام</th>
                                     </tr>
@@ -848,7 +850,7 @@ export const UnitsScreen = ({ ctx }) => {
                                 <tbody>
                                     {periodReportData.employees.length === 0 ? (
                                         <tr>
-                                            <td colSpan="12" className="px-4 py-8 text-center text-slate-500 font-bold">
+                                            <td colSpan="13" className="px-4 py-8 text-center text-slate-500 font-bold">
                                                 🚫 لا توجد نتائج مطابقة لخيارات الفلترة المحددة.
                                             </td>
                                         </tr>
@@ -887,6 +889,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                         <td className="px-3 py-3 text-center font-black text-rose-700">{item.leaves > 0 ? `${item.leaves} يوم` : '0'}</td>
                                                         <td className="px-3 py-3 text-center font-black text-purple-700">{item.courses > 0 ? `${item.courses} يوم` : '0'}</td>
                                                         <td className="px-3 py-3 text-center font-black text-indigo-700">{item.deputations > 0 ? `${item.deputations} يوم` : '0'}</td>
+                                                        <td className="px-3 py-3 text-center font-black text-teal-700">{item.detached > 0 ? `${item.detached} يوم` : '0'}</td>
                                                         <td className="px-3 py-3 text-center font-black text-red-700">{item.absence > 0 ? `${item.absence} يوم` : '0'}</td>
                                                         <td className="px-3 py-3 text-center">
                                                             <button
@@ -901,7 +904,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                     {/* السجل اليومي التفصيلي عند الضغط */}
                                                     {isExpanded && (
                                                         <tr className="bg-slate-900 text-white border-b-2 border-slate-700">
-                                                            <td colSpan="12" className="p-4 space-y-3">
+                                                            <td colSpan="13" className="p-4 space-y-3">
                                                                 <div className="flex justify-between items-center">
                                                                     <h4 className="font-black text-amber-400 text-xs md:text-sm flex items-center gap-1.5">
                                                                         <span>🗓️</span>
