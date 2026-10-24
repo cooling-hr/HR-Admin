@@ -1021,9 +1021,10 @@ import { buildDatePicker } from '../ui/datePicker';
                             const thuStatus = dailyStatusOverrides[thuStr] && dailyStatusOverrides[thuStr][emp.id];
                             const sunStatus = dailyStatusOverrides[sunStr] && dailyStatusOverrides[sunStr][emp.id];
 
-                            // إذا كان الخميس والأحد إجازة مدفوعة/اعتيادية/مرضية، تحسب الجمعة والسبت من ضمن الإجازة
+                            // إذا كان الخميس والأحد إجازة من النوع نفسه، تحسب الجمعة والسبت من ضمن الإجازة؛ وإجازتان
+                            // مختلفتان (اعتيادية ثم مرضية) لا تربطان، فتبقى الجمعة والسبت استراحة (قرار أسامة 2026-10-22)
                             const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق') || st.includes('بدون راتب'));
-                            if (isLeaveType(thuStatus) && isLeaveType(sunStatus)) {
+                            if (isLeaveType(thuStatus) && thuStatus === sunStatus) {
                                 return thuStatus; // تكتسب نفس نوع إجازة الخميس
                             }
 
@@ -1262,8 +1263,8 @@ import { buildDatePicker } from '../ui/datePicker';
                             const sunStatus = dailyStatusOverrides[sunStr] && dailyStatusOverrides[sunStr][empId];
                             const isLeaveType = (st) => st && (st.includes('إجازة اعتيادية') || st.includes('مرضية') || st.includes('خارج العراق') || st.includes('بدون راتب'));
 
-                            if (!isLeaveType(thuStatus) || !isLeaveType(sunStatus)) {
-                                const confirmLeave = confirm(`⚠️ تنبيه إداري:\n\nيوم (${day === 5 ? 'الجمعة' : 'السبت'}) هو يوم استراحة رسمية نهاية الأسبوع للدوام الصباحي.\n\nتذكير: لا تحسب الإجازة في نهاية الأسبوع إلا إذا كانت مؤشرة يوم الخميس ويوم الأحد معاً (قاعدة ربط الإجازة).\n\nهل تريد تأكيد تسليط الإجازة بالرغم من ذلك؟\n\n• اضغط [موافق / OK] للتأكيد وتسليط الإجازة.\n• اضغط [إلغاء / Cancel] للتراجع والاحتفاظ بـ استراحة نهاية الأسبوع.`);
+                            if (!(isLeaveType(thuStatus) && thuStatus === sunStatus)) {
+                                const confirmLeave = confirm(`⚠️ تنبيه إداري:\n\nيوم (${day === 5 ? 'الجمعة' : 'السبت'}) هو يوم استراحة رسمية نهاية الأسبوع للدوام الصباحي.\n\nتذكير: لا تحسب الإجازة في نهاية الأسبوع إلا إذا كانت مؤشرة من النوع نفسه يوم الخميس ويوم الأحد معاً (قاعدة ربط الإجازة).\n\nهل تريد تأكيد تسليط الإجازة بالرغم من ذلك؟\n\n• اضغط [موافق / OK] للتأكيد وتسليط الإجازة.\n• اضغط [إلغاء / Cancel] للتراجع والاحتفاظ بـ استراحة نهاية الأسبوع.`);
                                 if (!confirmLeave) {
                                     revertToDefault();
                                     return;
