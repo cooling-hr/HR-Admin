@@ -7,7 +7,7 @@ import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, 
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
-import { resolveCodeTable, timeFormCodeFor, UNKNOWN_CODE } from '../domain/timeForm';
+import { resolveCodeTable, timeFormCodeFor, timeFormTitle, UNKNOWN_CODE } from '../domain/timeForm';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../core/dates';
 import { SearchCircularProgress } from '../ui/SearchCircularProgress';
 import { ICON_PATHS, Icon, SAFETY_VEST_IMG, SAFETY_BOOT_IMG } from '../ui/Icon';
@@ -2429,6 +2429,42 @@ import { buildDatePicker } from '../ui/datePicker';
                 }, 250);
             };
 
+            // تصدير استمارة ضبط الوقت المختارة إلى Excel بالشكل المطبوع نفسه: صفّان لكل موظف (الرموز ثم الساعات)،
+            // والتسلسل والرقم والاسم ونوع الحركة والمجموع مدمجة عمودياً على الصفّين
+            const exportTimeFormExcel = async () => {
+                if (!(await ensureLibs('xlsx'))) return;
+                try {
+                    const isContracts = timeFormKind === 'contracts';
+                    const rows = isContracts ? timeFormData.contractRows : timeFormData.staffRows;
+                    const { ym, daysInMonth: monthDays } = timeFormData;
+                    const days = Array.from({ length: 31 }, (_, i) => i + 1);
+                    const lastCol = 4 + days.length;
+                    const aoa = [
+                        [timeFormTitle(timeFormKind)],
+                        [getArabicMonthLabel(ym)],
+                        ['التسلسل', 'الرقم الوظيفي', 'الاسم الثلاثي', 'نوع الحركة', ...days.map(day => day > monthDays ? day : `${day} ${getArabicDayName(`${ym}-${String(day).padStart(2, '0')}`)}`), 'مجموع الساعات']
+                    ];
+                    const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }, { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }];
+                    rows.forEach((row, idx) => {
+                        const r = aoa.length;
+                        aoa.push([idx + 1, row.employee.jobNumber || '', getTripleName(row.employee.name), '',
+                            ...row.cells.map(cell => !cell.inMonth || cell.isFuture ? '' : cell.outOfPeriod ? '–' : cell.code),
+                            row.totalHours || '']);
+                        aoa.push(['', '', '', '', ...row.cells.map(cell => cell.inMonth && !cell.outOfPeriod ? (cell.hours ?? '') : ''), '']);
+                        [0, 1, 2, 3, lastCol].forEach(c => merges.push({ s: { r, c }, e: { r: r + 1, c } }));
+                    });
+                    const ws = XLSX.utils.aoa_to_sheet(aoa);
+                    ws['!merges'] = merges;
+                    ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 28 }, { wch: 10 }, ...days.map(() => ({ wch: 5 })), { wch: 10 }];
+                    const wb = XLSX.utils.book_new();
+                    wb.Workbook = { Views: [{ RTL: true }] };
+                    XLSX.utils.book_append_sheet(wb, ws, 'استمارة ضبط الوقت');
+                    XLSX.writeFile(wb, `استمارة_ضبط_الوقت_${isContracts ? 'العقود' : 'الملاك'}_${ym}.xlsx`);
+                } catch (error) {
+                    alert('❌ خطأ في تصدير استمارة ضبط الوقت: ' + error.message);
+                }
+            };
+
             // طباعة بطاقة المنتسب من نافذة المعاينة. الصنف على body يفعّل عزل طباعتها
             // (body.printing-card في CSS)، والنافذة نفسها مرسومة خارج #root عبر portal.
             //
@@ -3296,7 +3332,7 @@ import { buildDatePicker } from '../ui/datePicker';
             const exportBackupJSON = () => {
                 try {
                     const backupData = {
-                        version: 'v9.5 Enterprise Cloud Edition',
+                        version: 'v9.6 Enterprise Cloud Edition',
                         exportDate: new Date().toISOString(),
                         staff: staff,
                         staffData: staff,
@@ -4880,7 +4916,7 @@ return (
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
                             <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, setMealAuthorizations, staff }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ printTimeForm, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
+                            <UnitsScreen ctx={{ printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
@@ -4921,7 +4957,7 @@ return (
                     
                     <footer className="bg-gray-800 text-white mt-12 py-6 text-center">
                         <p>© 2026 شركة نفط البصرة - شعبة تبريد المركز ومحطة عزل نهر بن عمر</p>
-                        <p className="text-xs text-blue-300 mt-2">👨‍💻 إعداد: المهندس أسامة خليل هاشم | الإصدار v9.5 Enterprise Cloud Edition</p>
+                        <p className="text-xs text-blue-300 mt-2">👨‍💻 إعداد: المهندس أسامة خليل هاشم | الإصدار v9.6 Enterprise Cloud Edition</p>
                     </footer>
                 </div>
             );
