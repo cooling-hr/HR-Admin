@@ -1,5 +1,5 @@
 import React from 'react';
-import { OPEN_ENDED_PERIOD_TYPES, quickPeriodEnd } from '../../domain/periods';
+import { OPEN_ENDED_PERIOD_TYPES, quickPeriodEnd, statusButtonLabel } from '../../domain/periods';
 
 // معالج الفترة السريعة من قائمة الحالة. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
@@ -9,28 +9,12 @@ export const QuickPeriodModal = ({ ctx }) => {
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[130] flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
                 <div className="bg-gradient-to-r from-indigo-700 to-blue-800 p-4 text-white flex-shrink-0 flex items-center justify-between">
-                    <h3 className="text-base font-black flex items-center gap-2"><span>📅</span><span>{quickPeriod.editingId ? 'تعديل فترة' : 'تسجيل فترة'}: {quickPeriod.category}</span></h3>
+                    <h3 className="text-base font-black flex items-center gap-2"><span>📅</span><span>{quickPeriod.editingId ? 'تعديل فترة' : 'تسجيل فترة'}: {statusButtonLabel(quickPeriod.category)}</span></h3>
                     <button type="button" onClick={() => setQuickPeriod(null)} aria-label="إغلاق" title="إغلاق (Esc)"
                         className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-bold transition cursor-pointer flex-shrink-0">✕</button>
                 </div>
                 <div className="p-5 space-y-4 text-right overflow-y-auto min-h-0 flex-1">
                     <p className="text-sm font-black text-slate-900">{quickPeriod.empName}</p>
-
-                    {quickPeriod.category === 'إجازة طويلة' && (
-                        <div className="space-y-1">
-                            <label className="block text-xs font-black text-slate-700">صنف الإجازة:</label>
-                            <div className="flex gap-2">
-                                <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, paid: true })}
-                                    className={`flex-1 py-2 rounded-xl text-xs font-black border-2 transition cursor-pointer ${quickPeriod.paid ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-slate-700 border-slate-300 hover:border-emerald-400'}`}>
-                                    براتب (إجازة اعتيادية)
-                                </button>
-                                <button type="button" onClick={() => setQuickPeriod({ ...quickPeriod, paid: false })}
-                                    className={`flex-1 py-2 rounded-xl text-xs font-black border-2 transition cursor-pointer ${!quickPeriod.paid ? 'bg-amber-600 text-white border-amber-700' : 'bg-white text-slate-700 border-slate-300 hover:border-amber-400'}`}>
-                                    بدون راتب
-                                </button>
-                            </div>
-                        </div>
-                    )}
 
                     {/* سحب اليد غالباً يأتي بعد غياب فعلي (وليس دائماً)، فيحتاج المسؤول أحياناً
                         إعادة تصنيف فترة غياب قائمة إلى سحب يد بعد صدور قرار إداري/قانوني —

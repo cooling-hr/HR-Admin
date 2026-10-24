@@ -2,7 +2,7 @@ import React from 'react';
 import { getThreeName } from '../../core/arabic';
 import { localDateStr } from '../../core/dates';
 import { getMissingFields } from '../../domain/employees';
-import { QUICK_STATUS_OPTIONS, getActivePeriod, periodsOf } from '../../domain/periods';
+import { STATUS_BUTTON_GROUPS, STATUS_BUTTON_VALUES, statusButtonLabel, getActivePeriod, periodsOf } from '../../domain/periods';
 import { getSafetyStatus } from '../../domain/safety';
 import { Icon, SAFETY_BOOT_IMG, SAFETY_VEST_IMG } from '../../ui/Icon';
 import { PageHeader } from '../../ui/PageHeader';
@@ -774,15 +774,13 @@ export const StaffListScreen = ({ ctx }) => {
                                                         resolvedStatus === 'في دورة' ? 'bg-indigo-100 text-indigo-800 border-indigo-300' :
                                                         'bg-orange-100 text-orange-800 border-orange-300'
                                                     }`}>
-                                                    {!QUICK_STATUS_OPTIONS.includes(resolvedStatus) && (
+                                                    {!STATUS_BUTTON_VALUES.includes(resolvedStatus) && (
                                                         <option value={resolvedStatus}>{resolvedStatus}</option>
                                                     )}
-                                                    <option value="نشط">نشط</option>
-                                                    <option value="في دورة">في دورة</option>
-                                                    <option value="إجازة طويلة">إجازة طويلة</option>
-                                                    <option value="إجازة أمومة">إجازة أمومة</option>
-                                                    <option value="غياب">غياب</option>
-                                                    <option value="سحب يد">سحب يد</option>
+                                                    {STATUS_BUTTON_GROUPS.map((g, gi) => {
+                                                        const opts = g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>);
+                                                        return g.label ? <optgroup key={gi} label={g.label}>{opts}</optgroup> : <React.Fragment key={gi}>{opts}</React.Fragment>;
+                                                    })}
                                                 </select>
                                             ) : (
                                                 <span className={`px-3 py-1 rounded-full text-sm font-bold ${
@@ -790,7 +788,7 @@ export const StaffListScreen = ({ ctx }) => {
                                                     resolvedStatus === 'في دورة' ? 'bg-indigo-100 text-indigo-800' :
                                                     'bg-orange-100 text-orange-800'
                                                 }`}>
-                                                    {resolvedStatus}
+                                                    {statusButtonLabel(resolvedStatus)}
                                                 </span>
                                             );
                                         })()}

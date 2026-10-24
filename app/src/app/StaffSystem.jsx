@@ -5,7 +5,7 @@ import { getJobRank, sortByJobNumber, sortByJobTitleHierarchy, ensureTopTwo, sor
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
-import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, QUICK_STATUS_OPTIONS, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave } from '../domain/periods';
+import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../core/dates';
 import { SearchCircularProgress } from '../ui/SearchCircularProgress';
@@ -3913,7 +3913,6 @@ import { buildDatePicker } from '../ui/datePicker';
                     empId: id,
                     empName: emp.name,
                     category: newStatus,
-                    paid: true,
                     from: localDateStr(),
                     mode: 'duration',
                     count: '',
@@ -3928,9 +3927,6 @@ import { buildDatePicker } from '../ui/datePicker';
                     alert('⛔ عذراً، ليس لديك صلاحية تعديل موقف المنتسبين!');
                     return;
                 }
-                // «إجازة طويلة» في النافذة فئة تتفرّع بمفتاح «براتب» إلى اعتيادية/بدون راتب، فتُعكَس هنا.
-                // أما نوع مخزَّن اسمه «إجازة طويلة» حرفياً (من استيراد قديم) فيُقفَل نوعه كي لا يتبدّل صامتاً.
-                const isSplit = (p.type === 'إجازة اعتيادية' || p.type === 'إجازة بدون راتب');
                 // فترة قديمة بلا معرّف (ملف يدوي أو نسخة سابقة على اعتماد per_<وقت>): تُمنح معرّفاً ثابتاً
                 // وتُحفظ فوراً — وإلا صار editingId أدناه undefined فتُحفَظ فترة موازية بدل استبدال هذه
                 let period = p;
@@ -3946,9 +3942,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 setQuickPeriod({
                     empId: emp.id,
                     empName: emp.name,
-                    category: isSplit ? 'إجازة طويلة' : period.type,
-                    keepType: !isSplit,
-                    paid: period.type !== 'إجازة بدون راتب',
+                    category: period.type,
                     from: period.from,
                     mode: 'date',
                     count: '',
@@ -3993,12 +3987,9 @@ import { buildDatePicker } from '../ui/datePicker';
                     alert('⛔ تاريخ البداية مطلوب.');
                     return;
                 }
-                // «إجازة طويلة» فئة يُضغط عليها في القائمة لا نوع مخزَّن: الطويلة براتب هي اعتيادية بمدة طويلة
                 // التعديل يُبقي الفترة بهويتها: تُستثنى من فحص التداخل مع نفسها، ويُعاد استعمال معرّفها
                 const editingId = quickPeriod.editingId || null;
-                const periodType = (quickPeriod.category === 'إجازة طويلة' && !quickPeriod.keepType)
-                    ? (quickPeriod.paid ? 'إجازة اعتيادية' : 'إجازة بدون راتب')
-                    : quickPeriod.category;
+                const periodType = quickPeriod.category;
                 const to = quickPeriodEnd(quickPeriod);
                 if (!to && !OPEN_ENDED_PERIOD_TYPES.includes(quickPeriod.category)) {
                     alert('⛔ المدة مطلوبة لهذا النوع من الفترات. الغياب وسحب اليد وحدهما يُتركان مفتوحي النهاية.');
