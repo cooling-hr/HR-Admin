@@ -24,7 +24,7 @@ export const STATUS_BUTTON_GROUPS: Array<{ label: string | null; options: Status
     { label: null, options: [{ value: 'نشط', label: 'نشط' }] },
     {
         label: 'الإجازات', options: [
-            { value: 'إجازة اعتيادية', label: 'إجازة براتب (براتب تام بدون مخصصات)' },
+            { value: 'إجازة اعتيادية', label: 'إجازة براتب تام داخل العراق' },
             { value: 'إجازة بدون راتب', label: 'إجازة بدون راتب داخل العراق' },
             { value: 'إجازة بدون راتب خارج العراق', label: 'إجازة بدون راتب خارج العراق' },
             { value: 'إجازة خارج العراق', label: 'إجازة اعتيادية خارج العراق' },
