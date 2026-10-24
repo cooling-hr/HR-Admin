@@ -44,7 +44,7 @@ export const TimeFormPrint = ({ ctx }) => {
                         return (
                             <th key={day} className={out ? 'tf-out' : undefined} style={out ? { background: OUT_BG } : undefined}>
                                 <div>{day}</div>
-                                {!out && <div style={{ fontSize: '5pt', fontWeight: 700 }}>{shortDayName(dateStr)}</div>}
+                                {!out && <div style={{ fontSize: '6pt', fontWeight: 700, lineHeight: 1 }}>{shortDayName(dateStr)}</div>}
                             </th>
                         );
                     })}
@@ -56,7 +56,8 @@ export const TimeFormPrint = ({ ctx }) => {
                     <tr>
                         <td rowSpan={2}>{idx + 1}</td>
                         <td rowSpan={2}>{row.employee.jobNumber}</td>
-                        <td rowSpan={2} style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden' }}>{getTripleName(row.employee.name)}</td>
+                        {/* الاسم الطويل يلتفّ على سطرين في الخانة المدمجة، ولا يُقصّ: ارتفاع الصفّين يتسع لهما */}
+                        <td rowSpan={2} style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'normal', lineHeight: 1.15 }}>{getTripleName(row.employee.name)}</td>
                         <td rowSpan={2}></td>
                         {row.cells.map(cell => {
                             if (!cell.inMonth) return <td key={cell.day} className="tf-out" style={{ background: OUT_BG }}></td>;

@@ -415,6 +415,8 @@
             /* ترويسة الجدول تتكرر في كل صفحة، وصفّا الموظف الواحد لا ينفصلان عبر صفحتين */
             body.printing-timeform .timeform-print-only thead { display: table-header-group !important; }
             body.printing-timeform .timeform-print-only tbody { break-inside: avoid !important; page-break-inside: avoid !important; }
+            /* خط أعرض أسفل صفّي كل موظف، كما على الشاشة: في الطباعة الأحادية يبهت السماوي فلا يفصل وحده */
+            body.printing-timeform .timeform-print-only tbody { border-bottom: 2px solid #000 !important; }
             body.printing-timeform .timeform-print-only tr { page-break-inside: avoid !important; }
         }
 
