@@ -12,6 +12,7 @@ export function useCloudDataLayer(deps) {
     dataEntryOperator,
     hourlyLeaveRecords,
     hourlyLeaveTimings,
+    timeFormCodeEdits,
     mealAuthorizations,
     officialHolidays,
     overtimeHoursRecords,
@@ -24,6 +25,7 @@ export function useCloudDataLayer(deps) {
     setDataEntryOperator,
     setHourlyLeaveRecords,
     setHourlyLeaveTimings,
+    setTimeFormCodeEdits,
     setMealAuthorizations,
     setOfficialHolidays,
     setOvertimeHoursRecords,
@@ -995,6 +997,7 @@ const handleSaveUser = async (e) => {
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
         hourlyLeaveTimings: hourlyLeaveTimings,
+        timeFormCodeEdits: timeFormCodeEdits,
         mealAuthorizations: mealAuthorizations,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
@@ -1101,6 +1104,7 @@ const handleDeleteUser = (userId) => {
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
         hourlyLeaveTimings: hourlyLeaveTimings,
+        timeFormCodeEdits: timeFormCodeEdits,
         mealAuthorizations: mealAuthorizations,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
@@ -1163,6 +1167,7 @@ const handleToggleUserActive = (userId) => {
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
         hourlyLeaveTimings: hourlyLeaveTimings,
+        timeFormCodeEdits: timeFormCodeEdits,
         mealAuthorizations: mealAuthorizations,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
@@ -1202,7 +1207,7 @@ const pendingPushRef = React.useRef(false);
 const pendingBundleRef = React.useRef(null);
 // بصمة آخر حمولة نعلم أنها على الخادم — تمنع إعادة بثّ ما استقبلناه للتو
 const lastSyncedSignatureRef = React.useRef(null);
-const CLOUD_SIGNATURE_KEYS = ['staffData', 'systemUsersList', 'officialHolidaysList', 'hourlyLeaveRecords', 'hourlyLeaveTimings', 'mealAuthorizations', 'overtimeHoursRecords', 'dailyStatusOverrides', 'shiftAnchorDate', 'threeShiftAnchorSquad', 'twoShiftAnchorSquad', 'overtimeSelectedIds', 'pendingDeletionRequest'];
+const CLOUD_SIGNATURE_KEYS = ['staffData', 'systemUsersList', 'officialHolidaysList', 'hourlyLeaveRecords', 'hourlyLeaveTimings', 'timeFormCodeEdits', 'mealAuthorizations', 'overtimeHoursRecords', 'dailyStatusOverrides', 'shiftAnchorDate', 'threeShiftAnchorSquad', 'twoShiftAnchorSquad', 'overtimeSelectedIds', 'pendingDeletionRequest'];
 const cloudPayloadSignature = (obj) => {
     try {
         return JSON.stringify(CLOUD_SIGNATURE_KEYS.map(k => (obj && obj[k] !== undefined) ? obj[k] : null));
@@ -1284,6 +1289,7 @@ const buildCloudBundle = (overrides = {}) => ({
     officialHolidaysList: officialHolidays,
     hourlyLeaveRecords: hourlyLeaveRecords,
     hourlyLeaveTimings: hourlyLeaveTimings,
+    timeFormCodeEdits: timeFormCodeEdits,
     mealAuthorizations: mealAuthorizations,
     overtimeHoursRecords: overtimeHoursRecords,
     dailyStatusOverrides: dailyStatusOverrides,
@@ -1629,6 +1635,7 @@ const pushDataToServer = async (customBundle = null) => {
         officialHolidaysList: officialHolidays,
         hourlyLeaveRecords: hourlyLeaveRecords,
         hourlyLeaveTimings: hourlyLeaveTimings,
+        timeFormCodeEdits: timeFormCodeEdits,
         mealAuthorizations: mealAuthorizations,
         overtimeHoursRecords: overtimeHoursRecords,
         dailyStatusOverrides: dailyStatusOverrides,
@@ -1701,6 +1708,11 @@ const applyDataBundleToState = (bundle) => {
     if (bundle.hourlyLeaveTimings && typeof bundle.hourlyLeaveTimings === 'object') {
         setHourlyLeaveTimings(bundle.hourlyLeaveTimings);
         safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(bundle.hourlyLeaveTimings));
+    }
+    // تعديلات دليل الرموز: حزمة من نسخة أقدم بلا الحقل لا تمحو تعديلات هذا الجهاز
+    if (bundle.timeFormCodeEdits && typeof bundle.timeFormCodeEdits === 'object' && !Array.isArray(bundle.timeFormCodeEdits)) {
+        setTimeFormCodeEdits(bundle.timeFormCodeEdits);
+        safeStorage.setItem('timeFormCodeEdits', JSON.stringify(bundle.timeFormCodeEdits));
     }
     // المخولون كذلك: حزمة من نسخة أقدم بلا الحقل لا تمحو اختيارات هذا الجهاز
     if (bundle.mealAuthorizations && typeof bundle.mealAuthorizations === 'object') {
@@ -1808,7 +1820,7 @@ React.useEffect(() => {
         pushDataToServer();
     }
 // لا dataEntryOperator هنا: اسم منظم الموقف خاص بكل جهاز ولا يُبثّ (انظر تعيينه عند الدخول)
-}, [staff, officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, overtimeHoursRecords, dailyStatusOverrides, anchorDate]);
+}, [staff, officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, timeFormCodeEdits, mealAuthorizations, overtimeHoursRecords, dailyStatusOverrides, anchorDate]);
 
 
 // ===== بوابات الإجراءات الحسّاسة ===== (انظر التعليق المقابل في طبقة الأوفلاين)

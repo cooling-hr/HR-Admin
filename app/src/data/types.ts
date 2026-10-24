@@ -6,6 +6,8 @@ export interface DataBundle {
   systemUsersList?: unknown[];
   officialHolidaysList?: string[];
   hourlyLeaveRecords?: Record<string, unknown>;
+  // تعديلات المستخدم على دليل الرموز (domain/timeForm)
+  timeFormCodeEdits?: Record<string, unknown>;
   overtimeHoursRecords?: Record<string, unknown>;
   dailyStatusOverrides?: Record<string, unknown>;
   shiftAnchorDate?: string;

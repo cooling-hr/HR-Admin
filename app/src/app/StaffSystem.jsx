@@ -7,7 +7,7 @@ import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, 
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
-import { resolveCodeTable, timeFormCodeFor, timeFormTitle, UNKNOWN_CODE } from '../domain/timeForm';
+import { normalizeTimeFormCodeEdits, resolveCodeTable, timeFormCodeFor, timeFormTitle, UNKNOWN_CODE } from '../domain/timeForm';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../core/dates';
 import { SearchCircularProgress } from '../ui/SearchCircularProgress';
 import { ICON_PATHS, Icon, SAFETY_VEST_IMG, SAFETY_BOOT_IMG } from '../ui/Icon';
@@ -241,6 +241,8 @@ import { buildDatePicker } from '../ui/datePicker';
                     return saved && typeof saved === 'object' ? saved : {};
                 } catch (e) { return {}; }
             });
+            // تعديلات المستخدم على دليل الرموز فوق الرموز الرسمية — انظر domain/timeForm؛ تُزامَن كالعطل الرسمية
+            const [timeFormCodeEdits, setTimeFormCodeEdits] = useState(() => { try { return normalizeTimeFormCodeEdits(JSON.parse(safeStorage.getItem('timeFormCodeEdits') || 'null')); } catch (e) { return normalizeTimeFormCodeEdits(null); } });
             // مخولو استلام وجبات المناوبين لكل موقع ووجبة — انظر domain/dutyMeals
             const [mealAuthorizations, setMealAuthorizations] = useState(() => {
                 try {
@@ -299,6 +301,9 @@ import { buildDatePicker } from '../ui/datePicker';
                 });
             };
 
+            // تحديث تعديلات دليل الرموز: الحفظ المحلي والبث يتولاهما مؤثّر الحفظ أدناه، كالتوقيتات
+            const updateTimeFormCodeEdits = (next) => setTimeFormCodeEdits(normalizeTimeFormCodeEdits(next));
+
             const toggleOfficialHolidayDate = (dateStr) => {
                 setOfficialHolidays(prev => {
                     const next = prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr];
@@ -309,6 +314,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: next,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        timeFormCodeEdits: timeFormCodeEdits,
                         mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
@@ -356,6 +362,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: next,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        timeFormCodeEdits: timeFormCodeEdits,
                         mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
@@ -524,12 +531,13 @@ import { buildDatePicker } from '../ui/datePicker';
                 safeStorage.setItem('officialHolidaysList', JSON.stringify(officialHolidays));
                 safeStorage.setItem('hourlyLeaveRecords', JSON.stringify(hourlyLeaveRecords));
                 safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(hourlyLeaveTimings));
+                safeStorage.setItem('timeFormCodeEdits', JSON.stringify(timeFormCodeEdits));
                 safeStorage.setItem('mealAuthorizations', JSON.stringify(mealAuthorizations));
                 safeStorage.setItem('overtimeHoursRecords', JSON.stringify(overtimeHoursRecords));
                 if (!isSyncingRef.current && isInitialCloudLoadCompleteRef.current && staff.length > 0) {
                     pushDataToCloud();
                 }
-            }, [officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, overtimeHoursRecords]);
+            }, [officialHolidays, hourlyLeaveRecords, hourlyLeaveTimings, timeFormCodeEdits, mealAuthorizations, overtimeHoursRecords]);
 
             React.useEffect(() => {
                 safeStorage.setItem('shiftAnchorDate', anchorDate);
@@ -719,6 +727,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 dataEntryOperator,
                 hourlyLeaveRecords,
                 hourlyLeaveTimings,
+                timeFormCodeEdits,
                 mealAuthorizations,
                 officialHolidays,
                 overtimeHoursRecords,
@@ -731,6 +740,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 setDataEntryOperator,
                 setHourlyLeaveRecords,
                 setHourlyLeaveTimings,
+                setTimeFormCodeEdits,
                 setMealAuthorizations,
                 setOfficialHolidays,
                 setOvertimeHoursRecords,
@@ -1373,6 +1383,7 @@ import { buildDatePicker } from '../ui/datePicker';
                             officialHolidaysList: officialHolidays,
                             hourlyLeaveRecords: hourlyLeaveRecords,
                             hourlyLeaveTimings: hourlyLeaveTimings,
+                            timeFormCodeEdits: timeFormCodeEdits,
                             mealAuthorizations: mealAuthorizations,
                             overtimeHoursRecords: overtimeHoursRecords,
                             dailyStatusOverrides: nextOverrides,
@@ -1467,6 +1478,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        timeFormCodeEdits: timeFormCodeEdits,
                         mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: updatedOverrides,
@@ -1492,6 +1504,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     hourlyLeaveTimings: hourlyLeaveTimings,
+                    timeFormCodeEdits: timeFormCodeEdits,
                     mealAuthorizations: mealAuthorizations,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
@@ -1516,6 +1529,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     hourlyLeaveTimings: hourlyLeaveTimings,
+                    timeFormCodeEdits: timeFormCodeEdits,
                     mealAuthorizations: mealAuthorizations,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
@@ -1726,7 +1740,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 const [year, month] = (periodStartDate || localDateStr()).split('-').map(Number);
                 const ym = `${year}-${String(month).padStart(2, '0')}`;
                 const monthDays = daysInMonth(ym);
-                const table = resolveCodeTable(null);
+                const table = resolveCodeTable(timeFormCodeEdits);
                 const itemById = {};
                 periodReportData.employees.forEach(item => { itemById[item.employee.id] = item; });
 
@@ -1772,7 +1786,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     staffRows: staffForm.rows, contractRows: contractForm.rows,
                     warnings: { staff: staffForm.warning, contracts: contractForm.warning },
                 };
-            }, [periodReportData, periodStartDate]);
+            }, [periodReportData, periodStartDate, timeFormCodeEdits]);
 
             // يضبط الفترة على الشهر كاملاً (من أول يوم إلى آخره)
             const selectTimeFormMonth = (ym) => {
@@ -2068,6 +2082,12 @@ import { buildDatePicker } from '../ui/datePicker';
                     setHourlyLeaveTimings(timings);
                     safeStorage.setItem('hourlyLeaveTimings', JSON.stringify(timings));
                 }
+                // ملف أقدم بلا المفتاح لا يمحو تعديلات هذا الجهاز على دليل الرموز
+                if (bundle.timeFormCodeEdits && typeof bundle.timeFormCodeEdits === 'object' && !Array.isArray(bundle.timeFormCodeEdits)) {
+                    const edits = normalizeTimeFormCodeEdits(bundle.timeFormCodeEdits);
+                    setTimeFormCodeEdits(edits);
+                    safeStorage.setItem('timeFormCodeEdits', JSON.stringify(edits));
+                }
                 if (bundle.mealAuthorizations && typeof bundle.mealAuthorizations === 'object') {
                     setMealAuthorizations(bundle.mealAuthorizations);
                     safeStorage.setItem('mealAuthorizations', JSON.stringify(bundle.mealAuthorizations));
@@ -2248,7 +2268,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 //    تُطبَّق بعد مسح أيام الفترات: موقف وارد اختير صراحةً ليوم مُسح يُكتب فوقه.
                 const attendance = analyzeMergeAttendance(incomingBundle, incoming, staff, {
                     overrides: dailyStatusOverrides, hourly: hourlyLeaveRecords, overtime: overtimeHoursRecords, holidays: officialHolidays,
-                    anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, tombstones: mergeTombstones.dailyStatus
+                    timeFormCodeEdits, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, tombstones: mergeTombstones.dailyStatus
                 });
                 const isAttendancePicked = (key) => !!(attendanceSelection && attendanceSelection[key]);
                 let nextOverrides = clearedOverrides;
@@ -2308,6 +2328,14 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (pickedHolidays.length > 0) {
                     nextHolidays = Array.from(new Set([...(officialHolidays || []), ...pickedHolidays])).sort();
                     appliedAttendanceCount += pickedHolidays.length;
+                }
+                // رموز دليل الرموز المختارة تُلحق بالمضافة لديك (إضافة لا تمحو شيئاً)؛ الحفظ والبث يتولاهما مؤثّر الحفظ
+                const pickedCodes = attendance.codes.filter(c => isAttendancePicked(c.key)).map(c => c.code);
+                if (pickedCodes.length > 0) {
+                    // الحالة قد تصل من السحابة ناقصة الحقول (Firebase يُسقط الفارغ)، فتُنظَّف قبل القراءة
+                    const current = normalizeTimeFormCodeEdits(timeFormCodeEdits);
+                    updateTimeFormCodeEdits({ ...current, custom: [...current.custom, ...pickedCodes] });
+                    appliedAttendanceCount += pickedCodes.length;
                 }
                 // كل ما تغيّر من بيانات الحضور يُحفظ مرة واحدة: مسح أيام الفترات، ثم المواقف والساعات والعطل المختارة
                 commitBundleMetadata({
@@ -2605,10 +2633,10 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (!showMergeModal || !incomingBundle) return null;
                 return analyzeMergeAttendance(incomingBundle, incomingStaff, staff, {
                     overrides: dailyStatusOverrides, hourly: hourlyLeaveRecords, overtime: overtimeHoursRecords, holidays: officialHolidays,
-                    anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, tombstones: mergeTombstones.dailyStatus
+                    timeFormCodeEdits, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, tombstones: mergeTombstones.dailyStatus
                 });
             }, [showMergeModal, incomingBundle, incomingStaff, staff, dailyStatusOverrides, hourlyLeaveRecords, overtimeHoursRecords,
-                officialHolidays, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, mergeTombstones]);
+                officialHolidays, timeFormCodeEdits, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad, dataEntryOperator, mergeTombstones]);
             const [mergeAttendanceSelection, setMergeAttendanceSelection] = useState({});
             // ما ليس لديك مؤشَّر، والعطل الجديدة مؤشَّرة؛ ما يخالف قيمة أو فترة لديك، والإعدادات العامة، بلا تأشير
             React.useEffect(() => {
@@ -2616,6 +2644,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 const picks = {};
                 mergeAttendance.items.forEach(item => { picks[item.key] = item.kind === 'new' && !item.deletedLocally; });
                 mergeAttendance.holidays.forEach(h => { picks[h.key] = true; });
+                mergeAttendance.codes.forEach(c => { picks[c.key] = true; });
                 mergeAttendance.settings.forEach(s => { picks[s.key] = false; });
                 setMergeAttendanceSelection(picks);
             }, [mergeAttendance]);
@@ -2626,7 +2655,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 setMergeAttendanceSelection(prev => {
                     const next = { ...prev };
                     if (scope === 'all') {
-                        [...mergeAttendance.items, ...mergeAttendance.holidays, ...mergeAttendance.settings].forEach(x => { next[x.key] = value; });
+                        [...mergeAttendance.items, ...mergeAttendance.holidays, ...mergeAttendance.codes, ...mergeAttendance.settings].forEach(x => { next[x.key] = value; });
                     } else {
                         mergeAttendance.items.forEach(item => { if (item.date === scope) next[item.key] = value; });
                     }
@@ -3339,6 +3368,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        timeFormCodeEdits: timeFormCodeEdits,
                         mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
@@ -3663,6 +3693,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     hourlyLeaveTimings: hourlyLeaveTimings,
+                    timeFormCodeEdits: timeFormCodeEdits,
                     mealAuthorizations: mealAuthorizations,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,
@@ -3781,6 +3812,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         officialHolidaysList: officialHolidays,
                         hourlyLeaveRecords: hourlyLeaveRecords,
                         hourlyLeaveTimings: hourlyLeaveTimings,
+                        timeFormCodeEdits: timeFormCodeEdits,
                         mealAuthorizations: mealAuthorizations,
                         overtimeHoursRecords: overtimeHoursRecords,
                         dailyStatusOverrides: dailyStatusOverrides,
@@ -3821,6 +3853,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: {},
                     hourlyLeaveTimings: {},
+                    timeFormCodeEdits: timeFormCodeEdits,
                     mealAuthorizations: {},
                     overtimeHoursRecords: {},
                     dailyStatusOverrides: {},
@@ -3846,6 +3879,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     officialHolidaysList: officialHolidays,
                     hourlyLeaveRecords: hourlyLeaveRecords,
                     hourlyLeaveTimings: hourlyLeaveTimings,
+                    timeFormCodeEdits: timeFormCodeEdits,
                     mealAuthorizations: mealAuthorizations,
                     overtimeHoursRecords: overtimeHoursRecords,
                     dailyStatusOverrides: dailyStatusOverrides,

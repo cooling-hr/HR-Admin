@@ -181,6 +181,12 @@ export interface MergeHolidayItem {
   date: string;
 }
 
+// رمز مضاف في دليل الرموز بالملف وليس لدى الجهاز (key = `code::<id>`)
+export interface MergeCodeItem {
+  key: string;
+  code: { id: string; letter: string; meaning: string };
+}
+
 export interface MergeSettingItem {
   key: string;
   kind: string;
@@ -192,6 +198,7 @@ export interface MergeSettingItem {
 export interface MergeAttendanceResult {
   items: MergeAttendanceItem[];
   holidays: MergeHolidayItem[];
+  codes: MergeCodeItem[];
   settings: MergeSettingItem[];
   orphans: number;
   ambiguous: number;
@@ -206,6 +213,7 @@ export interface LocalAttendanceState {
   overtime?: unknown;
   tombstones?: Record<string, unknown> | null;
   holidays?: string[] | null;
+  timeFormCodeEdits?: unknown;
   anchorDate?: string;
   threeShiftAnchorSquad?: string;
   twoShiftAnchorSquad?: string;

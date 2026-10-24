@@ -308,7 +308,7 @@ export const MergeModal = ({ ctx }) => {
                                     </div>
                                 </div>
                             )}
-                            {mergeAttendance && (mergeAttendance.items.length + mergeAttendance.holidays.length + mergeAttendance.settings.length) > 0 && (
+                            {mergeAttendance && (mergeAttendance.items.length + mergeAttendance.holidays.length + mergeAttendance.codes.length + mergeAttendance.settings.length) > 0 && (
                                 <div className="mt-3 bg-white bg-opacity-80 p-3 rounded-xl border border-indigo-100 font-normal space-y-2 text-right">
                                     <div className="flex justify-between items-center flex-wrap gap-1.5 border-b pb-1.5">
                                         <span className="font-black text-indigo-950">📋 المواقف اليومية والساعات الزمنية والإضافي:</span>
@@ -391,6 +391,19 @@ export const MergeModal = ({ ctx }) => {
                                             ))}
                                         </div>
                                     )}
+                                    {mergeAttendance.codes.length > 0 && (
+                                        <div className="border-t pt-1.5 space-y-0.5 text-[11px]">
+                                            <div className="font-bold text-indigo-900">🔤 رموز مضافة في دليل الرموز بالملف وليست لديك — تُضاف ولا يُحذف شيء:</div>
+                                            {mergeAttendance.codes.map(c => (
+                                                <label key={c.key} data-setting-key={c.key}
+                                                    className={`inline-flex items-center gap-1.5 cursor-pointer rounded px-1 py-0.5 ml-2 ${mergeAttendanceSelection[c.key] ? 'bg-indigo-50/60' : ''}`}>
+                                                    <input type="checkbox" checked={!!mergeAttendanceSelection[c.key]} onChange={() => toggleMergeAttendance(c.key)}
+                                                        className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
+                                                    <span>رمز «{c.code.letter}»: {c.code.meaning}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
                                     {mergeAttendance.settings.length > 0 && (
                                         <div className="border-t pt-1.5 space-y-0.5 text-[11px]">
                                             <div className="font-bold text-indigo-900">⚙️ إعدادات عامة مختلفة — تمسّ حساب كل الجهاز، فلا تُطبَّق ما لم تؤشّرها:</div>
@@ -420,7 +433,7 @@ export const MergeModal = ({ ctx }) => {
                                         </div>
                                     )}
                                     <div className="border-t pt-1.5 text-[11px] font-black text-indigo-900">
-                                        المؤشَّر للتطبيق: {mergeAttendanceCount} من {mergeAttendance.items.length + mergeAttendance.holidays.length + mergeAttendance.settings.length}
+                                        المؤشَّر للتطبيق: {mergeAttendanceCount} من {mergeAttendance.items.length + mergeAttendance.holidays.length + mergeAttendance.codes.length + mergeAttendance.settings.length}
                                         {mergeAttendancePending > 0 && <span className="text-amber-700 font-bold"> — {mergeAttendancePending} عليها تنبيه وغير مؤشَّرة، فلن تُطبَّق ما لم تؤشّرها</span>}
                                     </div>
                                 </div>

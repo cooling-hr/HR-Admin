@@ -1,6 +1,8 @@
 import { getActivePeriod, periodEndOf, periodIdentityOf, periodMergeKeyOf, periodsOf, periodsOverlap, samePeriodDates, samePeriodExtras } from './periods.js';
 import { normalizeArabicText, normalizeJobNumber } from '../core/arabic.js';
 import { ISO_DAY } from '../core/dates.js';
+import { normalizeTimeFormCodeEdits, resolveCodeTable } from './timeForm.js';
+import type { TimeFormCodeEdits } from './timeForm.js';
 import type {
     Employee, LocalAttendanceState, MergeAttendanceItem, MergeAttendanceResult,
     MergeContradictingDay, MergeFieldChange, MergeLocalOnlyPeriod, MergePeriodItem,
@@ -164,7 +166,7 @@ export const analyzeMergeAttendance = (
     currentStaff: Employee[],
     local: LocalAttendanceState,
 ): MergeAttendanceResult => {
-    const result: MergeAttendanceResult = { items: [], holidays: [], settings: [], orphans: 0, ambiguous: 0, invalid: 0, forNewEmployees: 0 };
+    const result: MergeAttendanceResult = { items: [], holidays: [], codes: [], settings: [], orphans: 0, ambiguous: 0, invalid: 0, forNewEmployees: 0 };
     if (!bundle || typeof bundle !== 'object' || Array.isArray(bundle)) return result;
     // موظفو الحزمة نفسها أولاً: مفاتيح قيمها معرّفاتهم
     const staffList = Array.isArray(bundle.staff) ? bundle.staff : Array.isArray(bundle.staffData) ? bundle.staffData : incomingList;
@@ -236,6 +238,17 @@ export const analyzeMergeAttendance = (
         result.holidays.push({ key: `holiday::${d}`, date: d });
     });
     result.holidays.sort((a, b) => a.date < b.date ? -1 : 1);
+    // رموز دليل الرموز المضافة في الملف: تعديلات الجهاز تغلب، فلا يُعرض رمز معرّفه أو حرفه أو معناه لدى الجهاز (بلا حساسية لحالة الأحرف)
+    const fold = (s: string) => s.trim().toLowerCase();
+    const deviceCodes = resolveCodeTable(local.timeFormCodeEdits as TimeFormCodeEdits | null | undefined).list;
+    const takenIds = new Set(deviceCodes.map(c => fold(c.id)));
+    const takenLetters = new Set(deviceCodes.map(c => fold(c.letter)));
+    const takenMeanings = new Set(deviceCodes.map(c => fold(c.meaning)));
+    normalizeTimeFormCodeEdits(bundle.timeFormCodeEdits).custom.forEach(c => {
+        if (takenIds.has(fold(c.id)) || takenLetters.has(fold(c.letter)) || takenMeanings.has(fold(c.meaning))) return;
+        takenIds.add(fold(c.id)); takenLetters.add(fold(c.letter)); takenMeanings.add(fold(c.meaning));
+        result.codes.push({ key: `code::${c.id}`, code: c });
+    });
     const localAnchor: Record<string, string> = { shiftAnchorDate: local.anchorDate || '', threeShiftAnchorSquad: local.threeShiftAnchorSquad || '', twoShiftAnchorSquad: local.twoShiftAnchorSquad || '' };
     const anchorValues: Record<string, string> = {};
     Object.keys(localAnchor).forEach(k => {

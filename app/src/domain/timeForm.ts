@@ -81,7 +81,10 @@ export const LONG_PAID_LEAVE_CODE = 'C';
 // موقف لا رمز له: علامة حمراء على الشاشة لا فراغ، فلا يضيع يوم بصمت
 export const UNKNOWN_CODE = '؟';
 
+// v ثابت لا يُقرأ: Firebase لا يحفظ الكائنات والمصفوفات الفارغة، فلولاه لسقط المفتاح كله حين تفرغ
+// التعديلات (حذف آخر رمز مضاف)، وعدّ الجهاز الآخر غيابه حزمة قديمة فأبقى الرمز وأعاده إلى الخادم.
 export type TimeFormCodeEdits = {
+    v: 1;
     overrides: Record<string, { letter?: string; meaning?: string }>;
     removed: string[];
     custom: TimeCode[];
@@ -105,16 +108,43 @@ export const linkedStatusesOf = (id: string): string[] => [
     ...Object.keys(STATUS_TO_CODE_ID).filter(s => STATUS_TO_CODE_ID[s] === id),
 ];
 
+export const EMPTY_TIME_FORM_CODE_EDITS: TimeFormCodeEdits = { v: 1, overrides: {}, removed: [], custom: [], activated: [] };
+
+const isPlainObject = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
+const strings = (x: unknown): string[] => Array.isArray(x) ? x.filter((s): s is string => typeof s === 'string') : [];
+
+// التعديلات تصل من التخزين المحلي والحزم والملفات، فتُنظَّف قبل الاستعمال: ما ليس بالشكل المتوقع يسقط
+export const normalizeTimeFormCodeEdits = (x: unknown): TimeFormCodeEdits => {
+    if (!isPlainObject(x)) return { ...EMPTY_TIME_FORM_CODE_EDITS };
+    // بلا نموذج أصلي للسبب نفسه في extraByMeaning: المفاتيح تصل من ملف قد يُعدَّل يدوياً
+    const overrides: TimeFormCodeEdits['overrides'] = Object.create(null);
+    if (isPlainObject(x.overrides)) {
+        for (const [id, o] of Object.entries(x.overrides)) {
+            if (!isPlainObject(o)) continue;
+            const entry: { letter?: string; meaning?: string } = {};
+            if (typeof o.letter === 'string' && o.letter.trim()) entry.letter = o.letter.trim();
+            if (typeof o.meaning === 'string' && o.meaning.trim()) entry.meaning = o.meaning.trim();
+            if (entry.letter || entry.meaning) overrides[id] = entry;
+        }
+    }
+    const custom = (Array.isArray(x.custom) ? x.custom : [])
+        .filter((c): c is TimeCode => isPlainObject(c) && typeof c.id === 'string' && typeof c.letter === 'string' && typeof c.meaning === 'string'
+            && !!c.id && !!c.letter.trim() && !!c.meaning.trim())
+        .map(c => ({ id: c.id, letter: c.letter.trim(), meaning: c.meaning.trim() }));
+    return { v: 1, overrides, removed: strings(x.removed), custom, activated: strings(x.activated) };
+};
+
 // الرسمية بتعديلات المستخدم (الحرف والمعنى المعروض)، بلا المحذوفة، ثم المضافة.
 // المربوط لا يُحذف حتى لو وصل في removed (حزمة قديمة أو ملف معدَّل يدوياً).
-export const resolveCodeTable = (edits?: TimeFormCodeEdits | null): ResolvedCodeTable => {
-    const overrides = edits?.overrides || {};
-    const removed = new Set(edits?.removed || []);
-    const activated = new Set(edits?.activated || []);
+export const resolveCodeTable = (rawEdits?: TimeFormCodeEdits | null): ResolvedCodeTable => {
+    const edits = normalizeTimeFormCodeEdits(rawEdits);
+    const overrides = edits.overrides;
+    const removed = new Set(edits.removed);
+    const activated = new Set(edits.activated);
     const officialList = OFFICIAL_TIME_CODES
         .filter(c => !removed.has(c.id) || linkedStatusesOf(c.id).length > 0)
         .map(c => ({ ...c, ...(overrides[c.id] || {}), id: c.id }));
-    const custom = (edits?.custom || []).map(c => ({ ...c }));
+    const custom = edits.custom;
     const list = [...officialList, ...custom];
     const byId: Record<string, TimeCode> = Object.fromEntries(list.map(c => [c.id, c]));
     // بلا نموذج أصلي: المعنى نص يكتبه المستخدم، فـ«constructor» أو «__proto__» يبقى مفتاحاً عادياً
