@@ -1775,7 +1775,8 @@ import { buildDatePicker } from '../ui/datePicker';
                             'الدوام الاعتيادي (يوم)': item.regularDuty,
                             'الدوام الإضافي (يوم)': item.overtimeDuty,
                             'الإجازات (يوم)': item.leaves,
-                            'الدورات والإيفاد (يوم)': item.coursesOrDeputation,
+                            'الدورات (يوم)': item.courses,
+                            'الإيفاد (يوم)': item.deputations,
                             'خارج الشعبة (يوم)': item.detached,
                             'الغياب (يوم)': item.absence,
                             'أيام الاستراحة (يوم)': item.rest
@@ -1783,7 +1784,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     });
 
                     setPreviewData(exportData);
-                    setVisiblePreviewColumns(['الرقم الوظيفي', 'الوحدة', 'طبيعة العمل', 'الدوام الاعتيادي (يوم)', 'الدوام الإضافي (يوم)', 'الإجازات (يوم)', 'خارج الشعبة (يوم)', 'الغياب (يوم)']);
+                    setVisiblePreviewColumns(['الرقم الوظيفي', 'الوحدة', 'طبيعة العمل', 'الدوام الاعتيادي (يوم)', 'الدوام الإضافي (يوم)', 'الإجازات (يوم)', 'الدورات (يوم)', 'الإيفاد (يوم)', 'خارج الشعبة (يوم)', 'الغياب (يوم)']);
                     // الفلاتر تُذكَر في العنوان: تقريران بعنوان واحد ومحتوى مختلف التباس خطر في مستند رسمي
                     const scopeParts = [];
                     if (periodUnitFilter !== 'all') scopeParts.push(periodUnitFilter);
