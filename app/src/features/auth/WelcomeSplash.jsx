@@ -79,7 +79,7 @@ export const WelcomeSplash = ({ ctx }) => {
                     <div className="inline-block px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full shadow-md">
                         <p className="text-sm font-bold">👨‍💻 تطوير: م. أسامة خليل هاشم</p>
                     </div>
-                    <p className="text-xs text-blue-300 mt-2 opacity-75 font-semibold">الإصدار v9.6 Enterprise Cloud Edition • 2026</p>
+                    <p className="text-xs text-blue-300 mt-2 opacity-75 font-semibold">الإصدار v9.7 Enterprise Cloud Edition • 2026</p>
 
                     {/* زر إغلاق بارز */}
                     <div className="mt-4 animate-fadeInUp-delay1">

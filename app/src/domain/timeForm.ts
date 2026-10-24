@@ -166,6 +166,7 @@ export const validateCodeEdit = (
     if (!letter) return 'اكتب حرف الرمز.';
     if (Array.from(letter).length > 2) return 'الحرف خانة واحدة أو خانتان.';
     if (!meaning) return 'اكتب معنى الرمز.';
+    if (Array.from(meaning).length > 40) return 'المعنى 40 حرفاً على الأكثر.';
     const sameLetter = table.list.find(c => c.id !== edit.id && c.letter.toUpperCase() === letter.toUpperCase());
     if (sameLetter) {
         const official = OFFICIAL_TIME_CODES.some(c => c.id === sameLetter.id);

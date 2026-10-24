@@ -1,5 +1,5 @@
 import React from 'react';
-import { OFFICIAL_TIME_CODES, UNKNOWN_CODE, timeFormTitle } from '../../domain/timeForm';
+import { UNKNOWN_CODE, resolveCodeTable, timeFormTitle } from '../../domain/timeForm';
 import { dailyStatusCategory } from '../../domain/dailyCounts';
 import { getArabicMonthLabel, getArabicDayName } from '../../core/dates';
 import { getTripleName } from '../../core/arabic';
@@ -23,7 +23,7 @@ const STICKY_ROW_EDGE = 'shadow-[inset_1px_0_0_0_#94a3b8,inset_0_-2px_0_0_#64748
 
 // استمارة ضبط الوقت على الشاشة: صفّان لكل موظف (الرموز ثم الساعات الإضافية)، استمارة الملاك أو العقود
 export const TimeFormView = ({ ctx }) => {
-    const { printTimeForm, exportTimeFormExcel, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth } = ctx;
+    const { printTimeForm, exportTimeFormExcel, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, timeFormCodeEdits, setShowCodesGuide } = ctx;
     const isContracts = timeFormKind === 'contracts';
     const rows = isContracts ? timeFormData.contractRows : timeFormData.staffRows;
     const unknown = (isContracts ? timeFormData.warnings.contracts : timeFormData.warnings.staff).unknown;
@@ -67,6 +67,12 @@ export const TimeFormView = ({ ctx }) => {
                     className={`px-3 py-1.5 rounded-xl text-[11px] font-black shadow-sm transition ${rows.length === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'}`}
                 >
                     📊 تصدير Excel
+                </button>
+                <button
+                    onClick={() => setShowCodesGuide(true)}
+                    className="px-3 py-1.5 rounded-xl text-[11px] font-black shadow-sm transition bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                >
+                    📖 دليل الرموز
                 </button>
             </div>
 
@@ -158,7 +164,7 @@ export const TimeFormView = ({ ctx }) => {
 
             <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center no-print">
                 <span className="text-[11px] font-black text-slate-500">مفتاح الرموز:</span>
-                {OFFICIAL_TIME_CODES.map(c => (
+                {resolveCodeTable(timeFormCodeEdits).list.map(c => (
                     <span key={c.id} className="flex items-center gap-1">
                         <span className="inline-flex items-center justify-center w-6 h-5 rounded font-black text-[10px] bg-slate-100 text-slate-700">{c.letter}</span>
                         <span className="text-[10px] font-bold text-slate-500">{c.meaning}</span>

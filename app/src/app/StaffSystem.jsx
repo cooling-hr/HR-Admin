@@ -22,6 +22,7 @@ import { EditEmployeeModal } from '../features/employees/EditEmployeeModal';
 import { EmployeeCardModal } from '../features/employees/EmployeeCardModal';
 import { NewEmployeeFormPrint } from '../features/employees/NewEmployeeFormPrint';
 import { HolidaysModal } from '../features/holidays/HolidaysModal';
+import { CodesGuideModal } from '../features/units/CodesGuideModal';
 import { PeriodHistoryModal } from '../features/periods/PeriodHistoryModal';
 import { QuickPeriodModal } from '../features/periods/QuickPeriodModal';
 import { ReturnPromptModal } from '../features/periods/ReturnPromptModal';
@@ -220,6 +221,7 @@ import { buildDatePicker } from '../ui/datePicker';
 
             // حالات نافذة العطل الرسمية والأعياد المتعددة الأيام
             const [showHolidaysModal, setShowHolidaysModal] = useState(false);
+            const [showCodesGuide, setShowCodesGuide] = useState(false);
             // بطاقة مطابقة الوجبات في الموقف اليومي مطويّة افتراضياً (لا تخزين)
             const [showShiftEditor, setShowShiftEditor] = useState(false);
             const [holidayRangeStart, setHolidayRangeStart] = useState('');
@@ -303,6 +305,8 @@ import { buildDatePicker } from '../ui/datePicker';
 
             // تحديث تعديلات دليل الرموز: الحفظ المحلي والبث يتولاهما مؤثّر الحفظ أدناه، كالتوقيتات
             const updateTimeFormCodeEdits = (next) => setTimeFormCodeEdits(normalizeTimeFormCodeEdits(next));
+            // عدد الأيام المسجَّل فيها هذا المعنى موقفاً يومياً: يقفل معنى الرمز ويمنع حذفه (المواصفة 4.4)
+            const countCodeUsage = (meaning) => { let n = 0; Object.values(dailyStatusOverrides || {}).forEach(day => { if (day && typeof day === 'object') Object.values(day).forEach(v => { if (v === meaning) n++; }); }); return n; };
 
             const toggleOfficialHolidayDate = (dateStr) => {
                 setOfficialHolidays(prev => {
@@ -3361,7 +3365,7 @@ import { buildDatePicker } from '../ui/datePicker';
             const exportBackupJSON = () => {
                 try {
                     const backupData = {
-                        version: 'v9.6 Enterprise Cloud Edition',
+                        version: 'v9.7 Enterprise Cloud Edition',
                         exportDate: new Date().toISOString(),
                         staff: staff,
                         staffData: staff,
@@ -4875,6 +4879,7 @@ import { buildDatePicker } from '../ui/datePicker';
             useEscapeClose(showRestoreCenterModal, () => setShowRestoreCenterModal(false));
             useEscapeClose(showPasteModal, () => setShowPasteModal(false));
             useEscapeClose(showHolidaysModal, () => setShowHolidaysModal(false));
+            useEscapeClose(showCodesGuide, () => setShowCodesGuide(false));
             useEscapeClose(!!pendingShiftConfirm, () => setPendingShiftConfirm(null));
             useEscapeClose(!!quickPeriod, () => setQuickPeriod(null));
             useEscapeClose(showUserMenu, () => setShowUserMenu(false));
@@ -4950,7 +4955,7 @@ return (
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
                             <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, setMealAuthorizations, staff }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
+                            <UnitsScreen ctx={{ printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
@@ -4970,6 +4975,7 @@ return (
                     
             {/* نافذة تأكيد إعادة ضبط وتثبيت الوجبة الرئيسية */}
             {/* نافذة إدارة العطل الرسمية والأعياد */}
+            {showCodesGuide && <CodesGuideModal ctx={{ timeFormCodeEdits, updateTimeFormCodeEdits, countCodeUsage, canEditCodes: canEdit('dailyReport'), codesLockedBy: lockedSections['dailyReport'] || '', setShowCodesGuide }} />}
             {showHolidaysModal && <HolidaysModal ctx={{ addOfficialHolidayRange, dailyReportDate, holidayRangeEnd, holidayRangeStart, officialHolidays, setHolidayRangeEnd, setHolidayRangeStart, setShowHolidaysModal, toggleOfficialHolidayDate }} />}
 
             {pendingHourlyLeave && <HourlyLeaveModal ctx={{ confirmHourlyLeave, pendingHourlyLeave, setPendingHourlyLeave }} />}
@@ -4991,7 +4997,7 @@ return (
                     
                     <footer className="bg-gray-800 text-white mt-12 py-6 text-center">
                         <p>© 2026 شركة نفط البصرة - شعبة تبريد المركز ومحطة عزل نهر بن عمر</p>
-                        <p className="text-xs text-blue-300 mt-2">👨‍💻 إعداد: المهندس أسامة خليل هاشم | الإصدار v9.6 Enterprise Cloud Edition</p>
+                        <p className="text-xs text-blue-300 mt-2">👨‍💻 إعداد: المهندس أسامة خليل هاشم | الإصدار v9.7 Enterprise Cloud Edition</p>
                     </footer>
                 </div>
             );
