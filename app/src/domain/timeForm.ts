@@ -91,11 +91,65 @@ export type TimeFormCodeEdits = {
 // extraByMeaning: الرموز المضافة، والرسمية التي فعّلها المستخدم حالةً يومية، مفهرسة بمعناها
 export type ResolvedCodeTable = { list: TimeCode[]; byId: Record<string, TimeCode>; extraByMeaning: Record<string, TimeCode> };
 
-// المرحلة 2 تعيد الرموز الرسمية وحدها؛ تطبيق تعديلات الدليل يأتي مع «دليل الرموز» (المرحلة 3)
-export const resolveCodeTable = (_edits?: TimeFormCodeEdits | null): ResolvedCodeTable => {
-    const list = OFFICIAL_TIME_CODES.map(c => ({ ...c }));
+// حالات النظام التي تُكتب بالرمز: من STATUS_TO_CODE_ID، ومن القواعد الخاصة في codeIdFor (L وC وR وY).
+// الرمز المربوط لا يُحذف من الدليل (4.4)، ويُعرض أمامه ما يُكتب به.
+const RULE_STATUSES: Record<string, string[]> = {
+    L: ['إجازة اعتيادية (تعديل يومي)'],
+    [LONG_PAID_LEAVE_CODE]: ['إجازة براتب تام داخل العراق (فترة مؤرَّخة)'],
+    R: ['استراحة نهاية الأسبوع (الجمعة)'],
+    Y: ['استراحة نهاية الأسبوع (السبت)'],
+};
+
+export const linkedStatusesOf = (id: string): string[] => [
+    ...(RULE_STATUSES[id] || []),
+    ...Object.keys(STATUS_TO_CODE_ID).filter(s => STATUS_TO_CODE_ID[s] === id),
+];
+
+// الرسمية بتعديلات المستخدم (الحرف والمعنى المعروض)، بلا المحذوفة، ثم المضافة.
+// المربوط لا يُحذف حتى لو وصل في removed (حزمة قديمة أو ملف معدَّل يدوياً).
+export const resolveCodeTable = (edits?: TimeFormCodeEdits | null): ResolvedCodeTable => {
+    const overrides = edits?.overrides || {};
+    const removed = new Set(edits?.removed || []);
+    const activated = new Set(edits?.activated || []);
+    const officialList = OFFICIAL_TIME_CODES
+        .filter(c => !removed.has(c.id) || linkedStatusesOf(c.id).length > 0)
+        .map(c => ({ ...c, ...(overrides[c.id] || {}), id: c.id }));
+    const custom = (edits?.custom || []).map(c => ({ ...c }));
+    const list = [...officialList, ...custom];
     const byId: Record<string, TimeCode> = Object.fromEntries(list.map(c => [c.id, c]));
-    return { list, byId, extraByMeaning: {} };
+    const extraByMeaning: Record<string, TimeCode> = {};
+    for (const c of officialList) if (activated.has(c.id) && !linkedStatusesOf(c.id).length) extraByMeaning[c.meaning] = c;
+    for (const c of custom) extraByMeaning[c.meaning] = c;
+    return { list, byId, extraByMeaning };
+};
+
+// رسالة الخطأ أو null. edit.id غائب = رمز يُضاف. والمعنى يُفحص بقواعد الحالة اليومية (محور المراجعة 4)
+// في الرمز المضاف وفي الرسمي المفعَّل، لأن معناهما هو النص المخزَّن في التعديل اليومي.
+export const validateCodeEdit = (
+    table: ResolvedCodeTable,
+    edit: { id?: string; letter: string; meaning: string },
+    reservedStatuses: string[],
+): string | null => {
+    const letter = String(edit.letter || '').trim();
+    const meaning = String(edit.meaning || '').trim();
+    if (!letter) return 'اكتب حرف الرمز.';
+    if (Array.from(letter).length > 2) return 'الحرف خانة واحدة أو خانتان.';
+    if (!meaning) return 'اكتب معنى الرمز.';
+    const sameLetter = table.list.find(c => c.id !== edit.id && c.letter.toUpperCase() === letter.toUpperCase());
+    if (sameLetter) {
+        const official = OFFICIAL_TIME_CODES.some(c => c.id === sameLetter.id);
+        const hint = official && !linkedStatusesOf(sameLetter.id).length
+            ? ' ولاستعمال هذا الرمز حالةً يومية فعّله من سطره في الدليل.'
+            : '';
+        return `الحرف «${sameLetter.letter}» مستعمل للرمز «${sameLetter.meaning}».${hint}`;
+    }
+    const isExtra = !edit.id || Object.values(table.extraByMeaning).some(c => c.id === edit.id);
+    if (isExtra) {
+        if (reservedStatuses.includes(meaning)) return `«${meaning}» حالة موجودة في النظام، ولها رمزها. اختر معنى آخر.`;
+        const sameMeaning = table.extraByMeaning[meaning];
+        if (sameMeaning && sameMeaning.id !== edit.id) return `المعنى «${meaning}» مستعمل للرمز «${sameMeaning.letter}».`;
+    }
+    return null;
 };
 
 export type TimeFormDayInput = { status: string; dateStr: string; fromPeriod: boolean; isShift: boolean; naturalStatus: string };
