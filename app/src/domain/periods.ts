@@ -2,7 +2,13 @@ import { addMonthsClamped, localDateStr } from '../core/dates.js';
 import type { Employee, PeriodDraft, PeriodType, StatusPeriod } from './types.js';
 
 // ===== الفترات المؤرَّخة للحالات (Dated Status Periods) =====
-export const PERIOD_TYPES: PeriodType[] = ['إجازة اعتيادية', 'في دورة', 'إيفاد', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
+// الأنواع الثمانية الأولى، ثم العشرة التي أُضيفت بطلب أسامة (2026-10-22) للمواقف الطويلة الرسمية
+// في استمارة ضبط الوقت. لا يُضاف نوع إلا بطلبه الصريح. والتفرّغ ليس منها: يُفعَّل من دليل الرموز.
+export const PERIOD_TYPES: PeriodType[] = [
+    'إجازة اعتيادية', 'في دورة', 'إيفاد', 'إجازة بدون راتب', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد',
+    'إجازة بدون راتب خارج العراق', 'إجازة خارج العراق', 'إجازة دراسية', 'إجازة أربع أو خمس سنوات', 'إجازة ولادة',
+    'إيفاد خارج العراق', 'أيام العدة', 'أيام بقسم آخر', 'خارج الخدمة', 'إصابة عمل',
+];
 
 // الأنواع مفتوحة النهاية: تُدخَل بتاريخ بداية فقط بلا مدة ولا تاريخ نهاية، وتبقى سارية
 // حتى تُنهى يدوياً بإعادة الحالة إلى «نشط». سحب اليد يُعامَل مطابقةً تامة للغياب هنا
@@ -13,6 +19,58 @@ export const OPEN_ENDED_PERIOD_TYPES: PeriodType[] = ['غياب', 'سحب يد']
 // بدون راتب، أو حالة قديمة من استيراد Excel)، فتُضاف عندئذٍ كخيار معروض حتى لا تعرض
 // القائمة أول خيار زوراً — وحينها لا يُطلق اختيار «نشط» حدث تغيير أصلاً.
 export const QUICK_STATUS_OPTIONS: string[] = ['نشط', 'في دورة', 'إجازة طويلة', 'إجازة أمومة', 'غياب', 'سحب يد'];
+
+// زر الحالة في جدول الملاك بعد إلغاء الباب «إجازة طويلة»: لكل حالة خيارها باسمها، في مجموعات
+// كقائمة الموقف اليومي (المواصفة 2026-10-22، القسم 5). القيمة هي النوع المخزَّن، والتسمية ما يُعرض:
+// «إجازة اعتيادية» تُعرض «إجازة براتب» و«إيفاد» يُعرض «إيفاد داخل العراق»، بلا ترحيل للبيانات.
+export type StatusButtonOption = { value: string; label: string };
+
+export const STATUS_BUTTON_GROUPS: Array<{ label: string | null; options: StatusButtonOption[] }> = [
+    { label: null, options: [{ value: 'نشط', label: 'نشط' }] },
+    {
+        label: 'الإجازات', options: [
+            { value: 'إجازة اعتيادية', label: 'إجازة براتب (براتب تام بدون مخصصات)' },
+            { value: 'إجازة بدون راتب', label: 'إجازة بدون راتب داخل العراق' },
+            { value: 'إجازة بدون راتب خارج العراق', label: 'إجازة بدون راتب خارج العراق' },
+            { value: 'إجازة خارج العراق', label: 'إجازة اعتيادية خارج العراق' },
+            { value: 'إجازة دراسية', label: 'إجازة دراسية' },
+            { value: 'إجازة أربع أو خمس سنوات', label: 'إجازة أربع أو خمس سنوات' },
+            { value: 'إجازة أمومة', label: 'إجازة أمومة' },
+            { value: 'إجازة ولادة', label: 'إجازة ولادة' },
+        ],
+    },
+    {
+        label: 'الدورات والإيفاد', options: [
+            { value: 'في دورة', label: 'في دورة' },
+            { value: 'إيفاد', label: 'إيفاد داخل العراق' },
+            { value: 'إيفاد خارج العراق', label: 'إيفاد خارج العراق' },
+        ],
+    },
+    {
+        label: 'مواقف أخرى', options: [
+            { value: 'أيام العدة', label: 'أيام العدة' },
+            { value: 'أيام بقسم آخر', label: 'أيام بقسم آخر' },
+            { value: 'خارج الخدمة', label: 'خارج الخدمة' },
+            { value: 'إصابة عمل', label: 'إصابة عمل' },
+            { value: 'غياب', label: 'غياب' },
+            { value: 'سحب يد', label: 'سحب يد' },
+        ],
+    },
+];
+
+export const STATUS_BUTTON_VALUES: string[] = STATUS_BUTTON_GROUPS.flatMap(g => g.options.map(o => o.value));
+
+const STATUS_BUTTON_LABELS: Record<string, string> = Object.fromEntries(
+    STATUS_BUTTON_GROUPS.flatMap(g => g.options.map(o => [o.value, o.label]))
+);
+
+// التسمية المعروضة للنوع المخزَّن، أو النص نفسه إن لم يكن في الزر (حالة قديمة مثل «إجازة طويلة»)
+export const statusButtonLabel = (type: string): string => STATUS_BUTTON_LABELS[type] || type;
+
+// المستبعدون من التقييم (المواصفة 6.4): أصحاب المواقف الطويلة من فترة مؤرَّخة. يظهرون في الكشف اليومي
+// بحالتهم، فالإخفاء منه يبقى بـisLongOrMaternityLeave. الدورة والإيفاد والغياب وسحب اليد لا تستبعد.
+const NOT_LONG_ABSENCE: string[] = ['في دورة', 'إيفاد', 'إيفاد خارج العراق', 'غياب', 'سحب يد'];
+export const LONG_ABSENCE_TYPES: string[] = PERIOD_TYPES.filter(t => !NOT_LONG_ABSENCE.includes(t));
 
 export const periodsOf = (emp?: Employee | null): StatusPeriod[] => (emp && Array.isArray(emp.statusPeriods)) ? emp.statusPeriods : [];
 
