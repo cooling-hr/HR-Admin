@@ -33,7 +33,7 @@
 
 ما لا تكشفه البوابة وأرجح أن يصيب المستخدم. كل محور مذكور في المهمة التي تملك كوده، ويُرسل إلى Codex مع الالتزام، ويُعطى لأسامة في قائمة التجربة:
 1. **جمعة وسبت بعد إجازة يومية** (الخميس والأحد اعتيادية بتعديل يومي): يُكتبان L لا C، لأنهما لم يأتيا من فترة مؤرَّخة (المهمة 5).
-2. **يوم إضافي بلا ساعات في `overtimeHoursRecords`**: الصف الثاني فارغ، واليوم مذكور في سطر التنبيه. تقرير الفترة يفترض له 2 أو 3 ساعات، والاستمارة لا تأخذ هذا الافتراض (المهمة 5).
+2. **يوم إضافي بلا ساعات في `overtimeHoursRecords`**: الصف الثاني فارغ بلا تنبيه (حالة نادرة تُكمَل يدوياً، قرار أسامة). تقرير الفترة يفترض له 2 أو 3 ساعات، والاستمارة لا تأخذ هذا الافتراض (المهمة 5).
 3. **فترة قائمة تُفتح للتعديل:** «إجازة اعتيادية» تُعرض «إجازة براتب» وتُحفظ بالنوع نفسه، و«إيفاد» يُعرض «إيفاد داخل العراق» ويُحفظ «إيفاد»، و«إجازة طويلة» القديمة تبقى كما هي (المهمة 2).
 4. **رمز مضاف بمعنى يطابق حالة موجودة** (مثل «غياب»)، أو بحرف مكرر: يُرفض الحفظ برسالة (المهمة 9).
 5. **تعديل الدليل على جهاز في النسخة السحابية:** يصل الأجهزة الأخرى ولا يمحوه حفظ تلقائي من جهاز لم يتلقّه بعد (المهمة 10).
@@ -52,10 +52,11 @@
 - تعديل: `CLAUDE.md` (قسم «اصطلاحات البيانات والتاريخ»، فقرة الأنواع الثمانية)
 
 **الواجهات:**
-- ينتج: `PERIOD_TYPES` بـ21 نوعاً، و`STATUS_BUTTON_GROUPS`، و`statusButtonLabel(type: string): string`، و`LONG_ABSENCE_TYPES: string[]`، والفئة `'detached'` في `DailyCategory`.
+- ينتج: `PERIOD_TYPES` بـ18 نوعاً، و`STATUS_BUTTON_GROUPS`، و`statusButtonLabel(type: string): string`، و`LONG_ABSENCE_TYPES: string[]`، والفئة `'detached'` في `DailyCategory`.
 
-- [ ] **الخطوة 1: أضف الأنواع الثلاثة عشر** إلى `PeriodType` وإلى `PERIOD_TYPES` بنصوصها حرفياً:
-  `إجازة بدون راتب خارج العراق`، `إجازة خارج العراق`، `إجازة دراسية`، `إجازة أربع أو خمس سنوات`، `إجازة ولادة`، `إيفاد خارج العراق`، `تفرغ`، `تفرغ جزئي بأمر الهيئة الإدارية`، `تفرغ للحشد الشعبي`، `أيام العدة`، `أيام بقسم آخر`، `خارج الخدمة`، `إصابة عمل`.
+- [ ] **الخطوة 1: أضف الأنواع العشرة** إلى `PeriodType` وإلى `PERIOD_TYPES` بنصوصها حرفياً:
+  `إجازة بدون راتب خارج العراق`، `إجازة خارج العراق`، `إجازة دراسية`، `إجازة أربع أو خمس سنوات`، `إجازة ولادة`، `إيفاد خارج العراق`، `أيام العدة`، `أيام بقسم آخر`، `خارج الخدمة`، `إصابة عمل`.
+  التفرّغ بأنواعه الثلاثة **ليس منها** (قرار أسامة 2026-10-24): يُفعَّل من دليل الرموز في المرحلة 3.
   و`OPEN_ENDED_PERIOD_TYPES` لا يتغير. وحدّث تعليق «الأنواع الثمانية» في الملفين ليذكر أن القائمة وُسِّعت بطلب أسامة 2026-10-22.
 
 - [ ] **الخطوة 2: استبدل `QUICK_STATUS_OPTIONS`** بـ:
@@ -67,16 +68,16 @@
   ```
   المجموعات والتسميات والقيم كما في جدول القسم 5 من المواصفة حرفياً. والمجموعة الأولى `label: null` فيها «نشط» وحده. القيمة المخزَّنة لخيار «إجازة براتب (براتب تام بدون مخصصات)» هي `إجازة اعتيادية`، ولخيار «إيفاد داخل العراق» هي `إيفاد`.
 
-- [ ] **الخطوة 3: أضف `LONG_ABSENCE_TYPES`** في `periods.ts`: كل `PERIOD_TYPES` عدا `في دورة` و`إيفاد` و`إيفاد خارج العراق` و`غياب` و`سحب يد` (القسم 6.4). و`isLongOrMaternityLeave` تبقى كما هي، لأنها تُستعمل في التصنيف لا في الإخفاء.
+- [ ] **الخطوة 3: أضف `LONG_ABSENCE_TYPES`** في `periods.ts` للتقييم وحده: كل `PERIOD_TYPES` عدا `في دورة` و`إيفاد` و`إيفاد خارج العراق` و`غياب` و`سحب يد` (القسم 6.4). و`isLongOrMaternityLeave` تبقى كما هي في التصنيف وفي الإخفاء من الكشف اليومي.
 
 - [ ] **الخطوة 4: الفئة `'detached'` في `dailyCounts.ts`:**
   - تُضاف إلى `DailyCategory`، وفي `DAILY_CATEGORY_ORDER` بعد `'mission'`.
-  - `const DETACHED_STATUSES = ['تفرغ', 'تفرغ جزئي بأمر الهيئة الإدارية', 'تفرغ للحشد الشعبي', 'أيام بقسم آخر', 'خارج الخدمة']`، و`const EXTRA_LEAVE_STATUSES = ['أيام العدة', 'إصابة عمل']`.
+  - `const DETACHED_STATUSES = ['أيام بقسم آخر', 'خارج الخدمة']`، وتسميتها المعروضة «خارج الشعبة»، و`const EXTRA_LEAVE_STATUSES = ['أيام العدة', 'إصابة عمل']`.
   - في `dailyStatusCategory` يُفحصان بالمطابقة التامة **قبل** أي `includes` (لأن «خارج الخدمة» قد تقع في فحص لاحق).
 
 - [ ] **الخطوة 5: قوائم الماء** (القسم 6.2): أضف `إيفاد خارج العراق` إلى `WATER_NEXT_MONTH_TYPES`. وأضف إلى `WATER_LEAVE_TALLY_TYPES` كل الأنواع الجديدة عدا `إيفاد خارج العراق`. غيّر نوع القائمتين إلى `string[]` إن احتاج الأمر، لأن `إجازة خارج العراق` تأتي من التعديل اليومي أيضاً.
 
-- [ ] **الخطوة 6: CLAUDE.md:** اكتب في فقرة الأنواع أنها صارت 21 نوعاً بطلب أسامة (2026-10-22)، وأن مرجع قائمتها `PERIOD_TYPES`، مع بقاء قاعدة «لا نوع جديد إلا بطلب صريح».
+- [ ] **الخطوة 6: CLAUDE.md:** اكتب في فقرة الأنواع أنها صارت 18 نوعاً بطلب أسامة (2026-10-22)، وأن مرجع قائمتها `PERIOD_TYPES`، مع بقاء قاعدة «لا نوع جديد إلا بطلب صريح».
 
 - [ ] **الخطوة 7: البوابة** (الالتزام: «Add the official long statuses as dated period types, with their daily-count category and water lists»).
 
@@ -107,30 +108,30 @@
 - [ ] **الخطوة 3:** حدّث الدليل 4.2 بالشرط الجديد، ومعه مثال: خميس اعتيادية وأحد مرضية تُكتب فيهما الجمعة R والسبت Y.
 - [ ] **الخطوة 4: البوابة** (الالتزام: «Bridge Friday and Saturday into leave only when Thursday and Sunday carry the same leave type»).
 
-### المهمة 4: الإخفاء والتقييم وأعمدة تقرير الفترة
+### المهمة 4: الاستبعاد من التقييم، وأعمدة تقرير الفترة
 
 **الملفات:**
-- تعديل: `app/src/app/StaffSystem.jsx` (حوالي 1818، 2653، 2795، و`periodReportData` 1566–1704، و`exportPeriodReportExcel`)
-- تعديل: `app/src/features/units/UnitsScreen.jsx` (حوالي 400 و423، و`DAILY_COUNT_CHIPS` السطر 47 وما بعده، وجدول إجمالي تقرير الفترة)
+- تعديل: `app/src/app/StaffSystem.jsx` (حوالي 2653 و2795، و`periodReportData` 1566–1704، و`exportPeriodReportExcel`)
+- تعديل: `app/src/features/units/UnitsScreen.jsx` (`DAILY_COUNT_CHIPS` السطر 47 وما بعده، وجدول إجمالي تقرير الفترة)
 - تعديل: الدليل الشامل 3.3 و4.1 و4.3 و8.1 و8.3
 
 **الواجهات:**
 - يستهلك: `LONG_ABSENCE_TYPES`، والفئة `'detached'`.
-- ينتج: `isHiddenLongAbsence(emp, dateStr): boolean` في `StaffSystem`، تُمرَّر في `ctx` إلى `UnitsScreen`. والحقل `detached: number` في كل عنصر من `periodReportData.employees`.
+- ينتج: الحقل `detached: number` في كل عنصر من `periodReportData.employees`.
 
-- [ ] **الخطوة 1:** عرّف `isHiddenLongAbsence`: تُعيد true إن لم يكن لليوم تعديل يومي للموظف، وكانت فترته في ذلك اليوم (`getActivePeriod`) من `LONG_ABSENCE_TYPES`. واستبدل بها `isLongOrMaternityLeave(status)` في المواضع الثلاثة لإخفاء الموظف من الكشف اليومي.
+- [ ] **الخطوة 1: الكشف اليومي لا يُمسّ** (قرار أسامة 2026-10-24): أصحاب المواقف الطويلة يظهرون فيه بحالتهم، ومواضع `isLongOrMaternityLeave` للإخفاء (1818، وUnitsScreen 400 و423) تبقى كما هي.
 - [ ] **الخطوة 2:** التقييم (2653 و2795): `!(p && LONG_ABSENCE_TYPES.includes(p.type))`.
 - [ ] **الخطوة 3: `periodReportData`:**
   - عدّاد `detached` لـ`dailyStatusCategory(status) === 'detached'`، يُفحص قبل فرع الإجازات.
   - فرع الإجازات يشمل أيضاً `إجازة بدون راتب` و`إجازة دراسية` و`إجازة ولادة` و`إجازة أربع أو خمس سنوات` و`أيام العدة` و`إصابة عمل`. أما «خارج العراق» فيلتقط الإجازتين خارج العراق كما هو اليوم.
   - تأكد أن `إيفاد خارج العراق` يقع في `deputations` لا في الإجازات: فرع الإجازات يفحص «خارج العراق» قبل فرع الإيفاد، فيجب استثناء ما فيه «إيفاد».
   - تُضاف `officialHolidays` و`overtimeHoursRecords` و`hourlyLeaveRecords` إلى اعتماديات `useMemo`.
-- [ ] **الخطوة 4:** عمود «متفرغ» في جدول الإجمالي على الشاشة وفي `exportPeriodReportExcel`، بعد «الإيفادات».
-- [ ] **الخطوة 5:** شارة «متفرغ» في `DAILY_COUNT_CHIPS`، تظهر عند وجودها فقط. ولونها من أصناف موجودة في قائمة الوضع الليلي، أو يُضاف صنفها إليها.
-- [ ] **الخطوة 6:** حدّث الدليل الشامل: 8.1 (قائمة المخفيين)، و8.3 (قائمتا الماء)، و3.3 و4.1 و4.3 (الأنواع الجديدة وزر الحالة).
-- [ ] **الخطوة 7: البوابة** (الالتزام: «Hide long statuses from the daily list by an explicit list, and count the new statuses in the period report»).
+- [ ] **الخطوة 4:** عمود «خارج الشعبة» في جدول الإجمالي على الشاشة وفي `exportPeriodReportExcel`، بعد «الإيفادات».
+- [ ] **الخطوة 5:** شارة «خارج الشعبة» في `DAILY_COUNT_CHIPS`، تظهر عند وجودها فقط. ولونها من أصناف موجودة في قائمة الوضع الليلي، أو يُضاف صنفها إليها.
+- [ ] **الخطوة 6:** حدّث الدليل الشامل: 8.1 (قائمة المستبعدين من التقييم، والظهور في الكشف اليومي)، و8.3 (قائمتا الماء)، و3.3 و4.1 و4.3 (الأنواع الجديدة وزر الحالة).
+- [ ] **الخطوة 7: البوابة** (الالتزام: «Exclude long statuses from the evaluation by an explicit list, and count the new statuses in the period report»).
 
-**نهاية المرحلة 1:** تقرير لأسامة بقائمة التجربة (محور المراجعة 3، والإخفاء، والماء)، والرفع بموافقته.
+**نهاية المرحلة 1:** تقرير لأسامة بقائمة التجربة (محور المراجعة 3، وظهور صاحب الإجازة الطويلة في الكشف واستبعاده من التقييم والماء)، والرفع بموافقته.
 
 ---
 
@@ -150,8 +151,8 @@
   export const STATUS_TO_CODE_ID: Record<string, string>; // جدول 4.2 بالمطابقة التامة
   export const LONG_PAID_LEAVE_CODE = 'C';
   export const UNKNOWN_CODE = '؟';
-  export type TimeFormCodeEdits = { overrides: Record<string, { letter?: string; meaning?: string }>; removed: string[]; custom: TimeCode[] };
-  export type ResolvedCodeTable = { list: TimeCode[]; byId: Record<string, TimeCode>; customByMeaning: Record<string, TimeCode> };
+  export type TimeFormCodeEdits = { overrides: Record<string, { letter?: string; meaning?: string }>; removed: string[]; custom: TimeCode[]; activated: string[] };
+  export type ResolvedCodeTable = { list: TimeCode[]; byId: Record<string, TimeCode>; extraByMeaning: Record<string, TimeCode> }; // extra = المضافة والرسمية المفعَّلة حالةً يومية
   export const resolveCodeTable = (edits?: TimeFormCodeEdits | null): ResolvedCodeTable;
   export type TimeFormDayInput = { status: string; dateStr: string; fromPeriod: boolean; isShift: boolean; naturalStatus: string };
   export const timeFormCodeFor = (day: TimeFormDayInput, table: ResolvedCodeTable): string; // '' فراغ، أو حرف، أو UNKNOWN_CODE
@@ -165,7 +166,7 @@
   2. الموقف الحاضر (دوام صباحي، حضور فعلي، ورقة عمل، مكلف بواجب، إجازة زمنية، وكل ما فيه «إضافي») فراغ.
   3. «استراحة نهاية الأسبوع»: يوم الجمعة R، ويوم السبت Y، حسب `dateStr`.
   4. `إجازة اعتيادية`: إن جاءت من فترة (`fromPeriod`) فالرمز `LONG_PAID_LEAVE_CODE`، وإلا L.
-  5. `STATUS_TO_CODE_ID`، ثم `customByMeaning`، ثم `UNKNOWN_CODE`.
+  5. `STATUS_TO_CODE_ID`، ثم `extraByMeaning`، ثم `UNKNOWN_CODE`.
 
   ويُعاد دائماً `table.byId[id].letter`. فإن حُذف الرمز من الجدول أُعيد `UNKNOWN_CODE`.
 - [ ] **الخطوة 3: `dailyLog`:**
@@ -174,9 +175,9 @@
 - [ ] **الخطوة 4: `timeFormData = useMemo(...)`** من `periodReportData`:
   - الشكل: `{ year, month, daysInMonth, staffRows, contractRows, warnings: { staff, contracts } }`.
   - كل صف: `{ employee, cells: Array<{ day: number; code: string; hours: number | null; inMonth: boolean; isFuture: boolean }>, totalHours: number }`، و`cells` طولها 31 دائماً.
-  - كل تحذير: `{ unknown: Array<{ name: string; days: number[] }>, missingHours: Array<{ name: string; days: number[] }> }`.
+  - كل تحذير: `{ unknown: Array<{ name: string; days: number[] }> }`.
   - الصفوف مرتّبة بـ`sortByJobNumber`، وتُقسم بـ`isContractEmployee`.
-  - `hours` = `otRecordedHours` لليوم الذي فيه «إضافي» في الموقف. و`missingHours` يجمع كل يوم فيه «إضافي» و`otRecordedHours === null` (محور المراجعة 2).
+  - `hours` = `otRecordedHours` لليوم الذي فيه «إضافي» في الموقف، وإلا `null` (محور المراجعة 2: لا افتراض ولا تنبيه).
   - `totalHours` جمع `hours`.
   - الشهر يُؤخذ من `periodStartDate`.
 - [ ] **الخطوة 5: البوابة.** لا واجهة بعد، فيكفي أن ينجح البناء (الالتزام: «Map each day's final status to its official time-form code»).
@@ -195,7 +196,7 @@
 - [ ] **الخطوة 1:** يصير المبدّل «📊 إجمالي / 📋 استمارة ضبط الوقت». وعند اختيار الاستمارة، إن لم تكن الفترة شهراً كاملاً، يُستدعى `selectTimeFormMonth` بشهر `periodStartDate`. وفي شريط الاستمارة حقل `<input type="month">` مربوط بـ`selectTimeFormMonth`.
 - [ ] **الخطوة 2: `TimeFormView`** يرسم:
   - مفتاح «الملاك / العقود».
-  - سطر التنبيه: عدد خانات `؟` وأسماء أصحابها، والأيام الإضافية بلا ساعات.
+  - سطر التنبيه: عدد خانات `؟` وأسماء أصحابها وأيامها.
   - العنوان كما في 3، ثم الجدول بصفّين لكل موظف. الأعمدة الأربعة الأولى و«مجموع الساعات» بـ`rowSpan={2}`. والصف الثاني خلفيته `#ccffff` بخاصية `style`، لا بصنف.
   - الأيام خارج الشهر مظللة، والأيام القادمة بنقطة باهتة، وخانة `؟` حمراء.
   - تحت الجدول مفتاح الرموز على الشاشة فقط.
@@ -260,7 +261,7 @@
   export const validateCodeEdit = (table: ResolvedCodeTable, edit: { id?: string; letter: string; meaning: string }, reservedStatuses: string[]): string | null; // رسالة الخطأ أو null
   ```
 
-- [ ] **الخطوة 1: `resolveCodeTable(edits)`** يطبّق `overrides` على الرسمي (الحرف والمعنى المعروض)، ويُسقط `removed`، ثم يُلحق `custom`. ويُبنى `customByMeaning` من `custom` وحدها.
+- [ ] **الخطوة 1: `resolveCodeTable(edits)`** يطبّق `overrides` على الرسمي (الحرف والمعنى المعروض)، ويُسقط `removed`، ثم يُلحق `custom`. ويُبنى `extraByMeaning` من `custom` ومن الرسمية التي معرّفها في `activated` (بمعناها بعد التعديل). مثال ذلك تفعيل U «أيام التفرغ».
 - [ ] **الخطوة 2: `validateCodeEdit`** يرفض:
   - الحرف الفارغ، أو الأطول من خانتين.
   - الحرف المستعمل لرمز آخر.
@@ -277,7 +278,7 @@
 **الواجهات:**
 - ينتج: `timeFormCodeEdits: TimeFormCodeEdits` و`updateTimeFormCodeEdits(next: TimeFormCodeEdits): void` (يحفظ محلياً ويبثّ). ومفتاح التخزين ومفتاح الحزمة كلاهما `timeFormCodeEdits`.
 
-- [ ] **الخطوة 1:** الحالة تُقرأ من `safeStorage`، والقيمة الافتراضية `{ overrides: {}, removed: [], custom: [] }`. و`updateTimeFormCodeEdits` يكتب ويبثّ بنمط `toggleOfficialHolidayDate` (السطر 298).
+- [ ] **الخطوة 1:** الحالة تُقرأ من `safeStorage`، والقيمة الافتراضية `{ overrides: {}, removed: [], custom: [], activated: [] }`. و`updateTimeFormCodeEdits` يكتب ويبثّ بنمط `toggleOfficialHolidayDate` (السطر 298).
 - [ ] **الخطوة 2: المزامنة:** في كل موضع يُبنى فيه كائن حزمة فيه `hourlyLeaveTimings:`، يُضاف `timeFormCodeEdits` بجانبه. اعثر على المواضع بالأمر `grep -n "hourlyLeaveTimings" src/app/StaffSystem.jsx src/data/*/*.js`، ومنها `buildCloudBundle` في الطبقة السحابية. ثم:
   - يُضاف المفتاح إلى `CLOUD_SIGNATURE_KEYS`.
   - يُضاف إلى تطبيق الحزمة الواردة في الطبقتين (بجانب `officialHolidaysList` عند 931 و1688)، وإلى الاستعادة في `StaffSystem` (حوالي 2015).
@@ -304,10 +305,10 @@
   - المضاف يُحذف إن كان `countCodeUsage` صفراً، وإلا ظهرت رسالة بعدد الأيام التي تحمله.
   - معنى المضاف يُقفل بعد أول استعمال.
 
-  وفيه «استعادة الافتراضي» لكل رمز رسمي. ونمط النافذة نمط النوافذ القائمة (`max-h-[92vh]` مع تمرير، والإغلاق بـEsc).
+  وأمام كل رمز رسمي بلا حالة زر «استعماله حالةً يومية» (يضيف معرّفه إلى `activated`)، ويُلغى بقاعدة حذف المضاف: إن كان `countCodeUsage` صفراً. ومعنى الرمز المفعَّل يُقفل بعد أول استعمال. وفيه «استعادة الافتراضي» لكل رمز رسمي. ونمط النافذة نمط النوافذ القائمة (`max-h-[92vh]` مع تمرير، والإغلاق بـEsc).
 - [ ] **الخطوة 2: التعديل والقراءة:** يعدّل الدليل من يعدّل العطل الرسمية. فإن كان `lockedSections['dailyReport']` بيد مستخدم آخر تُعطَّل أزرار التعديل وتبقى القراءة. و`reservedStatuses` لـ`validateCodeEdit` = كل قيم `DAILY_STATUS_GROUPS` و`PERIOD_TYPES` ومفاتيح `STATUS_TO_CODE_ID`.
-- [ ] **الخطوة 3: الموقف اليومي:** تُلحق بـ`DAILY_STATUS_GROUPS` عند الرسم مجموعة «رموز أخرى» من `custom`، بشرط وجود رمز مضاف. والقيمة المخزَّنة هي المعنى. ولونها صنف موجود في قائمة الوضع الليلي.
+- [ ] **الخطوة 3: الموقف اليومي:** تُلحق بـ`DAILY_STATUS_GROUPS` عند الرسم مجموعة «رموز أخرى» من قيم `extraByMeaning`، إن وُجد فيها شيء. والقيمة المخزَّنة هي المعنى. ولونها صنف موجود في قائمة الوضع الليلي.
 - [ ] **الخطوة 4:** زر «📖 دليل الرموز» في شريط الاستمارة. وارفع الإصدار إلى `v9.7`، وحدّث الدليلين (القسم 4.4 من المواصفة، ومن يعدّل الدليل).
 - [ ] **الخطوة 5: البوابة** (الالتزام: «Add the editable codes guide; added codes become daily statuses»).
 
-**نهاية المرحلة 3:** قائمة تجربة لأسامة: إضافة W «أيام الوفاة» وتسجيلها ليوم ثم ظهورها في الاستمارة، ومحاولة حذفها بعد ذلك، وتغيير حرف L، ومحور المراجعة 4. ومحور المراجعة 5 على جهازين في النسخة السحابية. ثم الرفع بموافقته، وبعده الجواب عن السؤال المؤجل (المواصفة 11).
+**نهاية المرحلة 3:** قائمة تجربة لأسامة: إضافة W «أيام الوفاة» وتفعيل U «أيام التفرغ»، وتسجيلهما ليوم ثم ظهورهما في الاستمارة، ومحاولة حذفهما أو إلغاء تفعيلهما بعد ذلك، وتغيير حرف L، ومحور المراجعة 4. ومحور المراجعة 5 على جهازين في النسخة السحابية. ثم الرفع بموافقته، وبعده الجواب عن السؤال المؤجل (المواصفة 11).
