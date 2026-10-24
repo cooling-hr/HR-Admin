@@ -6,7 +6,7 @@ import { OFFICIAL_TIME_CODES, STATUS_TO_CODE_ID, linkedStatusesOf, normalizeTime
 // حالات لها معنى في النظام ولا تظهر في المصادر الثلاثة أدناه، فلا يُعاد استعمالها معنى لرمز مضاف
 const EXTRA_RESERVED_STATUSES = ['استراحة نهاية الأسبوع', 'حضور فعلي', 'دوام صباحي', 'إجازة زمنية', 'إجازة اعتيادية', 'ورقة عمل', 'مكلف بواجب'];
 
-const BTN = 'px-2 py-1 rounded-lg font-black text-[11px] transition';
+const BTN = 'px-2 py-1 rounded-lg font-black text-[11px] transition whitespace-nowrap';
 const BTN_OFF = 'bg-slate-100 text-slate-400 cursor-not-allowed';
 const INPUT = 'px-2 py-1 border-2 border-slate-200 rounded-lg font-bold text-sm text-slate-800 focus:border-indigo-500 focus:outline-none';
 
@@ -44,6 +44,12 @@ export const CodesGuideModal = ({ ctx }) => {
     const saveEdit = (c) => {
         const letter = editLetter.trim().toUpperCase();
         const meaning = editMeaning.trim();
+        // يُفحص الاستعمال لحظة الحفظ لا عند الرسم وحده: قد يسجّل مستخدم آخر المعنى والتعديل مفتوح
+        const used = (isCustom(c.id) || isActivated(c.id)) && meaning !== c.meaning ? countCodeUsage(c.meaning) : 0;
+        if (used > 0) {
+            setEditMeaning(c.meaning);
+            return fail(c.id, `لا يُغيَّر المعنى: ${usedText(used)}.`);
+        }
         const err = validateCodeEdit(table, { id: c.id, letter, meaning }, reservedStatuses);
         if (err) return fail(c.id, err);
         if (isCustom(c.id)) {
@@ -119,7 +125,7 @@ export const CodesGuideModal = ({ ctx }) => {
     const NoticeText = ({ id }) => notice && notice.id === id ? <p className="text-xs font-bold text-red-700 mt-1">{notice.text}</p> : null;
 
     const actionBtn = (label, onClick, color, title) => (
-        <button type="button" disabled={!canEditCodes} onClick={onClick} title={title} className={`${BTN} ${canEditCodes ? color + ' cursor-pointer' : BTN_OFF}`}>{label}</button>
+        <button type="button" disabled={!canEditCodes} onClick={onClick} title={title} aria-label={title || undefined} className={`${BTN} ${canEditCodes ? color + ' cursor-pointer' : BTN_OFF}`}>{label}</button>
     );
 
     return (
@@ -134,7 +140,9 @@ export const CodesGuideModal = ({ ctx }) => {
                         </div>
                     </div>
                     <button
+                        type="button"
                         onClick={() => setShowCodesGuide(false)}
+                        aria-label="إغلاق النافذة"
                         className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold text-lg transition cursor-pointer"
                         title="إغلاق النافذة"
                     >
@@ -150,7 +158,7 @@ export const CodesGuideModal = ({ ctx }) => {
 
                 <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50/50">
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
-                        <table className="w-full text-sm">
+                        <table className="w-full min-w-[540px] text-sm">
                             <thead>
                                 <tr className="bg-slate-100 text-slate-800 font-black text-xs">
                                     <th className="px-3 py-2 text-right w-20">الحرف</th>
@@ -186,14 +194,14 @@ export const CodesGuideModal = ({ ctx }) => {
                                                 <td className="px-3 py-2">
                                                     <div className="flex flex-wrap gap-1">
                                                         {editing ? (<>
-                                                            {actionBtn('💾 حفظ', () => saveEdit(c), 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700')}
+                                                            {actionBtn('💾 حفظ', () => saveEdit(c), 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700', `حفظ الرمز ${c.letter}`)}
                                                             <button type="button" onClick={cancelEdit} className={`${BTN} bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer`}>إلغاء</button>
                                                         </>) : (<>
-                                                            {actionBtn('✏️ تعديل', () => startEdit(c), 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800')}
-                                                            {hasOverride && actionBtn('↩️ استعادة الافتراضي', () => restoreDefault(c), 'bg-slate-100 hover:bg-slate-200 text-slate-600')}
-                                                            {!!base && !linked.length && !activated && actionBtn('➕ استعماله حالةً يومية', () => activate(c), 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800')}
-                                                            {activated && actionBtn('إلغاء التفعيل', () => deactivate(c), 'bg-amber-100 hover:bg-amber-200 text-amber-900')}
-                                                            {!linked.length && actionBtn('🗑️ حذف', () => removeCode(c), 'bg-rose-100 hover:bg-rose-200 text-rose-700')}
+                                                            {actionBtn('✏️ تعديل', () => startEdit(c), 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800', `تعديل الرمز ${c.letter} (${c.meaning})`)}
+                                                            {hasOverride && actionBtn('↩️ استعادة الافتراضي', () => restoreDefault(c), 'bg-slate-100 hover:bg-slate-200 text-slate-600', `استعادة الافتراضي للرمز ${c.letter}`)}
+                                                            {!!base && !linked.length && !activated && actionBtn('➕ استعماله حالةً يومية', () => activate(c), 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800', `استعمال الرمز ${c.letter} (${c.meaning}) حالةً يومية`)}
+                                                            {activated && actionBtn('إلغاء التفعيل', () => deactivate(c), 'bg-amber-100 hover:bg-amber-200 text-amber-900', `إلغاء تفعيل الرمز ${c.letter}`)}
+                                                            {!linked.length && actionBtn('🗑️ حذف', () => removeCode(c), 'bg-rose-100 hover:bg-rose-200 text-rose-700', `حذف الرمز ${c.letter} (${c.meaning})`)}
                                                         </>)}
                                                     </div>
                                                 </td>
@@ -217,7 +225,7 @@ export const CodesGuideModal = ({ ctx }) => {
                                     <div key={base.id}>
                                         <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-700">
                                             <span><span className="font-black">{o.letter || base.letter}</span> — {o.meaning || base.meaning}</span>
-                                            {actionBtn('↩️ استعادة', () => restoreRemoved(base), 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700')}
+                                            {actionBtn('↩️ استعادة', () => restoreRemoved(base), 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700', `استعادة الرمز ${o.letter || base.letter}`)}
                                         </div>
                                         <NoticeText id={base.id} />
                                     </div>
@@ -229,8 +237,8 @@ export const CodesGuideModal = ({ ctx }) => {
                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2">
                         <h4 className="text-sm font-black text-slate-800">➕ إضافة رمز</h4>
                         <div className="flex flex-wrap items-center gap-2">
-                            <input value={addLetter} onChange={e => setAddLetter(e.target.value)} disabled={!canEditCodes} placeholder="الحرف" aria-label="حرف الرمز الجديد" className={`${INPUT} w-20 text-center`} />
-                            <input value={addMeaning} onChange={e => setAddMeaning(e.target.value)} disabled={!canEditCodes} placeholder="المعنى" aria-label="معنى الرمز الجديد" className={`${INPUT} flex-1 min-w-[10rem]`} />
+                            <input value={addLetter} onChange={e => setAddLetter(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addCode(); }} disabled={!canEditCodes} placeholder="الحرف" aria-label="حرف الرمز الجديد" className={`${INPUT} w-20 text-center`} />
+                            <input value={addMeaning} onChange={e => setAddMeaning(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addCode(); }} disabled={!canEditCodes} placeholder="المعنى" aria-label="معنى الرمز الجديد" className={`${INPUT} flex-1 min-w-[10rem]`} />
                             {actionBtn('➕ إضافة', addCode, 'bg-indigo-600 hover:bg-indigo-700 text-white')}
                         </div>
                         <NoticeText id="add" />

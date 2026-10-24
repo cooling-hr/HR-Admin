@@ -2333,12 +2333,14 @@ import { buildDatePicker } from '../ui/datePicker';
                     nextHolidays = Array.from(new Set([...(officialHolidays || []), ...pickedHolidays])).sort();
                     appliedAttendanceCount += pickedHolidays.length;
                 }
-                // رموز دليل الرموز المختارة تُلحق بالمضافة لديك (إضافة لا تمحو شيئاً)؛ الحفظ والبث يتولاهما مؤثّر الحفظ
+                // رموز دليل الرموز المختارة تُلحق بالمضافة لديك (إضافة لا تمحو شيئاً)، وتُكتب في الحزمة أدناه
+                // فتُحفظ محلياً في اللحظة نفسها مع المواقف، لا بعد رسالة النجاح (مراجعة Antigravity)
+                let nextCodeEdits;
                 const pickedCodes = attendance.codes.filter(c => isAttendancePicked(c.key)).map(c => c.code);
                 if (pickedCodes.length > 0) {
                     // الحالة قد تصل من السحابة ناقصة الحقول (Firebase يُسقط الفارغ)، فتُنظَّف قبل القراءة
                     const current = normalizeTimeFormCodeEdits(timeFormCodeEdits);
-                    updateTimeFormCodeEdits({ ...current, custom: [...current.custom, ...pickedCodes] });
+                    nextCodeEdits = { ...current, custom: [...current.custom, ...pickedCodes] };
                     appliedAttendanceCount += pickedCodes.length;
                 }
                 // كل ما تغيّر من بيانات الحضور يُحفظ مرة واحدة: مسح أيام الفترات، ثم المواقف والساعات والعطل المختارة
@@ -2346,7 +2348,8 @@ import { buildDatePicker } from '../ui/datePicker';
                     dailyStatusOverrides: nextOverrides || undefined,
                     hourlyLeaveRecords: nextHourly || undefined,
                     overtimeHoursRecords: nextOvertime || undefined,
-                    officialHolidaysList: nextHolidays || undefined
+                    officialHolidaysList: nextHolidays || undefined,
+                    timeFormCodeEdits: nextCodeEdits
                 });
                 attendance.settings.forEach(s => {
                     if (!isAttendancePicked(s.key)) return;
@@ -2365,7 +2368,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 const touchedEmployees = analysis.updated.filter(
                     upd => upd.changes.some(ch => isPicked(upd.jobNumber, ch.field))
                 ).length;
-                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم حذف: ${pickedDeletes.length} موظف\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}\n• الفترات المؤرخة المطبَّقة: ${appliedPeriodCount}\n• المواقف والعطل والإعدادات المطبَّقة: ${appliedAttendanceCount}`);
+                alert(`📊 تم إكمال الدمج والمزامنة بنجاح!\n\n• تم حذف: ${pickedDeletes.length} موظف\n• تم إضافة: ${newEmployees.length} موظف جديد\n• تم تحديث بيانات: ${touchedEmployees} موظف\n• الحقول المطبَّقة: ${appliedFieldCount} حقلاً${selection === null ? '' : ` من أصل ${analysis.updated.reduce((n, u) => n + u.changes.length, 0)}`}\n• الفترات المؤرخة المطبَّقة: ${appliedPeriodCount}\n• المواقف والعطل والرموز والإعدادات المطبَّقة: ${appliedAttendanceCount}`);
             };
 
             // رفع ملف أقدم من حالة السحابة يمحو كل ما حفظه الزملاء بعد تصديره — وحارس الحفظ العادي لا يراه،

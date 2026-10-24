@@ -396,7 +396,7 @@ export const MergeModal = ({ ctx }) => {
                                             <div className="font-bold text-indigo-900">🔤 رموز مضافة في دليل الرموز بالملف وليست لديك — تُضاف ولا يُحذف شيء:</div>
                                             {mergeAttendance.codes.map(c => (
                                                 <label key={c.key} data-setting-key={c.key}
-                                                    className={`inline-flex items-center gap-1.5 cursor-pointer rounded px-1 py-0.5 ml-2 ${mergeAttendanceSelection[c.key] ? 'bg-indigo-50/60' : ''}`}>
+                                                    className={`flex w-full items-center gap-1.5 cursor-pointer rounded px-1 py-1 ${mergeAttendanceSelection[c.key] ? 'bg-indigo-50/60' : ''}`}>
                                                     <input type="checkbox" checked={!!mergeAttendanceSelection[c.key]} onChange={() => toggleMergeAttendance(c.key)}
                                                         className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
                                                     <span>رمز «{c.code.letter}»: {c.code.meaning}</span>
@@ -455,7 +455,7 @@ export const MergeModal = ({ ctx }) => {
                                 <p className="text-slate-500 text-[11px] mt-1 leading-relaxed">
                                     {nothingToDo
                                         ? 'لم تختر شيئاً بعد — أشِّر ما تريد نقله من الملف أعلاه.'
-                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}${mergePeriodCount > 0 ? ` ويطبّق ${mergePeriodCount} فترة مؤرخة` : ''}${mergeAttendanceCount > 0 ? ` ومن المواقف والعطل والإعدادات ${mergeAttendanceCount}` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس. زرّ التطبيق أسفل النافذة.`}
+                                        : `يطبّق الحقول المؤشَّرة أعلاه وحدها${mergeAddCount > 0 ? ` ويضيف ${mergeAddCount} موظفاً` : ''}${mergePeriodCount > 0 ? ` ويطبّق ${mergePeriodCount} فترة مؤرخة` : ''}${mergeAttendanceCount > 0 ? ` ومن المواقف والعطل والرموز والإعدادات ${mergeAttendanceCount}` : ''}. كل حقل لم تؤشّره يبقى على قيمته الحالية بلا مساس. زرّ التطبيق أسفل النافذة.`}
                                 </p>
                             </div>
                         </div>
