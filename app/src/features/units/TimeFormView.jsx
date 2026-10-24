@@ -12,6 +12,10 @@ const CODE_CLASS_BY_CATEGORY = {
 };
 const UNKNOWN_CLASS = 'bg-red-200 text-red-800 ring-2 ring-red-500';
 const CELL = 'border border-slate-300 text-center';
+// حدّ أسفل صفّي كل موظف، فلا تُنسب ساعات موظف إلى رموز الذي يليه عند التمرير
+const ROW_END = 'border-b-2 border-b-slate-500';
+// اسم اليوم بلا «ال» وبحرفين: الأحد والأربعاء كانا يظهران معاً «الأ»
+const shortDayName = (dateStr) => getArabicDayName(dateStr).replace(/^ال/, '').slice(0, 2);
 
 // استمارة ضبط الوقت على الشاشة: صفّان لكل موظف (الرموز ثم الساعات الإضافية)، استمارة الملاك أو العقود
 export const TimeFormView = ({ ctx }) => {
@@ -80,7 +84,7 @@ export const TimeFormView = ({ ctx }) => {
                         <tr className="bg-slate-100 text-slate-800 font-black">
                             <th className={`${CELL} px-2 py-1`}>التسلسل</th>
                             <th className={`${CELL} px-2 py-1`}>الرقم الوظيفي</th>
-                            <th className={`${CELL} px-2 py-1 min-w-[150px]`}>الاسم الثلاثي</th>
+                            <th className={`${CELL} px-2 py-1 min-w-[150px] sticky right-0 z-10 bg-slate-100`}>الاسم الثلاثي</th>
                             <th className={`${CELL} px-2 py-1`}>نوع الحركة</th>
                             {days.map(day => {
                                 const out = day > daysInMonth;
@@ -88,7 +92,7 @@ export const TimeFormView = ({ ctx }) => {
                                 return (
                                     <th key={day} className={`${CELL} px-1 py-1 min-w-[28px] ${out ? 'bg-slate-200' : ''}`}>
                                         <div className="font-mono">{day}</div>
-                                        {!out && <div className="text-[9px] font-bold text-slate-500">{getArabicDayName(dateStr).slice(0, 3)}</div>}
+                                        {!out && <div className="text-[9px] font-bold text-slate-500">{shortDayName(dateStr)}</div>}
                                     </th>
                                 );
                             })}
@@ -99,14 +103,14 @@ export const TimeFormView = ({ ctx }) => {
                         {rows.map((row, idx) => (
                             <React.Fragment key={row.employee.id || idx}>
                                 <tr>
-                                    <td rowSpan={2} className={`${CELL} px-2 font-mono`}>{idx + 1}</td>
-                                    <td rowSpan={2} className={`${CELL} px-2 font-mono`}>{row.employee.jobNumber}</td>
-                                    <td rowSpan={2} className={`${CELL} px-2 text-right font-bold whitespace-nowrap`}>{getTripleName(row.employee.name)}</td>
-                                    <td rowSpan={2} className={`${CELL} px-2`}></td>
+                                    <td rowSpan={2} className={`${CELL} ${ROW_END} px-2 font-mono`}>{idx + 1}</td>
+                                    <td rowSpan={2} className={`${CELL} ${ROW_END} px-2 font-mono`}>{row.employee.jobNumber}</td>
+                                    <td rowSpan={2} className={`${CELL} ${ROW_END} px-2 text-right font-bold whitespace-nowrap sticky right-0 z-10 bg-white`}>{getTripleName(row.employee.name)}</td>
+                                    <td rowSpan={2} className={`${CELL} ${ROW_END} px-2`}></td>
                                     {row.cells.map(cell => {
                                         if (!cell.inMonth) return <td key={cell.day} className={`${CELL} bg-slate-200`}></td>;
                                         if (cell.outOfPeriod) return <td key={cell.day} title="خارج الفترة المختارة" className={`${CELL} bg-slate-100 text-slate-400`}>–</td>;
-                                        if (cell.isFuture) return <td key={cell.day} className={`${CELL} text-slate-300`}>·</td>;
+                                        if (cell.isFuture) return <td key={cell.day} title="يوم قادم" className={`${CELL} text-slate-400 font-black`}>·</td>;
                                         if (cell.code === '') return <td key={cell.day} title={cell.status} className={CELL}></td>;
                                         const cls = cell.code === UNKNOWN_CODE ? UNKNOWN_CLASS : CODE_CLASS_BY_CATEGORY[dailyStatusCategory(cell.status)];
                                         return (
@@ -115,14 +119,15 @@ export const TimeFormView = ({ ctx }) => {
                                             </td>
                                         );
                                     })}
-                                    <td rowSpan={2} className={`${CELL} px-2 font-mono font-black`}>{row.totalHours || ''}</td>
+                                    <td rowSpan={2} className={`${CELL} ${ROW_END} px-2 font-mono font-black`}>{row.totalHours || ''}</td>
                                 </tr>
                                 <tr>
-                                    {row.cells.map(cell => (
-                                        cell.inMonth
-                                            ? <td key={cell.day} className={`${CELL} font-mono text-[10px]`} style={{ backgroundColor: '#ccffff', color: '#0f172a' }}>{cell.hours ?? ''}</td>
-                                            : <td key={cell.day} className={`${CELL} bg-slate-200`}></td>
-                                    ))}
+                                    {row.cells.map(cell => {
+                                        if (!cell.inMonth) return <td key={cell.day} className={`${CELL} ${ROW_END} bg-slate-200`}></td>;
+                                        // اليوم خارج الفترة رمادي في الصفّين، لا سماوي كيوم محسوب
+                                        if (cell.outOfPeriod) return <td key={cell.day} className={`${CELL} ${ROW_END} bg-slate-100`}></td>;
+                                        return <td key={cell.day} className={`${CELL} ${ROW_END} font-mono text-[10px]`} style={{ backgroundColor: '#ccffff', color: '#0f172a' }}>{cell.hours ?? ''}</td>;
+                                    })}
                                 </tr>
                             </React.Fragment>
                         ))}
