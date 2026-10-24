@@ -1,5 +1,6 @@
 import React from 'react';
 import { PageHeader } from '../../ui/PageHeader';
+import { TimeFormView } from './TimeFormView';
 import { ARABIC_MONTH_NAMES, getArabicDayName, getDaysBetweenDates, localDateStr } from '../../core/dates';
 import { getThreeName, getTripleName, matchesStaffSearch } from '../../core/arabic';
 import { getMissingFields } from '../../domain/employees';
@@ -88,7 +89,7 @@ const ShiftPills = ({ shifts }) => (<>
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { showShiftEditor, setShowShiftEditor, DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
+    const { showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView } = ctx;
     const searchActive = !!periodSearchQuery.trim();
     // اليوم بالتوقيت المحلي (لا toISOString) لتمييز منقّل الشريط حين يكون التاريخ غير اليوم
     const todayStr = localDateStr();
@@ -723,19 +724,19 @@ export const UnitsScreen = ({ ctx }) => {
                                 <span>سجل حضور وإجازات المنتسبين للفترة من ({periodStartDate}) إلى ({periodEndDate})</span>
                             </h3>
                             <div className="flex items-center gap-2">
-                                {/* مبدّل العرض: إجمالي لكل موظف، أو مصفوفة يوماً بيوم للمجموعة كلها */}
+                                {/* مبدّل العرض: إجمالي لكل موظف، أو استمارة ضبط الوقت لشهر كامل */}
                                 <div className="flex bg-white border border-slate-300 rounded-xl overflow-hidden shadow-sm no-print">
                                     <button
-                                        onClick={() => setPeriodShowMatrix(false)}
-                                        className={`px-3 py-1.5 text-[11px] font-black transition cursor-pointer ${!periodShowMatrix ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                                        onClick={() => setPeriodView('summary')}
+                                        className={`px-3 py-1.5 text-[11px] font-black transition cursor-pointer ${periodView === 'summary' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                                     >
                                         📊 إجمالي
                                     </button>
                                     <button
-                                        onClick={() => setPeriodShowMatrix(true)}
-                                        className={`px-3 py-1.5 text-[11px] font-black transition cursor-pointer ${periodShowMatrix ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                                        onClick={showTimeForm}
+                                        className={`px-3 py-1.5 text-[11px] font-black transition cursor-pointer ${periodView === 'timeForm' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                                     >
-                                        📅 مصفوفة الأيام
+                                        📋 استمارة ضبط الوقت
                                     </button>
                                 </div>
                                 <button
@@ -750,83 +751,14 @@ export const UnitsScreen = ({ ctx }) => {
                                 >
                                     🔄 توزيع الوجبات
                                 </button>
-                                {/* الطباعة هنا لا في زر التصدير العام: ذاك يُخرج مستند الإجماليات، وهذا يُخرج المصفوفة */}
-                                {periodShowMatrix && (
-                                    <button
-                                        onClick={printDayMatrix}
-                                        disabled={periodReportData.employees.length === 0}
-                                        className={`px-3 py-1.5 rounded-xl text-[11px] font-black shadow-sm transition no-print flex items-center gap-1 ${
-                                            periodReportData.employees.length === 0
-                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95'
-                                        }`}
-                                        title="طباعة المصفوفة بمفتاح الرموز على ورق أفقي"
-                                    >
-                                        🖨️ طباعة المصفوفة
-                                    </button>
-                                )}
                                 <span className="bg-indigo-100 text-indigo-800 font-extrabold px-3 py-1 rounded-full text-xs">
                                     {periodReportData.employees.length} منتسب
                                 </span>
                             </div>
                         </div>
 
-                        {periodShowMatrix ? (
-                            /* مصفوفة الأيام: صف لكل موظف، عمود لكل يوم — كشف الحضور بشكله الرسمي المعتاد */
-                            <div>
-                                <div className="px-4 py-2.5 bg-white border-b border-slate-200 flex flex-wrap gap-x-3 gap-y-1.5 items-center">
-                                    <span className="text-[11px] font-black text-slate-500">مفتاح الرموز:</span>
-                                    {DAY_MATRIX_LEGEND.map(l => (
-                                        <span key={l.code} className="flex items-center gap-1">
-                                            <span className={`inline-flex items-center justify-center w-6 h-5 rounded font-black text-[10px] ${l.cls}`}>{l.code}</span>
-                                            <span className="text-[10px] font-bold text-slate-500">{l.label}</span>
-                                        </span>
-                                    ))}
-                                </div>
-                                <div className="overflow-x-auto w-full">
-                                    <table className="w-full text-right border-collapse text-xs">
-                                        <thead>
-                                            <tr className="bg-slate-100 text-slate-800 border-b border-slate-200 font-black">
-                                                <th className="px-2 py-2 text-center w-8 sticky right-0 bg-slate-100 z-10">ت</th>
-                                                <th className="px-3 py-2 text-right sticky right-8 bg-slate-100 z-10 min-w-[150px]">الاسم الكامل</th>
-                                                {periodReportData.datesList.map(d => {
-                                                    const dayNum = d.split('-')[2];
-                                                    return (
-                                                        <th key={d} className="px-1 py-2 text-center min-w-[34px] border-r border-slate-200" title={`${d} — ${getArabicDayName(d)}`}>
-                                                            <div className="font-mono font-black text-[11px] text-slate-700">{dayNum}</div>
-                                                            <div className="text-[9px] font-bold text-slate-400">{getArabicDayName(d).slice(0, 3)}</div>
-                                                        </th>
-                                                    );
-                                                })}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {periodReportRows.map((item, idx) => (
-                                                <tr key={item.employee.id || idx} className="border-b border-slate-100 hover:bg-indigo-50/30">
-                                                    <td className="px-2 py-1.5 text-center font-mono text-slate-400 text-[11px] sticky right-0 bg-white z-10">{idx + 1}</td>
-                                                    <td className="px-3 py-1.5 text-right font-bold text-slate-800 text-[11px] sticky right-8 bg-white z-10 whitespace-nowrap">
-                                                        {item.employee.name}
-                                                        <span className="block text-[9px] font-mono font-normal text-slate-400">{item.employee.jobNumber}</span>
-                                                    </td>
-                                                    {item.dailyLog.map(dayItem => {
-                                                        const cell = getDayMatrixCell(dayItem.status, dayItem.isFuture);
-                                                        return (
-                                                            <td key={dayItem.dateStr} className="px-0.5 py-1.5 text-center border-r border-slate-100" title={`${dayItem.dateStr} — ${dayItem.dayName}: ${cell.label}`}>
-                                                                <span className={`inline-flex items-center justify-center w-7 h-6 rounded font-black text-[10px] ${cell.cls}`}>
-                                                                    {cell.code}
-                                                                </span>
-                                                            </td>
-                                                        );
-                                                    })}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {periodReportData.employees.length === 0 && (
-                                    <div className="p-8 text-center text-slate-400 font-bold text-sm">لا يوجد منتسبون ضمن الفلاتر المحددة</div>
-                                )}
-                            </div>
+                        {periodView === 'timeForm' ? (
+                            <TimeFormView ctx={{ timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth }} />
                         ) : (
                         <div className="overflow-x-auto w-full">
                             <table className="w-full text-right border-collapse text-xs md:text-sm">

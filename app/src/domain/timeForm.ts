@@ -132,3 +132,8 @@ export const timeFormCodeFor = (day: TimeFormDayInput, table: ResolvedCodeTable)
     if (id === null) return UNKNOWN_CODE;
     return table.byId[id] ? table.byId[id].letter : UNKNOWN_CODE;
 };
+
+// عنوان الاستمارة كما في الملف الرسمي (بالألف في «أستمارة»)
+export const TIME_FORM_TITLE = 'أستمارة ضبط الوقت شعبة تبريد المركز';
+export const TIME_FORM_CONTRACTS_TITLE = 'أستمارة ضبط الوقت شعبة تبريد المركز — موظفو العقود';
+export const timeFormTitle = (kind: string): string => kind === 'contracts' ? TIME_FORM_CONTRACTS_TITLE : TIME_FORM_TITLE;

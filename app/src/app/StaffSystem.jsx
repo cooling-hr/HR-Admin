@@ -438,7 +438,9 @@ import { buildDatePicker } from '../ui/datePicker';
             });
             const [periodUnitFilter, setPeriodUnitFilter] = useState('all');
             const [periodWorkTypeFilter, setPeriodWorkTypeFilter] = useState('all');
-            const [periodShowMatrix, setPeriodShowMatrix] = useState(false);
+            // عرض الفترات: إجمالي أو استمارة ضبط الوقت، وأي استمارة (الملاك أو العقود)
+            const [periodView, setPeriodView] = useState('summary');
+            const [timeFormKind, setTimeFormKind] = useState('staff');
             const [showSquadSchedule, setShowSquadSchedule] = useState(false);
             const [periodSearchQuery, setPeriodSearchQuery] = useState('');
             const [expandedEmpPeriod, setExpandedEmpPeriod] = useState(null);
@@ -1738,13 +1740,13 @@ import { buildDatePicker } from '../ui/datePicker';
                         const dateStr = `${ym}-${String(day).padStart(2, '0')}`;
                         const log = day <= monthDays ? logByDate[dateStr] : null;
                         if (!log) {
-                            cells.push({ day, code: '', hours: null, inMonth: day <= monthDays, isFuture: false });
+                            cells.push({ day, code: '', status: '', hours: null, inMonth: day <= monthDays, outOfPeriod: day <= monthDays, isFuture: false });
                             continue;
                         }
                         const code = timeFormCodeFor({ status: log.status, dateStr, fromPeriod: log.fromPeriod, isShift, naturalStatus: log.naturalStatus }, table);
                         const hours = log.status.includes('إضافي') ? log.otRecordedHours : null;
                         if (hours) totalHours += hours;
-                        cells.push({ day, code, hours, inMonth: true, isFuture: log.isFuture });
+                        cells.push({ day, code, status: log.status, hours, inMonth: true, outOfPeriod: false, isFuture: log.isFuture });
                     }
                     return { employee: item.employee, cells, totalHours };
                 };
@@ -1759,12 +1761,33 @@ import { buildDatePicker } from '../ui/datePicker';
 
                 const staffForm = buildForm(periodReportData.employees.filter(i => !isContractEmployee(i.employee)));
                 const contractForm = buildForm(periodReportData.employees.filter(i => isContractEmployee(i.employee)));
+                // هل تغطي الفترة المختارة كل أيام الشهر؟ وإلا عُلِّمت أيامه الباقية outOfPeriod
+                const periodDates = new Set(periodReportData.datesList);
+                let coversMonth = true;
+                for (let day = 1; day <= monthDays; day++) {
+                    if (!periodDates.has(`${ym}-${String(day).padStart(2, '0')}`)) { coversMonth = false; break; }
+                }
                 return {
-                    year, month, daysInMonth: monthDays,
+                    year, month, ym, daysInMonth: monthDays, coversMonth,
                     staffRows: staffForm.rows, contractRows: contractForm.rows,
                     warnings: { staff: staffForm.warning, contracts: contractForm.warning },
                 };
             }, [periodReportData, periodStartDate]);
+
+            // يضبط الفترة على الشهر كاملاً (من أول يوم إلى آخره)
+            const selectTimeFormMonth = (ym) => {
+                if (!/^\d{4}-\d{2}$/.test(ym)) return;
+                setPeriodStartDate(`${ym}-01`);
+                setPeriodEndDate(`${ym}-${String(daysInMonth(ym)).padStart(2, '0')}`);
+            };
+
+            // فتح الاستمارة: إن لم تكن الفترة شهراً كاملاً من أوله انتقلت إلى شهر بدايتها
+            const showTimeForm = () => {
+                setPeriodView('timeForm');
+                if (!timeFormData.coversMonth || !(periodStartDate || '').endsWith('-01')) {
+                    selectTimeFormMonth((periodStartDate || localDateStr()).slice(0, 7));
+                }
+            };
 
             // ترميز خانة اليوم في مصفوفة الموقف: رمز مختصر ولون لكل حالة يومية ممكنة.
             // الحالات مأخوذة من getEmployeeDailyStatus وأنواع الفترات السبعة والتعديلات اليدوية —
@@ -4902,7 +4925,7 @@ return (
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
                             <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, setMealAuthorizations, staff }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ showShiftEditor, setShowShiftEditor, DAY_MATRIX_LEGEND, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getDayMatrixCell, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodShowMatrix, periodStartDate, periodUnitFilter, periodWorkTypeFilter, printDayMatrix, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodShowMatrix, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
+                            <UnitsScreen ctx={{ showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
