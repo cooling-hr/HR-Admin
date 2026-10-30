@@ -15,7 +15,6 @@ const CELL = 'border border-slate-300 text-center';
 // حدّ أسفل صفّي كل موظف، فلا تُنسب ساعات موظف إلى رموز الذي يليه عند التمرير
 const ROW_END = 'border-b-2 border-b-slate-500';
 // اسم اليوم بلا «ال» وبحرفين: الأحد والأربعاء كانا يظهران معاً «الأ»
-const shortDayName = (dateStr) => getArabicDayName(dateStr).replace(/^ال/, '').slice(0, 2);
 // حدود الخانة الثابتة في border-collapse يرسمها الجدول فلا تتحرك معها عند التمرير، فيُرسم خطّها
 // الأيسر (جهة الأيام) والسفلي بظلّ داخلي يتحرك معها
 const STICKY_HEAD_EDGE = 'shadow-[inset_1px_0_0_0_#94a3b8]';
@@ -116,7 +115,6 @@ export const TimeFormView = ({ ctx }) => {
                                 return (
                                     <th key={day} title={out ? undefined : getArabicDayName(dateStr)} className={`${CELL} px-1 py-1 min-w-[28px] ${out ? 'bg-slate-200' : ''}`}>
                                         <div className="font-mono">{day}</div>
-                                        {!out && <div className="text-[9px] font-bold text-slate-500">{shortDayName(dateStr)}</div>}
                                     </th>
                                 );
                             })}

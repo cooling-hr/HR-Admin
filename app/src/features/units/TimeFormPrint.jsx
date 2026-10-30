@@ -1,6 +1,6 @@
 import React from 'react';
 import { timeFormTitle } from '../../domain/timeForm';
-import { getArabicMonthLabel, getArabicDayName } from '../../core/dates';
+import { getArabicMonthLabel } from '../../core/dates';
 import { getTripleName } from '../../core/arabic';
 
 // قالب طباعة استمارة ضبط الوقت (الملاك أو العقود)، يظهر أثناء الطباعة فقط. الحالة والمنطق في StaffSystem؛
@@ -8,7 +8,6 @@ import { getTripleName } from '../../core/arabic';
 // ورق A4 أفقي بهامش 8 مم (العرض المتاح نحو 281 مم): الأعمدة الخمسة الثابتة نحو 85 مم، والأيام الـ31 تتقاسم الباقي.
 // الاستمارة وثيقة رسمية فلا يُطبع عليها توقيع المُعدّ ولا مفتاح الرموز.
 const OUT_BG = '#d9d9d9';
-const shortDayName = (dateStr) => getArabicDayName(dateStr).replace(/^ال/, '').slice(0, 2);
 
 export const TimeFormPrint = ({ ctx }) => {
     const { timeFormData, timeFormKind } = ctx;
@@ -40,11 +39,9 @@ export const TimeFormPrint = ({ ctx }) => {
                     <th>نوع الحركة</th>
                     {days.map(day => {
                         const out = day > daysInMonth;
-                        const dateStr = `${ym}-${String(day).padStart(2, '0')}`;
                         return (
                             <th key={day} className={out ? 'tf-out' : undefined} style={out ? { background: OUT_BG } : undefined}>
                                 <div>{day}</div>
-                                {!out && <div style={{ fontSize: '6pt', fontWeight: 700, lineHeight: 1 }}>{shortDayName(dateStr)}</div>}
                             </th>
                         );
                     })}

@@ -2506,7 +2506,7 @@ import { buildDatePicker } from '../ui/datePicker';
 
                     ws.getRow(3).height = 34;
                     ['التسلسل', 'الرقم الوظيفي', 'الاسم الثلاثي', 'نوع الحركة',
-                        ...days.map(day => day > monthDays ? String(day) : `${day}\n${getArabicDayName(`${ym}-${String(day).padStart(2, '0')}`).replace(/^ال/, '').slice(0, 2)}`),
+                        ...days.map(day => String(day)),
                         'مجموع الساعات'].forEach((v, i) => {
                         const cell = ws.getCell(3, i + 1);
                         cell.value = v;
