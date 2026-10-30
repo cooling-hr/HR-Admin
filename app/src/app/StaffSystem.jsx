@@ -1330,28 +1330,32 @@ import { buildDatePicker } from '../ui/datePicker';
                 }
 
                 // استراحة ذوي الاحتياجات الخاصة أيامها ثابتة غالباً (طلب أسامة 2026-10-30): عند اختيارها يُسأل
-                // عن تثبيت يومها في بقية أيام الشهر، فتُكتب مواقف يومية عادية تظهر في الاستمارة والعدّادات كاليدوية.
+                // عن تثبيتها على يوم الأسبوع نفسه في كل الشهر، فتُكتب مواقف يومية عادية تظهر في الاستمارة والعدّادات كاليدوية.
                 // لا تُكتب فوق موقف مُدخل، ولا في يوم لا يداوم فيه أصلاً (عطلة، نهاية أسبوع، فترة مؤرَّخة، استراحة مناوبة).
-                // وإن غيّر الموظف يومه يُعاد السؤال، ويُلغى تثبيت اليوم القديم في الأيام التالية.
+                // وإن غيّر الموظف يومه يُعاد السؤال: يُلغى اليوم القديم في الأيام التالية، ولا يُمسّ ما مضى من الشهر،
+                // فالأيام السابقة لا تُملأ عندئذ لأنها كانت على اليوم القديم.
                 const SPECIAL_NEEDS_REST = 'استراحة ذوي الاحتياجات الخاصة';
                 if (emp && status === SPECIAL_NEEDS_REST && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
                     const monthStr = dateStr.slice(0, 7);
                     const weekdayOf = (d) => { const p = d.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).getDay(); };
                     const weekday = weekdayOf(dateStr);
+                    const dayName = getArabicDayName(dateStr);
                     const ownOverride = (d) => dailyStatusOverrides[d] && dailyStatusOverrides[d][empId];
-                    const laterDays = [];
-                    for (let n = Number(dateStr.slice(8)) + 1; n <= daysInMonth(monthStr); n++) laterDays.push(monthStr + '-' + String(n).padStart(2, '0'));
-                    const toFix = laterDays.filter(d => weekdayOf(d) === weekday && !ownOverride(d)
+                    const monthDays = [];
+                    for (let n = 1; n <= daysInMonth(monthStr); n++) monthDays.push(monthStr + '-' + String(n).padStart(2, '0'));
+                    const otherDays = monthDays.filter(d => d !== dateStr);
+                    const changedDay = otherDays.some(d => weekdayOf(d) !== weekday && ownOverride(d) === SPECIAL_NEEDS_REST);
+                    const toFix = otherDays.filter(d => weekdayOf(d) === weekday && (d > dateStr || !changedDay) && !ownOverride(d)
                         && dailyStatusCategory(getEmployeeDailyStatus(emp, d, true)) === 'present');
-                    const toUnfix = laterDays.filter(d => weekdayOf(d) !== weekday && ownOverride(d) === SPECIAL_NEEDS_REST);
+                    const toUnfix = otherDays.filter(d => d > dateStr && weekdayOf(d) !== weekday && ownOverride(d) === SPECIAL_NEEDS_REST);
                     if (toFix.length > 0 || toUnfix.length > 0) {
                         const NL = String.fromCharCode(10);
                         const oldDayNames = [...new Set(toUnfix.map(getArabicDayName))].join(' و');
                         const fix = confirm('♿ تثبيت استراحة ذوي الاحتياجات الخاصة:' + NL + NL +
-                            'هل تريد تثبيت يوم (' + getArabicDayName(dateStr) + ') استراحةً للمنتسب (' + emp.name + ') في بقية أيام الشهر؟' + NL +
+                            'هل تريد تثبيت استراحة الموظف (' + emp.name + ') كل يوم ' + dayName + ' في هذا الشهر؟' + NL +
                             (toFix.length > 0 ? 'الأيام: ' + toFix.join('، ') + NL : '') +
-                            (toUnfix.length > 0 ? NL + 'ويُلغى تثبيت يوم (' + oldDayNames + ') في: ' + toUnfix.join('، ') + NL : '') + NL +
-                            '• [موافق / OK]: تثبيت اليوم في بقية الشهر.' + NL +
+                            (toUnfix.length > 0 ? NL + 'ويُلغى تثبيت يوم ' + oldDayNames + ' في: ' + toUnfix.join('، ') + NL : '') + NL +
+                            '• [موافق / OK]: تثبيت الاستراحة كل يوم ' + dayName + ' في هذا الشهر.' + NL +
                             '• [إلغاء / Cancel]: استراحة هذا اليوم وحده.');
                         if (fix) {
                             const setDays = [dateStr, ...toFix];
