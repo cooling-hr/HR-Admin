@@ -1296,6 +1296,39 @@ import { buildDatePicker } from '../ui/datePicker';
                     } catch(e) {}
                 }
 
+                // حضور في يوم يقع داخل غياب أو سحب يد: يُسأل عن المباشرة (طلب أسامة 2026-10-30).
+                // «نعم» تُنهي الفترة في اليوم السابق للمباشرة، و«لا» حضور هذا اليوم وحده والفترة مستمرة.
+                // لا إغلاق صامت: قد يحضر يوماً ويبقى غائباً. إنهاء الفترة تعديل على الملاك، فيحتاج صلاحيته.
+                let returnStaff = null;
+                const openAbsence = (emp && dailyStatusCategory(status) === 'present' && canEdit('staffMaster'))
+                    ? periodsOf(emp).find(p => p && OPEN_ENDED_PERIOD_TYPES.includes(p.type) && p.from && p.from <= dateStr && (!p.to || p.to >= dateStr))
+                    : null;
+                if (openAbsence) {
+                    const dayBefore = localDateStr(new Date(dateStr).getTime() - 86400000);
+                    const startsToday = openAbsence.from >= dateStr;
+                    const NL = String.fromCharCode(10);
+                    const resumed = confirm('✅ تأكيد المباشرة:' + NL + NL +
+                        'المنتسب (' + emp.name + ') في (' + openAbsence.type + ') منذ ' + openAbsence.from + (openAbsence.to ? ' إلى ' + openAbsence.to : '') + '.' + NL + NL +
+                        'هل باشر بالعمل في ' + dateStr + '؟' + NL + NL +
+                        (startsToday
+                            ? '• [موافق / OK]: يُحذف (' + openAbsence.type + ') المسجَّل من هذا اليوم ويُسجَّل حضوره.'
+                            : '• [موافق / OK]: ينتهي (' + openAbsence.type + ') في ' + dayBefore + ' ويُسجَّل حضوره.') + NL +
+                        '• [إلغاء / Cancel]: حضور هذا اليوم وحده، ويبقى (' + openAbsence.type + ') مستمراً.');
+                    if (resumed) {
+                        if (startsToday) updateTombstones({ addPeriods: [periodIdentityOf(openAbsence)] });
+                        const rest = startsToday
+                            ? periodsOf(emp).filter(x => x !== openAbsence)
+                            : periodsOf(emp).map(x => x === openAbsence ? { ...x, to: dayBefore, confirmedReturn: true } : x);
+                        // الحالة القديمة تتبع فترة اليوم بعد الإنهاء، كما في حذف الفترة من السجل
+                        const activeNow = getActivePeriod({ ...emp, statusPeriods: rest }, localDateStr());
+                        returnStaff = staff.map(s => s.id === emp.id ? { ...s, statusPeriods: rest, status: (activeNow && !activeNow.legacy) ? activeNow.type : 'نشط' } : s);
+                        setStaff(returnStaff);
+                        safeStorage.setItem('staffData', JSON.stringify(returnStaff));
+                        pushDataToCloud(buildCloudBundle({ staffData: returnStaff }));
+                        logAuditEvent('confirm_return:' + openAbsence.type + ':' + (emp.jobNumber || emp.id), currentUserName);
+                    }
+                }
+
                 // سجلات الساعات بعد تعديلها هنا، للبثّ المؤجَّل أدناه — قيم الإغلاق قبل الحفظ
                 let freshRecords = {};
                 if (status === 'default') {
@@ -1339,7 +1372,8 @@ import { buildDatePicker } from '../ui/datePicker';
                     } catch(e) {}
                 }
 
-                commitDailyStatusOverride(empId, dateStr, status, freshRecords);
+                // الملاك بعد إنهاء الفترة يرافق البثّ: بثّ المغلَّف من staff القديم كان سيعيدها مفتوحة
+                commitDailyStatusOverride(empId, dateStr, status, returnStaff ? { staffData: returnStaff, ...freshRecords } : freshRecords);
             };
 
             const confirmHourlyLeave = () => {
