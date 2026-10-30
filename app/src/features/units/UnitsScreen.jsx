@@ -8,40 +8,31 @@ import { isLongOrMaternityLeave } from '../../domain/periods';
 import { resolveCodeTable } from '../../domain/timeForm';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
 
-// خيارات قائمة الموقف اليومي مرتّبة بتكرارها كما ذكرها أسامة (2026-10-20). الأمومة والطويلة ليستا
-// هنا عمداً: تُسجَّلان فترة مؤرَّخة، ويختفي صاحبها من قائمة اليوم
+// خيارات قائمة الموقف اليومي مرتّبة بتكرارها كما ذكرها أسامة (2026-10-20). كل الحالات المؤرَّخة (الدورة
+// والإيفادان والإجازة خارج العراق وبدون راتب والغياب وسحب اليد، والأمومة والطويلة) ليست هنا عمداً:
+// تُسجَّل فترة من زر الحالة في تبويب الملاك (قرار أسامة 2026-10-30). الاعتيادية والمرضية تبقيان يوميتين برمز L
 export const DAILY_STATUS_GROUPS = [
     { label: 'الأكثر تكراراً', options: [
         { value: 'إجازة اعتيادية', label: '🏖️ إجازة اعتيادية', className: 'bg-white text-rose-700 font-bold' },
         { value: 'إجازة زمنية', label: '⏰ إجازة زمنية', className: 'bg-white text-amber-700 font-bold' },
         { value: 'ورقة عمل', label: '📝 ورقة عمل', className: 'bg-white text-emerald-700 font-bold' },
         { value: 'إجازة مرضية', label: '🏥 إجازة مرضية', className: 'bg-white text-rose-700 font-bold' },
-        { value: 'في دورة', label: '🎓 في دورة', className: 'bg-white text-indigo-700 font-bold' },
-    ] },
-    { label: 'أقل تكراراً', options: [
-        { value: 'غياب', label: '❌ غياب', className: 'bg-white text-red-700 font-bold' },
-        { value: 'إجازة بدون راتب', label: '💸 إجازة بدون راتب', className: 'bg-white text-orange-800 font-bold' },
     ] },
     { label: 'باقي الحالات', options: [
         { value: 'دوام صباحي', label: '🟢 دوام صباحي (حضور فعلي)', className: 'bg-white text-blue-700 font-bold' },
         { value: 'دوام إضافي', label: '⚡ دوام إضافي', className: 'bg-white text-emerald-800 font-bold' },
-        { value: 'إجازة خارج العراق', label: '🌍 إجازة خارج العراق', className: 'bg-white text-cyan-800 font-bold' },
-        { value: 'إيفاد داخل العراق', label: '🇮🇶 إيفاد داخل العراق', className: 'bg-white text-purple-700 font-bold' },
-        { value: 'إيفاد خارج العراق', label: '🌐 إيفاد خارج العراق', className: 'bg-white text-indigo-900 font-bold' },
         { value: 'مكلف بواجب', label: '🛠️ مكلف بواجب', className: 'bg-white text-sky-700 font-bold' },
         { value: 'تعذر حضور', label: '🚧 تعذر حضور', className: 'bg-white text-amber-800 font-bold' },
         { value: 'استراحة ذوي الاحتياجات الخاصة', label: '♿ استراحة ذوي الاحتياجات الخاصة', className: 'bg-white text-teal-800 font-bold' },
-        { value: 'سحب يد', label: '✋ سحب يد', className: 'bg-white text-red-700 font-bold' },
     ] },
 ];
 
-// أزرار سريعة تحت القائمة للحالات الأكثر تكراراً (الإضافي سادسها بطلب أسامة 2026-10-30)
+// أزرار سريعة تحت القائمة للحالات اليومية الأكثر تكراراً (الإضافي بطلب أسامة 2026-10-30)
 const QUICK_DAILY_STATUSES = [
     { value: 'إجازة اعتيادية', label: '🏖️ اعتيادية' },
     { value: 'إجازة زمنية', label: '⏰ زمنية' },
     { value: 'ورقة عمل', label: '📝 ورقة عمل' },
     { value: 'إجازة مرضية', label: '🏥 مرضية' },
-    { value: 'في دورة', label: '🎓 دورة' },
     { value: 'دوام إضافي', label: '⚡ إضافي' },
 ];
 
@@ -95,6 +86,7 @@ export const UnitsScreen = ({ ctx }) => {
     // الرموز المضافة من دليل الرموز (والرسمية المفعَّلة) خيارات في مجموعة «رموز أخرى»، تُحسب مرة واحدة لكل الموظفين
     const extraStatusOptions = Object.values(resolveCodeTable(timeFormCodeEdits).extraByMeaning).map(c => ({ value: c.meaning, label: '🔤 ' + c.meaning + ' (' + c.letter + ')', className: 'bg-white text-slate-700 font-bold' }));
     const statusGroups = [...DAILY_STATUS_GROUPS, ...(extraStatusOptions.length ? [{ label: 'رموز أخرى', options: extraStatusOptions }] : [])];
+    const knownStatusValues = new Set(statusGroups.flatMap(g => g.options.map(o => o.value)));
     const searchActive = !!periodSearchQuery.trim();
     // اليوم بالتوقيت المحلي (لا toISOString) لتمييز منقّل الشريط حين يكون التاريخ غير اليوم
     const todayStr = localDateStr();
@@ -538,6 +530,9 @@ export const UnitsScreen = ({ ctx }) => {
                                                                     <option value="default" className="bg-white text-slate-800 font-bold">
                                                                         ⚙️ الافتراضي ({getEmployeeDefaultNaturalStatus(emp, dailyReportDate)})
                                                                     </option>
+                                                                    {isOverride && !knownStatusValues.has(selectValue) && (
+                                                                        <option value={selectValue} className="bg-white text-slate-800 font-bold">{selectValue}</option>
+                                                                    )}
                                                                     {statusGroups.map(group => (
                                                                         <optgroup key={group.label} label={group.label} className="bg-white text-slate-500">
                                                                             {group.options.map(opt => (
