@@ -875,6 +875,17 @@ import { buildDatePicker } from '../ui/datePicker';
                             const daysLeft = Math.round((new Date(p.to) - new Date(today)) / 86400000);
                             endingSoon.push({ emp, period: p, daysLeft });
                         } else if (p.to < today) {
+                            // لا يُسأل عن مباشرة الصباحي إلا بعد أن يمضي أول يوم دوام يلي الانتهاء (لا في الجمعة
+                            // والسبت والعطل الرسمية)؛ وإلا كان الجواب تخميناً (قرار أسامة 2026-10-30)
+                            if (emp.workType !== 'مناوب') {
+                                let firstWork = p.to;
+                                for (let i = 0; i < 31; i++) {
+                                    firstWork = localDateStr(new Date(firstWork).getTime() + 86400000);
+                                    const dow = new Date(firstWork + 'T00:00:00').getDay();
+                                    if (dow !== 5 && dow !== 6 && !officialHolidays.includes(firstWork)) break;
+                                }
+                                if (firstWork >= today) return;
+                            }
                             endedUnconfirmed.push({ emp, period: p });
                         }
                     });
@@ -882,7 +893,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 endedUnconfirmed.sort((a, b) => (a.period.to < b.period.to ? -1 : 1));
                 endingSoon.sort((a, b) => a.daysLeft - b.daysLeft);
                 return { endingSoon, endedUnconfirmed };
-            }, [staff]);
+            }, [staff, officialHolidays]);
 
             const [waterMonth, setWaterMonth] = useState(() => localDateStr().slice(0, 7));
 
