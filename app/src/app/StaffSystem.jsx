@@ -923,18 +923,28 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (!pendingReturnPrompt) return;
                 const { emp, period } = pendingReturnPrompt;
                 const dayAfter = localDateStr(new Date(period.to).getTime() + 86400000);
+                // غياب «لا» يبدأ للصباحي من أول يوم دوام يلي الانتهاء لا من الجمعة أو العطلة (قرار أسامة 2026-10-30)؛
+                // والمناوب من اليوم التالي كما كان
+                let absenceFrom = dayAfter;
+                if (emp.workType !== 'مناوب') {
+                    for (let i = 0; i < 31; i++) {
+                        const dow = new Date(absenceFrom + 'T00:00:00').getDay();
+                        if (dow !== 5 && dow !== 6 && !officialHolidays.includes(absenceFrom)) break;
+                        absenceFrom = localDateStr(new Date(absenceFrom).getTime() + 86400000);
+                    }
+                }
                 // «لا» تفتح غياباً من اليوم التالي، لكن يجب ألا يتداخل مع فترة لاحقة مسجَّلة بالفعل —
                 // وإلا يُكتب مباشرة عبر setStaff متجاوزاً حارس التداخل في saveEmployeeEdit، فيصبح
                 // السجل محظوراً على أي حفظ مستقبلي بلا وسيلة لإصلاحه من الواجهة.
                 const laterPeriods = periodsOf(emp).filter(p => p.id !== period.id && p.from && p.from >= dayAfter);
                 const nextStart = laterPeriods.length > 0 ? laterPeriods.reduce((min, p) => p.from < min ? p.from : min, laterPeriods[0].from) : null;
                 const absenceTo = nextStart ? localDateStr(new Date(nextStart).getTime() - 86400000) : '';
-                const skipAbsence = nextStart === dayAfter;
+                const skipAbsence = !!nextStart && nextStart <= absenceFrom;
                 const updated = (staff || []).map(s => {
                     if (s.id !== emp.id) return s;
                     const marked = periodsOf(s).map(p => p.id === period.id ? { ...p, confirmedReturn: true } : p);
                     // «لا» تفتح غياباً مفتوح النهاية من اليوم التالي، فلا يختفي من الكشف بصمت
-                    const withAbsence = (didResume || skipAbsence) ? marked : [...marked, { id: 'per_' + Date.now(), type: 'غياب', from: dayAfter, to: absenceTo, note: 'لم يباشر بعد انتهاء ' + period.type }];
+                    const withAbsence = (didResume || skipAbsence) ? marked : [...marked, { id: 'per_' + Date.now(), type: 'غياب', from: absenceFrom, to: absenceTo, note: 'لم يباشر بعد انتهاء ' + period.type }];
                     return { ...s, statusPeriods: withAbsence };
                 });
                 setStaff(updated);
