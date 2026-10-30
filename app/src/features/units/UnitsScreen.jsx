@@ -35,13 +35,14 @@ export const DAILY_STATUS_GROUPS = [
     ] },
 ];
 
-// أزرار سريعة تحت القائمة للحالات الخمس الأكثر تكراراً
+// أزرار سريعة تحت القائمة للحالات الأكثر تكراراً (الإضافي سادسها بطلب أسامة 2026-10-30)
 const QUICK_DAILY_STATUSES = [
     { value: 'إجازة اعتيادية', label: '🏖️ اعتيادية' },
     { value: 'إجازة زمنية', label: '⏰ زمنية' },
     { value: 'ورقة عمل', label: '📝 ورقة عمل' },
     { value: 'إجازة مرضية', label: '🏥 مرضية' },
     { value: 'في دورة', label: '🎓 دورة' },
+    { value: 'دوام إضافي', label: '⚡ إضافي' },
 ];
 
 // شارات أعداد الموقف اليومي: مجموعها عدد الوحدة، والإضافي عدد فرعي من الحاضرين. الحاضر والإضافي
@@ -495,6 +496,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                     else if (status === 'دوام 24 ساعة') statusBadgeColor = 'bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-200';
                                                     else if (status.includes('استراحة')) statusBadgeColor = 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
                                                     else if (status.includes('إجازة') || status.includes('مرضية')) statusBadgeColor = 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100';
+                                                    else if (status.includes('إضافي')) statusBadgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 font-bold';
                                                     else if (status === 'ورقة عمل') statusBadgeColor = 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 font-bold';
                                                     else if (status === 'مكلف بواجب') statusBadgeColor = 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100 font-bold';
                                                     else if (status.includes('تعذر') || status.includes('توقف موقع')) statusBadgeColor = 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 font-bold';
