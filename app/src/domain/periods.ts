@@ -55,12 +55,57 @@ export const STATUS_BUTTON_GROUPS: Array<{ label: string | null; options: Status
 
 export const STATUS_BUTTON_VALUES: string[] = STATUS_BUTTON_GROUPS.flatMap(g => g.options.map(o => o.value));
 
+// رمز كل حالة ولون فئتها (طلب أسامة 2026-10-30): الإجازات وردي، الدورات والإيفاد نيلي، المواقف الأخرى عنبري،
+// الغياب وسحب اليد أحمر، النشط أخضر. badge للزر المغلق والشارة، option لخيار القائمة. الأصناف مكتوبة كاملة
+// (Tailwind يمسحها نصاً) وكلها مغطاة في الوضع الليلي.
+const TONES = {
+    green: { badge: 'bg-green-100 text-green-800 border-green-300', option: 'bg-white text-green-700 font-bold' },
+    rose: { badge: 'bg-rose-100 text-rose-800 border-rose-300', option: 'bg-white text-rose-700 font-bold' },
+    indigo: { badge: 'bg-indigo-100 text-indigo-800 border-indigo-300', option: 'bg-white text-indigo-700 font-bold' },
+    amber: { badge: 'bg-amber-100 text-amber-800 border-amber-300', option: 'bg-white text-amber-800 font-bold' },
+    red: { badge: 'bg-red-100 text-red-800 border-red-300', option: 'bg-white text-red-700 font-bold' },
+} as const;
+
+const STATUS_STYLE: Record<string, { icon: string; tone: keyof typeof TONES }> = {
+    'نشط': { icon: '✅', tone: 'green' },
+    'إجازة اعتيادية': { icon: '🏖️', tone: 'rose' },
+    'إجازة بدون راتب': { icon: '💼', tone: 'rose' },
+    'إجازة خارج العراق': { icon: '🌍', tone: 'rose' },
+    'إجازة دراسية': { icon: '📚', tone: 'rose' },
+    'إجازة أربع أو خمس سنوات': { icon: '🗓️', tone: 'rose' },
+    'إجازة أمومة': { icon: '🤱', tone: 'rose' },
+    'إجازة ولادة': { icon: '👶', tone: 'rose' },
+    'إجازة طويلة': { icon: '🛌', tone: 'rose' },
+    'في دورة': { icon: '🎓', tone: 'indigo' },
+    'إيفاد': { icon: '✈️', tone: 'indigo' },
+    'إيفاد خارج العراق': { icon: '🌐', tone: 'indigo' },
+    'أيام العدة': { icon: '🕌', tone: 'amber' },
+    'أيام بقسم آخر': { icon: '🏢', tone: 'amber' },
+    'خارج الخدمة': { icon: '🚪', tone: 'amber' },
+    'إصابة عمل': { icon: '🩹', tone: 'amber' },
+    'غياب': { icon: '⛔', tone: 'red' },
+    'سحب يد': { icon: '✋', tone: 'red' },
+};
+
+// نص غير معروف (حالة قديمة) يأخذ اللون العنبري بلا رمز، كما كان برتقالياً قبلاً
+export const statusStyle = (type: string): { icon: string; badge: string; option: string } => {
+    const s = STATUS_STYLE[type];
+    const tone = TONES[s ? s.tone : 'amber'];
+    return { icon: s ? s.icon : '', badge: tone.badge, option: tone.option };
+};
+
 const STATUS_BUTTON_LABELS: Record<string, string> = Object.fromEntries(
     STATUS_BUTTON_GROUPS.flatMap(g => g.options.map(o => [o.value, o.label]))
 );
 
 // التسمية المعروضة للنوع المخزَّن، أو النص نفسه إن لم يكن في الزر (حالة قديمة مثل «إجازة طويلة»)
 export const statusButtonLabel = (type: string): string => STATUS_BUTTON_LABELS[type] || type;
+
+// التسمية مع رمزها لعرضها في الزر والشارة والقائمة
+export const statusButtonLabelWithIcon = (type: string): string => {
+    const icon = statusStyle(type).icon;
+    return (icon ? icon + ' ' : '') + statusButtonLabel(type);
+};
 
 // المستبعدون من التقييم (المواصفة 6.4): أصحاب المواقف الطويلة من فترة مؤرَّخة. يظهرون في الكشف اليومي
 // بحالتهم، فالإخفاء منه يبقى بـisLongOrMaternityLeave. الدورة والإيفاد والغياب وسحب اليد لا تستبعد.

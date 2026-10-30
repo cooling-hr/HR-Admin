@@ -2,7 +2,7 @@ import React from 'react';
 import { getThreeName } from '../../core/arabic';
 import { localDateStr } from '../../core/dates';
 import { getMissingFields } from '../../domain/employees';
-import { STATUS_BUTTON_GROUPS, STATUS_BUTTON_VALUES, statusButtonLabel, getActivePeriod, periodsOf } from '../../domain/periods';
+import { STATUS_BUTTON_GROUPS, STATUS_BUTTON_VALUES, statusButtonLabelWithIcon, statusStyle, getActivePeriod, periodsOf } from '../../domain/periods';
 import { getSafetyStatus } from '../../domain/safety';
 import { Icon, SAFETY_BOOT_IMG, SAFETY_VEST_IMG } from '../../ui/Icon';
 import { PageHeader } from '../../ui/PageHeader';
@@ -769,26 +769,18 @@ export const StaffListScreen = ({ ctx }) => {
                                             const resolvedStatus = (getActivePeriod(s, localDateStr()) || {}).type || s.status || 'نشط';
                                             return view === 'all' ? (
                                                 <select value={resolvedStatus} onChange={(e) => changeStatus(s.id, e.target.value)}
-                                                    className={`px-3 py-1 rounded-full text-sm font-bold border-2 cursor-pointer ${
-                                                        resolvedStatus === 'نشط' ? 'bg-green-100 text-green-800 border-green-300' :
-                                                        resolvedStatus === 'في دورة' ? 'bg-indigo-100 text-indigo-800 border-indigo-300' :
-                                                        'bg-orange-100 text-orange-800 border-orange-300'
-                                                    }`}>
+                                                    className={`px-3 py-1 rounded-full text-sm font-bold border-2 cursor-pointer ${statusStyle(resolvedStatus).badge}`}>
                                                     {!STATUS_BUTTON_VALUES.includes(resolvedStatus) && (
-                                                        <option value={resolvedStatus}>{resolvedStatus}</option>
+                                                        <option value={resolvedStatus} className={statusStyle(resolvedStatus).option}>{statusButtonLabelWithIcon(resolvedStatus)}</option>
                                                     )}
                                                     {STATUS_BUTTON_GROUPS.map((g, gi) => {
-                                                        const opts = g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>);
+                                                        const opts = g.options.map(o => <option key={o.value} value={o.value} className={statusStyle(o.value).option}>{statusStyle(o.value).icon} {o.label}</option>);
                                                         return g.label ? <optgroup key={gi} label={g.label}>{opts}</optgroup> : <React.Fragment key={gi}>{opts}</React.Fragment>;
                                                     })}
                                                 </select>
                                             ) : (
-                                                <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                                                    resolvedStatus === 'نشط' ? 'bg-green-100 text-green-800' :
-                                                    resolvedStatus === 'في دورة' ? 'bg-indigo-100 text-indigo-800' :
-                                                    'bg-orange-100 text-orange-800'
-                                                }`}>
-                                                    {statusButtonLabel(resolvedStatus)}
+                                                <span className={`px-3 py-1 rounded-full text-sm font-bold ${statusStyle(resolvedStatus).badge}`}>
+                                                    {statusButtonLabelWithIcon(resolvedStatus)}
                                                 </span>
                                             );
                                         })()}

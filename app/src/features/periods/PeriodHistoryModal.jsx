@@ -1,6 +1,6 @@
 import React from 'react';
 import { localDateStr } from '../../core/dates';
-import { periodPhaseOf, periodsOf } from '../../domain/periods';
+import { periodPhaseOf, periodsOf, statusStyle, statusButtonLabelWithIcon } from '../../domain/periods';
 
 // سجل فترات الموظف. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
@@ -37,7 +37,7 @@ export const PeriodHistoryModal = ({ ctx }) => {
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
                                         <span className={`px-2 py-0.5 rounded-full text-[11px] font-black border ${phaseClass}`}>{phase}</span>
-                                        <span className="text-sm font-black text-slate-800">{p.type}</span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-sm font-black border ${statusStyle(p.type).badge}`}>{statusButtonLabelWithIcon(p.type)}</span>
                                     </div>
                                     <div className="text-xs font-bold text-slate-600">{periodSpanJsx(p)}</div>
                                     {p.note ? <div className="text-[11px] font-bold text-slate-500">📝 {p.note}</div> : null}
