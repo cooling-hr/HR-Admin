@@ -85,8 +85,13 @@ export const sortByJobNumber = (arr: Employee[]): Employee[] => {
 // ترتيب بالرقم الوظيفي وحده تصاعدياً، بلا أولويات ولا فصل للعقود — كما في استمارة ضبط الوقت الرسمية.
 // من لا رقم له يأتي آخراً، والتساوي يُحسم بالاسم ليبقى الترتيب ثابتاً.
 export const sortByJobNumberOnly = (arr: Employee[]): Employee[] => {
-    const num = (s: Employee): number => parseInt(String(s.jobNumber || '').replace(/\D/g, '')) || 999999;
-    return [...arr].sort((a, b) => (num(a) - num(b)) || String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+    // Infinity لا 999999، فرقم من سبع خانات لا يتأخر عمّن لا رقم له؛ والمقارنة بلا طرح لأن Infinity - Infinity = NaN
+    const num = (s: Employee): number => parseInt(String(s.jobNumber || '').replace(/\D/g, '')) || Infinity;
+    return [...arr].sort((a, b) => {
+        const na = num(a), nb = num(b);
+        if (na !== nb) return na < nb ? -1 : 1;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'ar');
+    });
 };
 
 // دالة الترتيب الهرمي حسب العنوان الوظيفي (للوحدات)
