@@ -1,4 +1,4 @@
-import { normalizeArabicText } from '../core/arabic.js';
+import { normalizeArabicText, normalizeJobNumber } from '../core/arabic.js';
 import { isContractEmployee } from './employees.js';
 import type { Employee } from './types.js';
 
@@ -86,7 +86,7 @@ export const sortByJobNumber = (arr: Employee[]): Employee[] => {
 // من لا رقم له يأتي آخراً، والتساوي يُحسم بالاسم ليبقى الترتيب ثابتاً.
 export const sortByJobNumberOnly = (arr: Employee[]): Employee[] => {
     // Infinity لا 999999، فرقم من سبع خانات لا يتأخر عمّن لا رقم له؛ والمقارنة بلا طرح لأن Infinity - Infinity = NaN
-    const num = (s: Employee): number => parseInt(String(s.jobNumber || '').replace(/\D/g, '')) || Infinity;
+    const num = (s: Employee): number => parseInt(normalizeJobNumber(s.jobNumber).replace(/\D/g, '')) || Infinity;
     return [...arr].sort((a, b) => {
         const na = num(a), nb = num(b);
         if (na !== nb) return na < nb ? -1 : 1;
