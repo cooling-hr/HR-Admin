@@ -7,7 +7,7 @@ import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, 
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
-import { normalizeTimeFormCodeEdits, resolveCodeTable, timeFormCodeFor, timeFormTitle, UNKNOWN_CODE } from '../domain/timeForm';
+import { normalizeTimeFormCodeEdits, resolveCodeTable, SHADED_TIME_FORM_STATUSES, timeFormCodeFor, timeFormTitle, UNKNOWN_CODE } from '../domain/timeForm';
 import { localDateStr, daysInMonth, getDaysBetweenDates, getArabicDayName, ARABIC_MONTH_NAMES, getArabicMonthLabel, addMonthsClamped, formatDateToString, parseExcelDate, calculateYearsOfService, ISO_DAY } from '../core/dates';
 import { SearchCircularProgress } from '../ui/SearchCircularProgress';
 import { ICON_PATHS, Icon, SAFETY_VEST_IMG, SAFETY_BOOT_IMG } from '../ui/Icon';
@@ -2465,37 +2465,95 @@ import { buildDatePicker } from '../ui/datePicker';
                 }, 250);
             };
 
-            // تصدير استمارة ضبط الوقت المختارة إلى Excel بالشكل المطبوع نفسه: صفّان لكل موظف (الرموز ثم الساعات)،
-            // والتسلسل والرقم والاسم ونوع الحركة والمجموع مدمجة عمودياً على الصفّين
+            // تصدير استمارة ضبط الوقت المختارة إلى Excel بشكل الملف الرسمي (ExcelJS لأنه يكتب التنسيق، وSheetJS لا يكتبه):
+            // صفّان لكل موظف (الرموز ثم الساعات)، والتسلسل والرقم والاسم ونوع الحركة والمجموع مدمجة على الصفّين.
+            // رأس الجدول وصف الساعات فيروزيان (CCFFFF) بحدود رفيعة كالرسمي، وخط أعرض تحت كل موظف، ورأس الجدول
+            // يتكرر في كل صفحة مطبوعة. أيام الحالات الدائمة (SHADED_TIME_FORM_STATUSES) رمادية في الصفّين، وما بعد نهاية الشهر أفتح.
+            // الخلايا المدمجة تتشارك كائن التنسيق في ExcelJS، فخطّ أعمدتها واحد في الصفّين عمداً.
             const exportTimeFormExcel = async () => {
-                if (!(await ensureLibs('xlsx'))) return;
+                if (!(await ensureLibs('exceljs'))) return;
                 try {
+                    const ExcelJS = window.ExcelJS;
                     const isContracts = timeFormKind === 'contracts';
                     const rows = isContracts ? timeFormData.contractRows : timeFormData.staffRows;
                     const { ym, daysInMonth: monthDays } = timeFormData;
                     const days = Array.from({ length: 31 }, (_, i) => i + 1);
-                    const lastCol = 4 + days.length;
-                    const aoa = [
-                        [timeFormTitle(timeFormKind)],
-                        [getArabicMonthLabel(ym)],
-                        ['التسلسل', 'الرقم الوظيفي', 'الاسم الثلاثي', 'نوع الحركة', ...days.map(day => day > monthDays ? day : `${day} ${getArabicDayName(`${ym}-${String(day).padStart(2, '0')}`)}`), 'مجموع الساعات']
-                    ];
-                    const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }, { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }];
-                    rows.forEach((row, idx) => {
-                        const r = aoa.length;
-                        aoa.push([idx + 1, row.employee.jobNumber || '', getTripleName(row.employee.name), '',
-                            ...row.cells.map(cell => !cell.inMonth || cell.isFuture ? '' : cell.outOfPeriod ? '–' : cell.code),
-                            row.totalHours || '']);
-                        aoa.push(['', '', '', '', ...row.cells.map(cell => cell.inMonth && !cell.outOfPeriod ? (cell.hours ?? '') : ''), '']);
-                        [0, 1, 2, 3, lastCol].forEach(c => merges.push({ s: { r, c }, e: { r: r + 1, c } }));
+                    const firstDayCol = 5;
+                    const lastCol = firstDayCol + days.length; // مجموع الساعات
+                    const wb = new ExcelJS.Workbook();
+                    const ws = wb.addWorksheet('استمارة ضبط الوقت', {
+                        views: [{ rightToLeft: true, state: 'frozen', xSplit: 3, ySplit: 3 }],
+                        pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true,
+                            printTitlesRow: '3:3', margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } }
                     });
-                    const ws = XLSX.utils.aoa_to_sheet(aoa);
-                    ws['!merges'] = merges;
-                    ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 28 }, { wch: 10 }, ...days.map(() => ({ wch: 5 })), { wch: 10 }];
-                    const wb = XLSX.utils.book_new();
-                    wb.Workbook = { Views: [{ RTL: true }] };
-                    XLSX.utils.book_append_sheet(wb, ws, 'استمارة ضبط الوقت');
-                    XLSX.writeFile(wb, `استمارة_ضبط_الوقت_${isContracts ? 'العقود' : 'الملاك'}_${ym}.xlsx`);
+                    [6, 12, 28, 8, ...days.map(() => 5), 9].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+                    const thin = { style: 'thin', color: { argb: 'FF000000' } };
+                    const medium = { style: 'medium', color: { argb: 'FF000000' } };
+                    const fillOf = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+                    const CYAN = 'FFCCFFFF', SHADE = 'FFD9D9D9', OUT_OF_MONTH = 'FFF2F2F2';
+                    const center = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+                    ws.mergeCells(1, 1, 1, lastCol);
+                    ws.getCell(1, 1).value = timeFormTitle(timeFormKind);
+                    ws.getCell(1, 1).font = { name: 'Arial', size: 16, bold: true };
+                    ws.getCell(1, 1).alignment = center;
+                    ws.getRow(1).height = 30;
+                    ws.mergeCells(2, 1, 2, lastCol);
+                    ws.getCell(2, 1).value = getArabicMonthLabel(ym);
+                    ws.getCell(2, 1).font = { name: 'Arial', size: 13, bold: true };
+                    ws.getCell(2, 1).alignment = center;
+                    ws.getRow(2).height = 22;
+
+                    ws.getRow(3).height = 34;
+                    ['التسلسل', 'الرقم الوظيفي', 'الاسم الثلاثي', 'نوع الحركة',
+                        ...days.map(day => day > monthDays ? String(day) : `${day}\n${getArabicDayName(`${ym}-${String(day).padStart(2, '0')}`)}`),
+                        'مجموع الساعات'].forEach((v, i) => {
+                        const cell = ws.getCell(3, i + 1);
+                        cell.value = v;
+                        cell.font = { name: 'Arial', size: i + 1 >= firstDayCol && i + 1 < lastCol ? 9 : 11, bold: true };
+                        cell.alignment = center;
+                        cell.fill = fillOf(CYAN);
+                        cell.border = { top: thin, left: thin, bottom: thin, right: thin };
+                    });
+
+                    let r = 4;
+                    rows.forEach((row, idx) => {
+                        ws.getRow(r).height = 20;
+                        ws.getRow(r + 1).height = 16;
+                        [idx + 1, row.employee.jobNumber || '', getTripleName(row.employee.name), ''].forEach((v, i) => {
+                            ws.mergeCells(r, i + 1, r + 1, i + 1);
+                            ws.getCell(r, i + 1).value = v;
+                        });
+                        ws.mergeCells(r, lastCol, r + 1, lastCol);
+                        ws.getCell(r, lastCol).value = row.totalHours || '';
+                        row.cells.forEach((cell, i) => {
+                            const c = firstDayCol + i;
+                            ws.getCell(r, c).value = !cell.inMonth || cell.isFuture ? '' : cell.outOfPeriod ? '–' : cell.code;
+                            ws.getCell(r + 1, c).value = cell.inMonth && !cell.outOfPeriod ? (cell.hours ?? '') : '';
+                            const shade = !cell.inMonth ? OUT_OF_MONTH : SHADED_TIME_FORM_STATUSES.includes(cell.status) ? SHADE : null;
+                            if (shade) ws.getCell(r, c).fill = fillOf(shade);
+                            ws.getCell(r + 1, c).fill = fillOf(shade || CYAN);
+                        });
+                        for (let c = 1; c <= lastCol; c++) {
+                            const isDay = c >= firstDayCol && c < lastCol;
+                            [0, 1].forEach(k => {
+                                const cell = ws.getCell(r + k, c);
+                                cell.alignment = c === 3 ? { horizontal: 'right', vertical: 'middle', wrapText: true, indent: 1 } : center;
+                                cell.font = { name: 'Arial', size: c === 3 ? 12 : isDay && k === 1 ? 9 : 11, bold: !(isDay && k === 1) };
+                                cell.border = { top: thin, left: thin, right: thin, bottom: k === 1 ? medium : thin };
+                            });
+                        }
+                        r += 2;
+                    });
+
+                    const buffer = await wb.xlsx.writeBuffer();
+                    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `استمارة_ضبط_الوقت_${isContracts ? 'العقود' : 'الملاك'}_${ym}.xlsx`;
+                    a.click();
+                    setTimeout(() => window.URL.revokeObjectURL(url), 1500);
                 } catch (error) {
                     alert('❌ خطأ في تصدير استمارة ضبط الوقت: ' + error.message);
                 }

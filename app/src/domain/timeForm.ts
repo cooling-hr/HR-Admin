@@ -223,3 +223,11 @@ export const timeFormCodeFor = (day: TimeFormDayInput, table: ResolvedCodeTable)
 export const TIME_FORM_TITLE = 'أستمارة ضبط الوقت شعبة تبريد المركز';
 export const TIME_FORM_CONTRACTS_TITLE = 'أستمارة ضبط الوقت شعبة تبريد المركز — موظفو العقود';
 export const timeFormTitle = (kind: string): string => kind === 'contracts' ? TIME_FORM_CONTRACTS_TITLE : TIME_FORM_TITLE;
+
+// الحالات الدائمة التي تُظلَّل خاناتها رمادياً في ملف Excel كما على الورق (طلب أسامة 2026-10-30):
+// سحب اليد والإجازات والمواقف الطويلة. الإجازة الاعتيادية وبدون راتب وخارج العراق والدورة والإيفاد
+// والغياب ليست منها، فهي مواقف مؤقتة تُكتب برمزها وحده.
+export const SHADED_TIME_FORM_STATUSES: string[] = [
+    'سحب يد', 'إجازة طويلة', 'إجازة دراسية', 'إجازة أربع أو خمس سنوات', 'إجازة أمومة', 'إجازة ولادة',
+    'أيام العدة', 'أيام بقسم آخر', 'خارج الخدمة', 'إصابة عمل',
+];
