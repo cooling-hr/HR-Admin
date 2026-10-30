@@ -1308,7 +1308,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     const startsToday = openAbsence.from >= dateStr;
                     const NL = String.fromCharCode(10);
                     const resumed = confirm('✅ تأكيد المباشرة:' + NL + NL +
-                        'المنتسب (' + emp.name + ') في (' + openAbsence.type + ') منذ ' + openAbsence.from + (openAbsence.to ? ' إلى ' + openAbsence.to : '') + '.' + NL + NL +
+                        'المنتسب (' + emp.name + ') في (' + openAbsence.type + ') ' + (openAbsence.to ? 'من ' + openAbsence.from + ' إلى ' + openAbsence.to : 'منذ ' + openAbsence.from) + '.' + NL + NL +
                         'هل باشر بالعمل في ' + dateStr + '؟' + NL + NL +
                         (startsToday
                             ? '• [موافق / OK]: يُحذف (' + openAbsence.type + ') المسجَّل من هذا اليوم ويُسجَّل حضوره.'
