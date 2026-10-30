@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';   // لـcreatePortal في بطاقة الموظف، لا للتركيب (التركيب في ملف المدخل)
 import { FIELD_NAMES_AR, mergeKeyOf, ownKey, ATTENDANCE_PARTS, isValidAttendanceValue, analyzeMergePeriods, analyzeMergeAttendance, analyzeMerge } from '../domain/merge';
-import { getJobRank, sortByJobNumber, sortByJobTitleHierarchy, ensureTopTwo, sortByUnit } from '../domain/sorting';
+import { getJobRank, sortByJobNumber, sortByJobNumberOnly, sortByJobTitleHierarchy, ensureTopTwo, sortByUnit } from '../domain/sorting';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
@@ -1738,7 +1738,7 @@ import { buildDatePicker } from '../ui/datePicker';
             }, [staff, periodStartDate, periodEndDate, periodUnitFilter, periodWorkTypeFilter, periodSearchQuery, dailyStatusOverrides, officialHolidays, overtimeHoursRecords, hourlyLeaveRecords, anchorDate, threeShiftAnchorSquad, twoShiftAnchorSquad]);
 
             // استمارة ضبط الوقت (المواصفة 3 و4) لشهر بداية الفترة: رمز كل يوم وساعات إضافيه المسجَّلة.
-            // 31 خانة لكل صف دائماً، والصفوف استمارتان (الملاك والعقود) مرتّبتان بالرقم الوظيفي.
+            // 31 خانة لكل صف دائماً، والصفوف استمارتان (الملاك والعقود) مرتّبتان بالرقم الوظيفي وحده (بلا أولويات، كالجدول الرسمي).
             // التنبيه يجمع خانات «؟» في الأيام المنقضية وحدها، فالأيام القادمة تُعرض نقطة.
             const timeFormData = useMemo(() => {
                 const [year, month] = (periodStartDate || localDateStr()).split('-').map(Number);
@@ -1770,7 +1770,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 };
 
                 const buildForm = (items) => {
-                    const rows = sortByJobNumber(items.map(i => i.employee)).map(emp => buildRow(itemById[emp.id]));
+                    const rows = sortByJobNumberOnly(items.map(i => i.employee)).map(emp => buildRow(itemById[emp.id]));
                     const unknown = rows
                         .map(r => ({ name: r.employee.name, days: r.cells.filter(c => c.code === UNKNOWN_CODE && !c.isFuture).map(c => c.day) }))
                         .filter(u => u.days.length > 0);

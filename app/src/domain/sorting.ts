@@ -82,6 +82,13 @@ export const sortByJobNumber = (arr: Employee[]): Employee[] => {
     return [...priorityItems, ...regularItems, ...contracts];
 };
 
+// ترتيب بالرقم الوظيفي وحده تصاعدياً، بلا أولويات ولا فصل للعقود — كما في استمارة ضبط الوقت الرسمية.
+// من لا رقم له يأتي آخراً، والتساوي يُحسم بالاسم ليبقى الترتيب ثابتاً.
+export const sortByJobNumberOnly = (arr: Employee[]): Employee[] => {
+    const num = (s: Employee): number => parseInt(String(s.jobNumber || '').replace(/\D/g, '')) || 999999;
+    return [...arr].sort((a, b) => (num(a) - num(b)) || String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+};
+
 // دالة الترتيب الهرمي حسب العنوان الوظيفي (للوحدات)
 export const sortByJobTitleHierarchy = (arr: Employee[], unitName: string = ''): Employee[] => {
     const cleanJobNumber = (num?: unknown): string => String(num || '').trim().replace(/\D/g, '');
