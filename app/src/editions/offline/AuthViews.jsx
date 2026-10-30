@@ -70,7 +70,7 @@ export const LoginFields = ({ ctx }) => {
         </button>
 
         <div className="pt-3 mt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
-            <span>الإصدار: <strong className="text-slate-600 font-mono">v9.7 Enterprise</strong></span>
+            <span>الإصدار: <strong className="text-slate-600 font-mono">v9.8 Enterprise</strong></span>
             <button
                 type="button"
                 onClick={() => {

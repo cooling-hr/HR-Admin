@@ -3523,7 +3523,7 @@ import { buildDatePicker } from '../ui/datePicker';
             const exportBackupJSON = () => {
                 try {
                     const backupData = {
-                        version: 'v9.7 Enterprise Cloud Edition',
+                        version: 'v9.8 Enterprise Cloud Edition',
                         exportDate: new Date().toISOString(),
                         staff: staff,
                         staffData: staff,
@@ -5155,7 +5155,7 @@ return (
                     
                     <footer className="bg-gray-800 text-white mt-12 py-6 text-center">
                         <p>© 2026 شركة نفط البصرة - شعبة تبريد المركز ومحطة عزل نهر بن عمر</p>
-                        <p className="text-xs text-blue-300 mt-2">👨‍💻 إعداد: المهندس أسامة خليل هاشم | الإصدار v9.7 Enterprise Cloud Edition</p>
+                        <p className="text-xs text-blue-300 mt-2">👨‍💻 إعداد: المهندس أسامة خليل هاشم | الإصدار v9.8 Enterprise Cloud Edition</p>
                     </footer>
                 </div>
             );
