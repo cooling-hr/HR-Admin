@@ -2506,13 +2506,13 @@ import { buildDatePicker } from '../ui/datePicker';
 
                     ws.getRow(3).height = 34;
                     ['التسلسل', 'الرقم الوظيفي', 'الاسم الثلاثي', 'نوع الحركة',
-                        ...days.map(day => day > monthDays ? String(day) : `${day}\n${getArabicDayName(`${ym}-${String(day).padStart(2, '0')}`)}`),
+                        ...days.map(day => day > monthDays ? String(day) : `${day}\n${getArabicDayName(`${ym}-${String(day).padStart(2, '0')}`).replace(/^ال/, '').slice(0, 2)}`),
                         'مجموع الساعات'].forEach((v, i) => {
                         const cell = ws.getCell(3, i + 1);
                         cell.value = v;
                         cell.font = { name: 'Arial', size: i + 1 >= firstDayCol && i + 1 < lastCol ? 9 : 11, bold: true };
                         cell.alignment = center;
-                        cell.fill = fillOf(CYAN);
+                        cell.fill = fillOf(i + 1 >= firstDayCol && i + 1 < lastCol && i + 2 - firstDayCol > monthDays ? OUT_OF_MONTH : CYAN);
                         cell.border = { top: thin, left: thin, bottom: thin, right: thin };
                     });
 
