@@ -1349,13 +1349,20 @@ import { buildDatePicker } from '../ui/datePicker';
                     const toUnfix = laterDays.filter(d => weekdayOf(d) !== weekday && ownOverride(d) === SPECIAL_NEEDS_REST);
                     if (toFix.length > 0 || toUnfix.length > 0) {
                         const NL = String.fromCharCode(10);
-                        const oldDayNames = [...new Set(toUnfix.map(getArabicDayName))].join(' و');
+                        // نص الزرّين يصف ما يحدث فعلاً: قد لا يبقى يوم مماثل بعده (آخر ثلاثاء في الشهر) وفيه يوم قديم يُلغى
+                        const oldNames = [...new Set(toUnfix.map(getArabicDayName))];
+                        const oldDayLabel = (oldNames.length > 1 ? 'أيام ' : 'يوم ') + oldNames.join(' و');
+                        const okAction = [
+                            toFix.length > 0 ? 'تثبيت الاستراحة كل يوم ' + dayName + ' من هذا اليوم إلى آخر الشهر' : 'استراحة هذا اليوم',
+                            toUnfix.length > 0 ? 'وإلغاء تثبيت ' + oldDayLabel + ' في الأيام التالية' : ''
+                        ].filter(Boolean).join('، ');
                         const fix = confirm('♿ تثبيت استراحة ذوي الاحتياجات الخاصة:' + NL + NL +
-                            'هل تريد تثبيت استراحة الموظف (' + emp.name + ') كل يوم ' + dayName + ' في هذا الشهر؟' + NL +
-                            (toFix.length > 0 ? 'الأيام: ' + toFix.join('، ') + NL : '') +
-                            (toUnfix.length > 0 ? NL + 'ويُلغى تثبيت يوم ' + oldDayNames + ' في: ' + toUnfix.join('، ') + NL : '') + NL +
-                            '• [موافق / OK]: تثبيت الاستراحة كل يوم ' + dayName + ' من هذا اليوم إلى آخر الشهر.' + NL +
-                            '• [إلغاء / Cancel]: استراحة هذا اليوم وحده.');
+                            (toFix.length > 0
+                                ? 'هل تريد تثبيت استراحة الموظف (' + emp.name + ') كل يوم ' + dayName + ' في هذا الشهر؟' + NL + 'الأيام: ' + toFix.join('، ') + NL
+                                : 'تغيّر يوم استراحة الموظف (' + emp.name + ') إلى ' + dayName + '.' + NL) +
+                            (toUnfix.length > 0 ? NL + 'المثبَّت سابقاً على ' + oldDayLabel + ' في: ' + toUnfix.join('، ') + NL : '') + NL +
+                            '• [موافق / OK]: ' + okAction + '.' + NL +
+                            '• [إلغاء / Cancel]: استراحة هذا اليوم وحده' + (toUnfix.length > 0 ? '، ويبقى ' + oldDayLabel + ' مثبَّتاً' : '') + '.');
                         if (fix) {
                             const setDays = [dateStr, ...toFix];
                             updateTombstones({
