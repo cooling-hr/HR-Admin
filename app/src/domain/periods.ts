@@ -69,7 +69,7 @@ const TONES = {
 const STATUS_STYLE: Record<string, { icon: string; tone: keyof typeof TONES }> = {
     'نشط': { icon: '✅', tone: 'green' },
     'إجازة اعتيادية': { icon: '🏖️', tone: 'rose' },
-    'إجازة بدون راتب': { icon: '💼', tone: 'rose' },
+    'إجازة بدون راتب': { icon: '💸', tone: 'rose' },
     'إجازة خارج العراق': { icon: '🌍', tone: 'rose' },
     'إجازة دراسية': { icon: '📚', tone: 'rose' },
     'إجازة أربع أو خمس سنوات': { icon: '🗓️', tone: 'rose' },
