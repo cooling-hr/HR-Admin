@@ -4,6 +4,7 @@ import { FIELD_NAMES_AR, mergeKeyOf, ownKey, ATTENDANCE_PARTS, isValidAttendance
 import { getJobRank, sortByJobNumber, sortByJobNumberOnly, sortByJobTitleHierarchy, ensureTopTwo, sortByUnit } from '../domain/sorting';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
+import { shiftLeaveCarry, shiftLeaveCarryNote } from '../domain/shiftLeave';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
 import { ARABIC_INDIC_DIGITS, EXTENDED_ARABIC_INDIC_DIGITS, normalizeArabic, normalizeArabicForSearch, normalizeJobNumber, matchesStaffSearch, guessGender, normalizeGender, getThreeName, getTripleName, normalizeArabicText, ARABIC_ONES, ARABIC_TEENS, ARABIC_TENS, ARABIC_HUNDREDS, numberChunkToArabicWords, arabicManualDaysCount, arabicHoursCount, formatMobileNumber, fixPhoneNumber, expandAbbrev } from '../core/arabic';
@@ -951,44 +952,59 @@ import { buildDatePicker } from '../ui/datePicker';
                     } catch (e) {}
                     return 'دوام صباحي';
                 }
-                if (emp.workType === 'مناوب') {
-                    if (!emp.squad) return 'مناوب (الوجبة غير محددة)';
-                    const isThreeShift = emp.location && emp.location.includes('نهر بن عمر');
-                    const diffDays = getDaysBetweenDates(dateStr, anchorDate);
-                    
-                    if (isThreeShift) {
-                        const squads = ['A', 'B', 'C', 'D'];
-                        const idxAnchor = squads.indexOf(threeShiftAnchorSquad);
-                        if (idxAnchor === -1) return 'استراحة مناوبة';
-                        const idxActive = (idxAnchor + (diffDays % 4) + 4) % 4;
-                        if (emp.squad === squads[idxActive]) return 'دوام 24 ساعة';
+                if (emp.workType === 'مناوب') return getShiftCycleStatus(emp, dateStr);
+                return 'دوام صباحي';
+            };
+
+            // موقف المناوب من دورة وجبته وحدها، بلا تعديل يومي ولا فترة
+            const getShiftCycleStatus = (emp, dateStr) => {
+                if (!emp.squad) return 'مناوب (الوجبة غير محددة)';
+                const isThreeShift = emp.location && emp.location.includes('نهر بن عمر');
+                const diffDays = getDaysBetweenDates(dateStr, anchorDate);
+
+                if (isThreeShift) {
+                    const squads = ['A', 'B', 'C', 'D'];
+                    const idxAnchor = squads.indexOf(threeShiftAnchorSquad);
+                    if (idxAnchor === -1) return 'استراحة مناوبة';
+                    const idxActive = (idxAnchor + (diffDays % 4) + 4) % 4;
+                    if (emp.squad === squads[idxActive]) return 'دوام 24 ساعة';
+                    return 'استراحة مناوبة';
+                } else {
+                    const squadToDayMap = { 'A': 1, 'C': 2, 'D': 3, 'B': 4 };
+                    const anchorDay = squadToDayMap[twoShiftAnchorSquad] || 1;
+                    const cycleDay = ((anchorDay - 1 + diffDays) % 4 + 4) % 4 + 1;
+                    const S = emp.squad;
+                    if (cycleDay === 1) {
+                        if (S === 'A') return 'دوام صباحي (12 ساعة)';
+                        if (S === 'B') return 'دوام مسائي (12 ساعة)';
                         return 'استراحة مناوبة';
-                    } else {
-                        const squadToDayMap = { 'A': 1, 'C': 2, 'D': 3, 'B': 4 };
-                        const anchorDay = squadToDayMap[twoShiftAnchorSquad] || 1;
-                        const cycleDay = ((anchorDay - 1 + diffDays) % 4 + 4) % 4 + 1;
-                        const S = emp.squad;
-                        if (cycleDay === 1) {
-                            if (S === 'A') return 'دوام صباحي (12 ساعة)';
-                            if (S === 'B') return 'دوام مسائي (12 ساعة)';
-                            return 'استراحة مناوبة';
-                        } else if (cycleDay === 2) {
-                            if (S === 'C') return 'دوام صباحي (12 ساعة)';
-                            if (S === 'A') return 'دوام مسائي (12 ساعة)';
-                            return 'استراحة مناوبة';
-                        } else if (cycleDay === 3) {
-                            if (S === 'D') return 'دوام صباحي (12 ساعة)';
-                            if (S === 'C') return 'دوام مسائي (12 ساعة)';
-                            return 'استراحة مناوبة';
-                        } else if (cycleDay === 4) {
-                            if (S === 'B') return 'دوام صباحي (12 ساعة)';
-                            if (S === 'D') return 'دوام مسائي (12 ساعة)';
-                            return 'استراحة مناوبة';
-                        }
+                    } else if (cycleDay === 2) {
+                        if (S === 'C') return 'دوام صباحي (12 ساعة)';
+                        if (S === 'A') return 'دوام مسائي (12 ساعة)';
+                        return 'استراحة مناوبة';
+                    } else if (cycleDay === 3) {
+                        if (S === 'D') return 'دوام صباحي (12 ساعة)';
+                        if (S === 'C') return 'دوام مسائي (12 ساعة)';
+                        return 'استراحة مناوبة';
+                    } else if (cycleDay === 4) {
+                        if (S === 'B') return 'دوام صباحي (12 ساعة)';
+                        if (S === 'D') return 'دوام مسائي (12 ساعة)';
                         return 'استراحة مناوبة';
                     }
+                    return 'استراحة مناوبة';
                 }
-                return 'دوام صباحي';
+            };
+
+            // امتداد إجازة المناوب إلى يوم استراحته (domain/shiftLeave.ts): null إن كان في اليوم تعديل يومي أو فترة
+            const getShiftLeaveCarry = (emp, dateStr) => {
+                if (emp.workType !== 'مناوب' || !emp.squad || !dateStr) return null;
+                if (dailyStatusOverrides[dateStr] && dailyStatusOverrides[dateStr][emp.id]) return null;
+                if (getActivePeriod(emp, dateStr)) return null;
+                return shiftLeaveCarry(dateStr, {
+                    isThreeShift: !!(emp.location && emp.location.includes('نهر بن عمر')),
+                    cycleStatus: (d) => getShiftCycleStatus(emp, d),
+                    overrideOf: (d) => dailyStatusOverrides[d] && dailyStatusOverrides[d][emp.id],
+                });
             };
 
             // ignoreOverride: الموقف الطبيعي بلا التعديل اليومي، لرمز المناوب في استمارة ضبط الوقت (المواصفة 6.5)
@@ -1056,45 +1072,13 @@ import { buildDatePicker } from '../ui/datePicker';
                     return 'دوام صباحي';
                 }
                 if (emp.workType === 'مناوب') {
-                    if (!emp.squad) {
-                        return 'مناوب (الوجبة غير محددة)';
+                    const cycleStatus = getShiftCycleStatus(emp, dateStr);
+                    // إجازة في المسائي أو الـ24 ساعة تجعل الاستراحات بعدها إجازة (domain/shiftLeave.ts)
+                    if (cycleStatus === 'استراحة مناوبة' && !ignoreOverride) {
+                        const carry = getShiftLeaveCarry(emp, dateStr);
+                        if (carry && carry.mode === 'leave') return carry.type;
                     }
-                    const isThreeShift = emp.location && emp.location.includes('نهر بن عمر');
-                    const diffDays = getDaysBetweenDates(dateStr, anchorDate);
-                    
-                    if (isThreeShift) {
-                        const squads = ['A', 'B', 'C', 'D'];
-                        const idxAnchor = squads.indexOf(threeShiftAnchorSquad);
-                        if (idxAnchor === -1) return 'استراحة مناوبة';
-                        const idxActive = (idxAnchor + (diffDays % 4) + 4) % 4;
-                        if (emp.squad === squads[idxActive]) {
-                            return 'دوام 24 ساعة';
-                        }
-                        return 'استراحة مناوبة';
-                    } else {
-                        const squadToDayMap = { 'A': 1, 'C': 2, 'D': 3, 'B': 4 };
-                        const anchorDay = squadToDayMap[twoShiftAnchorSquad] || 1;
-                        const cycleDay = ((anchorDay - 1 + diffDays) % 4 + 4) % 4 + 1;
-                        const S = emp.squad;
-                        if (cycleDay === 1) {
-                            if (S === 'A') return 'دوام صباحي (12 ساعة)';
-                            if (S === 'B') return 'دوام مسائي (12 ساعة)';
-                            return 'استراحة مناوبة';
-                        } else if (cycleDay === 2) {
-                            if (S === 'C') return 'دوام صباحي (12 ساعة)';
-                            if (S === 'A') return 'دوام مسائي (12 ساعة)';
-                            return 'استراحة مناوبة';
-                        } else if (cycleDay === 3) {
-                            if (S === 'D') return 'دوام صباحي (12 ساعة)';
-                            if (S === 'C') return 'دوام مسائي (12 ساعة)';
-                            return 'استراحة مناوبة';
-                        } else if (cycleDay === 4) {
-                            if (S === 'B') return 'دوام صباحي (12 ساعة)';
-                            if (S === 'D') return 'دوام مسائي (12 ساعة)';
-                            return 'استراحة مناوبة';
-                        }
-                        return 'استراحة مناوبة';
-                    }
+                    return cycleStatus;
                 }
                 return 'غير محدد';
             };
@@ -1139,7 +1123,13 @@ import { buildDatePicker } from '../ui/datePicker';
                     const dateStr = monthStr + '-' + String(d).padStart(2, '0');
                     if (!isWorkDay(dateStr)) continue;
                     workDays++;
-                    if (WATER_LEAVE_TALLY_TYPES.includes(getEmployeeDailyStatus(emp, dateStr))) leaveDays++;
+                    const st = getEmployeeDailyStatus(emp, dateStr);
+                    if (WATER_LEAVE_TALLY_TYPES.includes(st)) leaveDays++;
+                    else if (st === 'استراحة مناوبة') {
+                        // استراحة تُعدّ إجازة بعد إجازة من مناوبة صباحية (domain/shiftLeave.ts)
+                        const carry = getShiftLeaveCarry(emp, dateStr);
+                        if (carry && carry.mode === 'counted' && WATER_LEAVE_TALLY_TYPES.includes(carry.type)) leaveDays++;
+                    }
                 }
                 return leaveDays >= Math.ceil(workDays / 2);
             };
@@ -1771,11 +1761,16 @@ import { buildDatePicker } from '../ui/datePicker';
                         const otRaw = overtimeHoursRecords[dateStr] && overtimeHoursRecords[dateStr][emp.id];
                         const otRecordedHours = (otRaw != null && otRaw !== '' && isFinite(Number(otRaw))) ? Number(otRaw) : null;
                         const naturalStatus = (emp.workType === 'مناوب' && status.includes('إضافي')) ? getEmployeeDailyStatus(emp, dateStr, true) : status;
-                        dailyLog.push({ dateStr, dayName, status, isOverride: !!isOverride, hourlyHours, otHours, isFuture: !isPastOrToday, fromPeriod, otRecordedHours, naturalStatus });
+                        // استراحة بعد إجازة من مناوبة صباحية: تبقى استراحة وتُعدّ في الإجازات (domain/shiftLeave.ts)
+                        const carry = status === 'استراحة مناوبة' ? getShiftLeaveCarry(emp, dateStr) : null;
+                        const countedLeaveNote = shiftLeaveCarryNote(carry);
+                        dailyLog.push({ dateStr, dayName, status, isOverride: !!isOverride, hourlyHours, otHours, isFuture: !isPastOrToday, fromPeriod, otRecordedHours, naturalStatus, countedLeaveNote });
 
                         // احتساب أيام الحضور والإحصائيات فقط للأيام المنقضية واليوم الحالي
                         if (isPastOrToday) {
-                            if (status === 'دوام صباحي' || status === 'حضور فعلي' || status === 'دوام صباحي (12 ساعة)' || status === 'دوام مسائي (12 ساعة)' || status === 'دوام 24 ساعة' || status === 'إجازة زمنية' || status === 'ورقة عمل' || status === 'مكلف بواجب') {
+                            if (countedLeaveNote) {
+                                leaves++;
+                            } else if (status === 'دوام صباحي' || status === 'حضور فعلي' || status === 'دوام صباحي (12 ساعة)' || status === 'دوام مسائي (12 ساعة)' || status === 'دوام 24 ساعة' || status === 'إجازة زمنية' || status === 'ورقة عمل' || status === 'مكلف بواجب') {
                                 regularDuty++;
                             } else if (status === 'دوام إضافي' || status.includes('إضافي')) {
                                 overtimeDuty++;
@@ -2027,6 +2022,7 @@ import { buildDatePicker } from '../ui/datePicker';
                                     'الملاحظات': dailyStatusNote(status,
                                         hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id],
                                         overtimeHoursRecords[dailyReportDate] && overtimeHoursRecords[dailyReportDate][s.id])
+                                        || (status === 'استراحة مناوبة' ? shiftLeaveCarryNote(getShiftLeaveCarry(s, dailyReportDate)) : '')
                                 });
                             });
                         }

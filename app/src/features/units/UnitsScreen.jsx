@@ -856,7 +856,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                                         let bgClass = 'bg-slate-800 border-slate-700 text-slate-200';
                                                                         if (dayItem.status === 'دوام صباحي' || dayItem.status.includes('12 ساعة') || dayItem.status.includes('24 ساعة')) bgClass = 'bg-slate-800 border-emerald-500/50 text-emerald-300';
                                                                         else if (dayItem.status === 'دوام إضافي' || dayItem.status.includes('إضافي')) bgClass = 'bg-amber-950 border-amber-500 text-amber-300 font-black';
-                                                                        else if (dayItem.status.includes('إجازة') || dayItem.status.includes('مرضية')) bgClass = 'bg-rose-950 border-rose-500 text-rose-300';
+                                                                        else if (dayItem.status.includes('إجازة') || dayItem.status.includes('مرضية') || dayItem.countedLeaveNote) bgClass = 'bg-rose-950 border-rose-500 text-rose-300';
                                                                         else if (dayItem.status === 'غياب') bgClass = 'bg-red-900 border-red-500 text-white font-black';
                                                                         else if (dayItem.status === 'سحب يد') bgClass = 'bg-red-900 border-red-300 text-white font-black';
 
@@ -869,6 +869,9 @@ export const UnitsScreen = ({ ctx }) => {
                                                                                 <div className="font-bold text-[11px] truncate" title={dayItem.status}>
                                                                                     {dayItem.isOverride ? '📌 ' : ''}{dayItem.status}
                                                                                 </div>
+                                                                                {dayItem.countedLeaveNote && (
+                                                                                    <div className="text-[10px] font-bold leading-snug">🏖️ {dayItem.countedLeaveNote}</div>
+                                                                                )}
                                                                             </div>
                                                                         );
                                                                     })}
