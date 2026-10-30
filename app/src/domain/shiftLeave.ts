@@ -25,9 +25,9 @@ const addDaysStr = (dateStr: string, n: number): string => {
 
 export const shiftLeaveCarry = (
     dateStr: string,
-    opts: { isThreeShift: boolean; cycleStatus: (d: string) => string; overrideOf: (d: string) => unknown },
+    opts: { isThreeShift: boolean; cycleStatus: (d: string) => string; overrideOf: (d: string) => unknown; workedOn: (d: string) => boolean },
 ): ShiftLeaveCarry | null => {
-    const { isThreeShift, cycleStatus, overrideOf } = opts;
+    const { isThreeShift, cycleStatus, overrideOf, workedOn } = opts;
     if (cycleStatus(dateStr) !== SHIFT_REST) return null;
     const month = dateStr.slice(0, 7);
     // أقرب يوم دوام قبل الاستراحة: يوم أو يومان في الثنائية، وحتى ثلاثة في الثلاثية
@@ -38,8 +38,8 @@ export const shiftLeaveCarry = (
         if (natural === SHIFT_REST) continue;
         const ov = overrideOf(d);
         if (isCarriedLeaveType(ov)) return { type: ov, mode: 'leave', from: d };
-        // الإجازة في الصباحي تخص أول استراحة وحدها، والمسائي بينهما بلا إجازة
-        if (isThreeShift || natural !== SHIFT_EVENING || back !== 1) return null;
+        // الإجازة في الصباحي تخص أول استراحة وحدها، والمسائي بينهما داومه فعلاً (لا غياب ولا دورة فيه)
+        if (isThreeShift || natural !== SHIFT_EVENING || back !== 1 || !workedOn(d)) return null;
         const m = addDaysStr(d, -1);
         const ovM = overrideOf(m);
         if (m.slice(0, 7) === month && cycleStatus(m) === SHIFT_MORNING && isCarriedLeaveType(ovM)) {

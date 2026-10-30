@@ -1004,6 +1004,11 @@ import { buildDatePicker } from '../ui/datePicker';
                     isThreeShift: !!(emp.location && emp.location.includes('نهر بن عمر')),
                     cycleStatus: (d) => getShiftCycleStatus(emp, d),
                     overrideOf: (d) => dailyStatusOverrides[d] && dailyStatusOverrides[d][emp.id],
+                    // يوم دوام لا يمتد إليه شيء، فلا دوران في استدعاء getEmployeeDailyStatus هنا
+                    workedOn: (d) => {
+                        const st = getEmployeeDailyStatus(emp, d);
+                        return isShiftOnDutyStatus(st) || st.includes('إضافي') || ['دوام صباحي', 'حضور فعلي', 'ورقة عمل', 'مكلف بواجب', 'إجازة زمنية'].includes(st);
+                    },
                 });
             };
 
