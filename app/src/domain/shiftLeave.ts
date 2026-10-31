@@ -4,7 +4,7 @@
 // - إجازة في يوم الصباحي (ثنائية) يليها مسائي يداومه: أول استراحة بعده تبقى استراحة (N في الاستمارة)
 //   وتُضاف يوماً إلى عداد الإجازات وعدّ قائمة الماء، مع ملاحظة في كشف الموقف اليومي.
 // الإجازة المعتبرة تعديل يومي فقط (الفترة المؤرَّخة تنتهي بتاريخ عودتها)، وكل أنواعها عدا الزمنية.
-// والامتداد داخل الشهر الواحد، كربط الجمعة والسبت. موقف مُدخل في يوم الاستراحة يغلب (يفحصه المستدعي).
+// والامتداد يعبر حدّ الشهر (تصحيح أسامة 2026-11-01): ما وقع من الاستراحة في الشهر اللاحق يُحسب فيه. موقف مُدخل في يوم الاستراحة يغلب (يفحصه المستدعي).
 
 import { getArabicDayName } from '../core/dates.js';
 
@@ -29,11 +29,9 @@ export const shiftLeaveCarry = (
 ): ShiftLeaveCarry | null => {
     const { isThreeShift, cycleStatus, overrideOf, workedOn } = opts;
     if (cycleStatus(dateStr) !== SHIFT_REST) return null;
-    const month = dateStr.slice(0, 7);
     // أقرب يوم دوام قبل الاستراحة: يوم أو يومان في الثنائية، وحتى ثلاثة في الثلاثية
     for (let back = 1; back <= 3; back++) {
         const d = addDaysStr(dateStr, -back);
-        if (d.slice(0, 7) !== month) return null;
         const natural = cycleStatus(d);
         if (natural === SHIFT_REST) continue;
         const ov = overrideOf(d);
@@ -42,7 +40,7 @@ export const shiftLeaveCarry = (
         if (isThreeShift || natural !== SHIFT_EVENING || back !== 1 || !workedOn(d)) return null;
         const m = addDaysStr(d, -1);
         const ovM = overrideOf(m);
-        if (m.slice(0, 7) === month && cycleStatus(m) === SHIFT_MORNING && isCarriedLeaveType(ovM)) {
+        if (cycleStatus(m) === SHIFT_MORNING && isCarriedLeaveType(ovM)) {
             return { type: ovM, mode: 'counted', from: m };
         }
         return null;
