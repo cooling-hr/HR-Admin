@@ -858,7 +858,9 @@ React.useEffect(() => {
             const res = await cloudFetch(`${FIREBASE_SESSIONS_URL}.json?t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
-                setActiveSessions(data || {});
+                // نتيجة مطابقة لما قبلها تُترك كما هي: الاستعلام كل 3 ثوانٍ كان يعيد رسم الشاشة كلها بلا تغيير
+                const next = data || {};
+                setActiveSessions(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next);
             }
         } catch (e) {}
     };
@@ -1192,7 +1194,19 @@ const [syncStatus, setSyncStatus] = useState({
     isSyncing: false
 });
                         // ===== محرك المزامنة السحابية الحية الرسمي (Google Firebase Realtime DB) =====
-const [cloudSyncStatus, setCloudSyncStatus] = useState({ connected: true, syncing: false, lastSync: null, error: null });
+const [cloudSyncStatus, setCloudSyncStatusRaw] = useState({ connected: true, syncing: false, lastSync: null, error: null });
+// كل تغيير في هذه الحالة يعيد رسم الشاشة كلها (الطبقة تعيش داخل StaffSystem)، وهي تتغير مع كل
+// استطلاع وكل حفظ: الحالة المطابقة لما قبلها تُعاد كما هي فلا يُعاد الرسم بلا داعٍ
+const setCloudSyncStatus = (next) => setCloudSyncStatusRaw(prev => {
+    const n = typeof next === 'function' ? next(prev) : next;
+    const keys = new Set([...Object.keys(prev), ...Object.keys(n)]);
+    for (const k of keys) {
+        if ((prev[k] ?? null) !== (n[k] ?? null)) return n;
+    }
+    return prev;
+});
+// وقت آخر مزامنة بدقة الدقيقة: بالثواني كان يغيّر الحالة (فيعيد الرسم) مع كل استطلاع
+const syncClockLabel = () => new Date().toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
 // آخر lastCloudUpdate رآه هذا الجهاز من الخادم — يُقارَن قبل كل حفظ لمنع محو عمل زميل
 const knownServerUpdateRef = React.useRef(null);
 const lastCloudTimeRef = React.useRef(null);
@@ -1228,7 +1242,6 @@ const fetchCloudData = async () => {
     if (isFetchingCloudRef.current) return;
     isFetchingCloudRef.current = true;
     try {
-        setCloudSyncStatus(prev => ({ ...prev, syncing: true }));
         // موثَّق عمداً: بيانات الملاك (أسماء وهواتف وعناوين) لم تعد مقروءة للعموم،
         // فقراءتها تحتاج توكن حساب له دور مسند — لذا cloudFetch لا fetch عارياً
         const res = await cloudFetch(FIREBASE_DB_URL + '?t=' + Date.now(), {
@@ -1256,7 +1269,11 @@ const fetchCloudData = async () => {
                         // بل لقطة قديمة أُعيد بثّها). الآن: لا يتقدّم الختم إلا بعد
                         // applyDataBundleToState فعلاً بلا استثناء، فتُعاد المحاولة
                         // تلقائياً في الاستطلاع التالي (كل 5 ثوانٍ) حتى تصل لقطة سليمة
-                        if (cloudData.staffData && Array.isArray(cloudData.staffData) && cloudData.staffData.length > 0) {
+                        // حفظ هذا الجهاز جارٍ: ما وصل الآن قد يكون حزمته هو (يسبق ردُّ الخادم ختمَه المحلي)،
+                        // وتطبيقه يعيد كتابة كل الحالة فوق ما على الشاشة. الاستطلاع التالي يجد الختم متطابقاً
+                        if (isPushingRef.current) {
+                            // لا شيء يُطبَّق الآن
+                        } else if (cloudData.staffData && Array.isArray(cloudData.staffData) && cloudData.staffData.length > 0) {
                             try {
                                 applyDataBundleToState(cloudData);
                                 lastCloudTimeRef.current = cloudData.lastCloudUpdate;
@@ -1266,7 +1283,7 @@ const fetchCloudData = async () => {
                         }
                     }
                 }
-                setCloudSyncStatus({ connected: true, syncing: false, lastSync: new Date().toLocaleTimeString('ar-IQ') });
+                setCloudSyncStatus({ connected: true, syncing: false, lastSync: syncClockLabel(), error: null });
             }
         } else {
             setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false }));
@@ -1338,7 +1355,6 @@ const pushDataToCloud = async (bundle = null) => {
     }
     isPushingRef.current = true;
     try {
-        setCloudSyncStatus(prev => ({ ...prev, syncing: true }));
         const nowIso = (bundle && bundle.lastCloudUpdate) ? bundle.lastCloudUpdate : new Date().toISOString();
         const dataPayload = { ...(bundle || (buildCloudBundleRef.current || buildCloudBundle)()), lastCloudUpdate: nowIso };
         // عقدة القفل writeClaim ليست حقلاً من حزمة البيانات (لا تدخل بصمة التكرار
@@ -1443,7 +1459,7 @@ const pushDataToCloud = async (bundle = null) => {
             lastCloudTimeRef.current = nowIso;
             knownServerUpdateRef.current = nowIso;
             lastSyncedSignatureRef.current = payloadSignature;
-            setCloudSyncStatus({ connected: true, syncing: false, lastSync: new Date().toLocaleTimeString('ar-IQ'), error: null });
+            setCloudSyncStatus({ connected: true, syncing: false, lastSync: syncClockLabel(), error: null });
             logAuditEvent('save_system_bundle', currentUserName);
 
             // 3. حفظ لقطة أرشيفية تلقائية يومية غير قابلة للإلغاء في الأرشيف السحابي (Immutable Daily
