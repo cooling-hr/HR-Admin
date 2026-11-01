@@ -4749,17 +4749,13 @@ import { buildDatePicker } from '../ui/datePicker';
                     let counter = 1;
                     
                     if (selectedUnit) {
-                        // تصدير وحدة واحدة محددة
-                        const unitStaff = current.filter(s => s.unit === selectedUnit.name);
-                        const sortedStaff = sortByJobTitleHierarchy(unitStaff, selectedUnit.name);
-                        
-                        sortedStaff.forEach(s => {
-                            exportData.push({
-                                'ت': counter++,
-                                'الاسم الكامل': s.name,
-                                'الرقم الوظيفي': s.jobNumber,
-                                'العنوان الوظيفي': s.jobTitle
+                        // تصدير وحدة واحدة محددة: ما في المعاينة نفسه، بأعمدتها المختارة وتعديلات خلاياها
+                        previewData.filter(d => d.type === 'data').forEach(row => {
+                            const filtered = {};
+                            Object.keys(row).forEach(k => {
+                                if (k === 'ت' || k === 'الاسم الكامل' || visiblePreviewColumns.includes(k)) filtered[k] = row[k];
                             });
+                            exportData.push(filtered);
                         });
                     } else {
                         // تصدير كل الوحدات
@@ -4796,8 +4792,8 @@ import { buildDatePicker } from '../ui/datePicker';
                     }
                     
                     const ws = XLSX.utils.json_to_sheet(exportData);
-                    ws['!cols'] = [{wch: 5.8}, {wch: 35}, {wch: 14}, {wch: 22}];
-                    
+                    ws['!cols'] = [{wch: 5.8}, {wch: 35}, {wch: 14}, {wch: 22}, {wch: 22}, {wch: 12}];
+
                     const sheetName = selectedUnit ? selectedUnit.name : 'الوحدات';
                     XLSX.utils.book_append_sheet(wb, ws, sheetName);
                     
