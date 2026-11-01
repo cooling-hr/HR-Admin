@@ -101,7 +101,7 @@ import { buildDatePicker } from '../ui/datePicker';
             
             // حفظ تلقائي عند تغيير البيانات وبثها للسحابة الحية
             React.useEffect(() => {
-                if (staff.length > 1 && !isSyncingRef.current && isInitialCloudLoadCompleteRef.current) {
+                if (staff.length > 0 && !isSyncingRef.current && isInitialCloudLoadCompleteRef.current) {
                     safeStorage.setItem('staffData', JSON.stringify(staff));
                     pushDataToCloud();
                 }
@@ -1442,7 +1442,7 @@ import { buildDatePicker } from '../ui/datePicker';
                                 freshRecords = { overtimeHoursRecords: withDayValue(overtimeHoursRecords, dateStr, empId, maxHours) };
                             }
                         } else {
-                            revertToDefault();
+                            // «إلغاء» يُبقي موقف اليوم كما كان، كنافذة الزمنية وورقة العمل
                             return;
                         }
                     } catch(e) {}
@@ -5061,6 +5061,9 @@ import { buildDatePicker } from '../ui/datePicker';
             useEscapeClose(!!quickPeriod, () => setQuickPeriod(null));
             useEscapeClose(showUserMenu, () => setShowUserMenu(false));
             useEscapeClose(showPreview, () => setShowPreview(false));
+            // العنوان خاص بالمعاينة المفتوحة، وخلوّه يعني أعمدة قابلة للتخصيص وتصديراً بها، فيُصفَّر
+            // عند كل إغلاق (Esc أو انتهاء التصدير) كي لا ترثه المعاينة التالية
+            React.useEffect(() => { if (!showPreview) setPreviewTitle(''); }, [showPreview]);
             useEscapeClose(showEditModal && !!editingEmployee, cancelEdit);
             useEscapeClose(showPrintForm, () => setShowPrintForm(false));
             useEscapeClose(!!waterMemoGroup, () => setWaterMemoGroup(null));

@@ -1119,7 +1119,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                     'البريد الإلكتروني': s.email || ''
                                                 }));
                                                 setPreviewData(exportData);
-                                                setVisiblePreviewColumns(['الرقم الوظيفي', 'العنوان الوظيفي', 'رقم الهاتف النقال']);
+                                                setVisiblePreviewColumns(['الرقم الوظيفي', 'العنوان الوظيفي', 'النقال']);
                                                 setShowPreview(true);
                                             }}
                                             className="bg-[var(--action)] hover:bg-[var(--action-hover)] text-white rounded-lg px-6 py-3 font-bold transition shadow-sm"
