@@ -1,8 +1,9 @@
 // إجازة المناوب تمتد إلى أيام استراحته (قرار أسامة 2026-10-30). الدورة الثنائية: صباحي، مسائي، استراحتان؛
 // والثلاثية: 24 ساعة ثم ثلاث استراحات. يقرّر آخرُ يوم إجازة قبل الاستراحة:
-// - إجازة في يوم المسائي (ثنائية) أو يوم الـ24 ساعة (ثلاثية): كل الاستراحات بعده إجازة في الموقف اليومي نفسه.
-// - إجازة في يوم الصباحي (ثنائية) يليها مسائي يداومه: أول استراحة بعده تبقى استراحة (N في الاستمارة)
-//   وتُضاف يوماً إلى عداد الإجازات وعدّ قائمة الماء، مع ملاحظة في كشف الموقف اليومي.
+// - إجازة في يوم المسائي (ثنائية) أو يوم الـ24 ساعة (ثلاثية): تُحسب كل الاستراحات بعده.
+// - إجازة في يوم الصباحي (ثنائية) يليها مسائي يداومه: تُحسب أول استراحة بعده وحدها.
+// والمحسوبة تبقى استراحة في الموقف اليومي والاستمارة (N)، وتُضاف إلى مجموع إجازات تقرير الفترة مع ملاحظة
+// في سجله التفصيلي، وإلى عدّ قائمة الماء (قرار أسامة 2026-11-01).
 // الإجازة المعتبرة تعديل يومي فقط (الفترة المؤرَّخة تنتهي بتاريخ عودتها)، وكل أنواعها عدا الزمنية.
 // والامتداد يعبر حدّ الشهر (تصحيح أسامة 2026-11-01): ما وقع من الاستراحة في الشهر اللاحق يُحسب فيه. موقف مُدخل في يوم الاستراحة يغلب (يفحصه المستدعي).
 
@@ -12,7 +13,10 @@ const SHIFT_REST = 'استراحة مناوبة';
 const SHIFT_MORNING = 'دوام صباحي (12 ساعة)';
 const SHIFT_EVENING = 'دوام مسائي (12 ساعة)';
 
-export type ShiftLeaveCarry = { type: string; mode: 'leave' | 'counted'; from: string };
+export type ShiftLeaveCarry = { type: string; from: string; shift: string };
+
+const shiftLabel = (natural: string): string =>
+    natural === SHIFT_MORNING ? 'صباحية' : natural === SHIFT_EVENING ? 'مسائية' : '24 ساعة';
 
 export const isCarriedLeaveType = (status: unknown): status is string =>
     typeof status === 'string' && status.includes('إجازة') && status !== 'إجازة زمنية';
@@ -35,13 +39,13 @@ export const shiftLeaveCarry = (
         const natural = cycleStatus(d);
         if (natural === SHIFT_REST) continue;
         const ov = overrideOf(d);
-        if (isCarriedLeaveType(ov)) return { type: ov, mode: 'leave', from: d };
+        if (isCarriedLeaveType(ov)) return { type: ov, from: d, shift: shiftLabel(natural) };
         // الإجازة في الصباحي تخص أول استراحة وحدها، والمسائي بينهما داومه فعلاً (لا غياب ولا دورة فيه)
         if (isThreeShift || natural !== SHIFT_EVENING || back !== 1 || !workedOn(d)) return null;
         const m = addDaysStr(d, -1);
         const ovM = overrideOf(m);
         if (cycleStatus(m) === SHIFT_MORNING && isCarriedLeaveType(ovM)) {
-            return { type: ovM, mode: 'counted', from: m };
+            return { type: ovM, from: m, shift: shiftLabel(SHIFT_MORNING) };
         }
         return null;
     }
@@ -50,6 +54,6 @@ export const shiftLeaveCarry = (
 
 // نص الملاحظة بصياغة أسامة
 export const shiftLeaveCarryNote = (carry: ShiftLeaveCarry | null): string =>
-    carry && carry.mode === 'counted'
-        ? `ضوعفت الإجازة لأن يوم ${getArabicDayName(carry.from)} ${carry.from} صادف إجازة من مناوبة صباحية`
+    carry
+        ? `ضوعفت الإجازة لأن يوم ${getArabicDayName(carry.from)} ${carry.from} صادف إجازة من مناوبة ${carry.shift}`
         : '';

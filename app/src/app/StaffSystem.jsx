@@ -1025,7 +1025,6 @@ import { buildDatePicker } from '../ui/datePicker';
                     isThreeShift: !!(emp.location && emp.location.includes('نهر بن عمر')),
                     cycleStatus: (d) => getShiftCycleStatus(emp, d),
                     overrideOf: (d) => dailyStatusOverrides[d] && dailyStatusOverrides[d][emp.id],
-                    // يوم دوام لا يمتد إليه شيء، فلا دوران في استدعاء getEmployeeDailyStatus هنا
                     workedOn: (d) => {
                         const st = getEmployeeDailyStatus(emp, d);
                         return isShiftOnDutyStatus(st) || st.includes('إضافي') || ['دوام صباحي', 'حضور فعلي', 'ورقة عمل', 'مكلف بواجب', 'إجازة زمنية'].includes(st);
@@ -1098,13 +1097,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     return 'دوام صباحي';
                 }
                 if (emp.workType === 'مناوب') {
-                    const cycleStatus = getShiftCycleStatus(emp, dateStr);
-                    // إجازة في المسائي أو الـ24 ساعة تجعل الاستراحات بعدها إجازة (domain/shiftLeave.ts)
-                    if (cycleStatus === 'استراحة مناوبة' && !ignoreOverride) {
-                        const carry = getShiftLeaveCarry(emp, dateStr);
-                        if (carry && carry.mode === 'leave') return carry.type;
-                    }
-                    return cycleStatus;
+                    return getShiftCycleStatus(emp, dateStr);
                 }
                 return 'غير محدد';
             };
@@ -1152,9 +1145,9 @@ import { buildDatePicker } from '../ui/datePicker';
                     const st = getEmployeeDailyStatus(emp, dateStr);
                     if (WATER_LEAVE_TALLY_TYPES.includes(st)) leaveDays++;
                     else if (st === 'استراحة مناوبة') {
-                        // استراحة تُعدّ إجازة بعد إجازة من مناوبة صباحية (domain/shiftLeave.ts)
+                        // استراحة تُعدّ إجازة بعد إجازة في وجبة المناوب (domain/shiftLeave.ts)
                         const carry = getShiftLeaveCarry(emp, dateStr);
-                        if (carry && carry.mode === 'counted' && WATER_LEAVE_TALLY_TYPES.includes(carry.type)) leaveDays++;
+                        if (carry && WATER_LEAVE_TALLY_TYPES.includes(carry.type)) leaveDays++;
                     }
                 }
                 return leaveDays >= Math.ceil(workDays / 2);
@@ -1793,7 +1786,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         const otRaw = overtimeHoursRecords[dateStr] && overtimeHoursRecords[dateStr][emp.id];
                         const otRecordedHours = (otRaw != null && otRaw !== '' && isFinite(Number(otRaw))) ? Number(otRaw) : null;
                         const naturalStatus = (emp.workType === 'مناوب' && status.includes('إضافي')) ? getEmployeeDailyStatus(emp, dateStr, true) : status;
-                        // استراحة بعد إجازة من مناوبة صباحية: تبقى استراحة وتُعدّ في الإجازات (domain/shiftLeave.ts)
+                        // استراحة بعد إجازة في وجبة المناوب: تبقى استراحة وتُعدّ في الإجازات (domain/shiftLeave.ts)
                         const carry = status === 'استراحة مناوبة' ? getShiftLeaveCarry(emp, dateStr) : null;
                         const countedLeaveNote = shiftLeaveCarryNote(carry);
                         dailyLog.push({ dateStr, dayName, status, isOverride: !!isOverride, hourlyHours, otHours, isFuture: !isPastOrToday, fromPeriod, otRecordedHours, naturalStatus, countedLeaveNote });
@@ -2054,7 +2047,6 @@ import { buildDatePicker } from '../ui/datePicker';
                                     'الملاحظات': dailyStatusNote(status,
                                         hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id],
                                         overtimeHoursRecords[dailyReportDate] && overtimeHoursRecords[dailyReportDate][s.id])
-                                        || (status === 'استراحة مناوبة' ? shiftLeaveCarryNote(getShiftLeaveCarry(s, dailyReportDate)) : '')
                                 });
                             });
                         }
