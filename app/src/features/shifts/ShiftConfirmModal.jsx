@@ -1,9 +1,10 @@
 import React from 'react';
+import { recalibrateAnchors } from '../../domain/shiftCycle';
 
 // نافذة تأكيد إعادة ضبط وتثبيت الوجبة. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const ShiftConfirmModal = ({ ctx }) => {
-    const { dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad } = ctx;
+    const { anchorDate, timeFormCodeEdits, dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad } = ctx;
     return (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-fadeIn no-print">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-scaleUp">
@@ -36,18 +37,15 @@ export const ShiftConfirmModal = ({ ctx }) => {
                             setAnchorDate(targetDate);
                             safeStorage.setItem('shiftAnchorDate', targetDate);
 
-                            let newThreeSquad = threeShiftAnchorSquad;
-                            let newTwoSquad = twoShiftAnchorSquad;
-
-                            if (pendingShiftConfirm.type === '24h') {
-                                newThreeSquad = pendingShiftConfirm.squad;
-                                setThreeShiftAnchorSquad(newThreeSquad);
-                                safeStorage.setItem('threeShiftAnchorSquad', newThreeSquad);
-                            } else if (pendingShiftConfirm.type === '12h') {
-                                newTwoSquad = pendingShiftConfirm.squad;
-                                setTwoShiftAnchorSquad(newTwoSquad);
-                                safeStorage.setItem('twoShiftAnchorSquad', newTwoSquad);
-                            }
+                            // النوع الآخر تُحسب وجبته في التاريخ الجديد، فلا تنزاح دورته
+                            const { threeSquad: newThreeSquad, twoSquad: newTwoSquad } = recalibrateAnchors(
+                                { anchorDate, threeSquad: threeShiftAnchorSquad, twoSquad: twoShiftAnchorSquad },
+                                pendingShiftConfirm.type, pendingShiftConfirm.squad, targetDate
+                            );
+                            setThreeShiftAnchorSquad(newThreeSquad);
+                            safeStorage.setItem('threeShiftAnchorSquad', newThreeSquad);
+                            setTwoShiftAnchorSquad(newTwoSquad);
+                            safeStorage.setItem('twoShiftAnchorSquad', newTwoSquad);
 
                             // المزامنة السحابية الفورية لضمان عدم عودة الوجبة السابقة
                             pushDataToCloud({
@@ -56,6 +54,7 @@ export const ShiftConfirmModal = ({ ctx }) => {
                                 officialHolidaysList: officialHolidays,
                                 hourlyLeaveRecords: hourlyLeaveRecords,
                                 hourlyLeaveTimings: hourlyLeaveTimings,
+                                timeFormCodeEdits: timeFormCodeEdits,
                                 mealAuthorizations: mealAuthorizations,
                                 overtimeHoursRecords: overtimeHoursRecords,
                                 dailyStatusOverrides: dailyStatusOverrides,

@@ -5155,7 +5155,7 @@ return (
             {showHolidaysModal && <HolidaysModal ctx={{ addOfficialHolidayRange, dailyReportDate, holidayRangeEnd, holidayRangeStart, officialHolidays, setHolidayRangeEnd, setHolidayRangeStart, setShowHolidaysModal, toggleOfficialHolidayDate }} />}
 
             {pendingHourlyLeave && <HourlyLeaveModal ctx={{ confirmHourlyLeave, pendingHourlyLeave, setPendingHourlyLeave }} />}
-            {pendingShiftConfirm && <ShiftConfirmModal ctx={{ dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad }} />}
+            {pendingShiftConfirm && <ShiftConfirmModal ctx={{ anchorDate, timeFormCodeEdits, dailyReportDate, dailyStatusOverrides, dataEntryOperator, hourlyLeaveRecords, hourlyLeaveTimings, mealAuthorizations, officialHolidays, overtimeHoursRecords, overtimeIds, pendingDeletionRequest, pendingShiftConfirm, pushDataToCloud, safeStorage, setAnchorDate, setPendingShiftConfirm, setThreeShiftAnchorSquad, setTwoShiftAnchorSquad, showCustomAlert, staff, systemUsers, threeShiftAnchorSquad, twoShiftAnchorSquad }} />}
 
             {pendingReturnPrompt && <ReturnPromptModal ctx={{ confirmReturn, pendingReturnPrompt }} />}
 
