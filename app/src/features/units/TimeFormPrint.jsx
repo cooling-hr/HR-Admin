@@ -83,7 +83,7 @@ export const TimeFormPrint = ({ ctx }) => {
                 <div style={{ height: '16mm', borderBottom: '1px solid #000' }}></div>
             </div>
             <div style={{ width: '60mm', textAlign: 'center' }}>
-                <div>مسؤول الشعبة</div>
+                <div>مسؤول {org.terms.the}</div>
                 <div style={{ height: '16mm', borderBottom: '1px solid #000' }}></div>
             </div>
         </div>

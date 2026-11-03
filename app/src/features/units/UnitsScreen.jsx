@@ -45,7 +45,7 @@ const DAILY_COUNT_CHIPS = [
     { key: 'leave', label: '🏖️ مجاز', className: 'bg-rose-50 text-rose-700 border-rose-200', always: true },
     { key: 'course', label: '🎓 دورة', className: 'bg-indigo-50 text-indigo-700 border-indigo-200', always: true },
     { key: 'mission', label: '✈️ إيفاد', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-    { key: 'detached', label: '🏢 خارج الشعبة', className: 'bg-teal-50 text-teal-700 border-teal-200' },
+    { key: 'detached', label: terms => `🏢 خارج ${terms.the}`, className: 'bg-teal-50 text-teal-700 border-teal-200' },
     { key: 'rest', label: '🌙 استراحة', className: 'bg-slate-100 text-slate-600 border-slate-200' },
     { key: 'excused', label: '🚧 تعذر حضور', className: 'bg-amber-100 text-amber-900 border-amber-300' },
     { key: 'absent', label: '❌ غياب', className: 'bg-red-600 text-white border-red-600' },
@@ -53,9 +53,9 @@ const DAILY_COUNT_CHIPS = [
     { key: 'other', label: '❔ غير مصنّف', className: 'bg-white text-slate-700 border-slate-200' },
 ];
 
-const DailyCountChips = ({ counts }) => DAILY_COUNT_CHIPS.filter(c => c.always || (counts || {})[c.key] > 0).map(c => (
+const DailyCountChips = ({ counts, terms }) => DAILY_COUNT_CHIPS.filter(c => c.always || (counts || {})[c.key] > 0).map(c => (
     <span key={c.key} className={`border font-black px-2.5 py-0.5 rounded-full text-xs whitespace-nowrap ${c.className}`}>
-        {c.label} {(counts || {})[c.key] || 0}
+        {typeof c.label === 'function' ? c.label(terms) : c.label} {(counts || {})[c.key] || 0}
     </span>
 ));
 
@@ -117,7 +117,7 @@ export const UnitsScreen = ({ ctx }) => {
                     <div className="px-6 pt-6">
                     <PageHeader
                         icon="clipboard-list"
-                        title="الموقف اليومي لمنتسبي الشعبة"
+                        title={`الموقف اليومي لمنتسبي ${org.terms.the}`}
                         description="موقف موحد حسب الوحدات يعرض جميع المناوبين (في الدوام أو الاستراحة) والصباحيين غير الحاضرين فقط"
                         actions={
                             <button onClick={exportDailyReportExcel} className="bg-[var(--action)] hover:bg-[var(--action-hover)] text-white px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm shadow-sm transition active:scale-95 flex items-center gap-1.5 flex-1 md:flex-initial justify-center cursor-pointer">
@@ -263,10 +263,10 @@ export const UnitsScreen = ({ ctx }) => {
 
 
                     {/* شريط الأرقام المدمج: إحصاء الشعبة كلها (لا الوحدة المختارة) من المصنِّف نفسه الذي تعتمده شارات «كافة الوحدات» */}
-                    <div className="text-xs font-black text-slate-600 no-print">📊 إحصاء الشعبة كلها ليوم {getArabicDayName(dailyReportDate)} {dailyReportDate}</div>
+                    <div className="text-xs font-black text-slate-600 no-print">📊 إحصاء {org.terms.the} {org.terms.whole} ليوم {getArabicDayName(dailyReportDate)} {dailyReportDate}</div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 no-print">
                         <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2">
-                            <span className="text-[11px] font-bold text-slate-600">🏢 الدوام الفعلي للشعبة</span>
+                            <span className="text-[11px] font-bold text-slate-600">🏢 الدوام الفعلي {org.terms.forThe}</span>
                             <span className="text-lg font-black text-slate-800">{dailyStats.onDuty}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2" title="يشمل ورقة العمل والمكلف بواجب والإجازة الزمنية">
@@ -381,9 +381,9 @@ export const UnitsScreen = ({ ctx }) => {
 
                         <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto md:flex-wrap md:overflow-visible px-1 pb-1">
                             <span className="text-xs font-black text-slate-300 whitespace-nowrap">
-                                {selectedDailyUnitTab === 'all' ? 'موقف الشعبة كلها:' : `موقف ${selectedDailyUnitTab}:`}
+                                {selectedDailyUnitTab === 'all' ? `موقف ${org.terms.the} ${org.terms.whole}:` : `موقف ${selectedDailyUnitTab}:`}
                             </span>
-                            <DailyCountChips counts={dailyUnitCounts[selectedDailyUnitTab]} />
+                            <DailyCountChips counts={dailyUnitCounts[selectedDailyUnitTab]} terms={org.terms} />
                         </div>
                     </div>
 
@@ -435,7 +435,7 @@ export const UnitsScreen = ({ ctx }) => {
                                             <span className="bg-slate-200 text-slate-700 font-black px-2.5 py-0.5 rounded-full text-xs">
                                                 {unitStaff.length} موظف
                                             </span>
-                                            <DailyCountChips counts={dailyUnitCounts[unitName]} />
+                                            <DailyCountChips counts={dailyUnitCounts[unitName]} terms={org.terms} />
                                         </div>
 
                                         {/* أزرار الإجراء السريع الجماعي لموقع / وحدة الدوام */}
@@ -685,7 +685,7 @@ export const UnitsScreen = ({ ctx }) => {
                                         <div className="text-2xl font-black text-slate-900 mt-1">{periodReportData.summary.totalStaff} منتسب</div>
                                         <div className="text-[10px] font-bold text-slate-400 mt-0.5">
                                             {(periodUnitFilter === 'all' && periodWorkTypeFilter === 'all' && !periodSearchQuery.trim())
-                                                ? 'يشمل جميع كادر الشعبة المعتمد بالكامل'
+                                                ? `يشمل جميع كادر ${org.terms.the} المعتمد بالكامل`
                                                 : `مُصفّى: ${[periodUnitFilter !== 'all' ? periodUnitFilter : null, periodWorkTypeFilter !== 'all' ? (periodWorkTypeFilter === 'صباحي' ? 'الملاك الصباحي' : 'الملاك المناوب') : null, periodSearchQuery.trim() ? 'بحث بالاسم/الرقم' : null].filter(Boolean).join(' — ')}`}
                                         </div>
                                     </div>
@@ -771,7 +771,7 @@ export const UnitsScreen = ({ ctx }) => {
                                         <th className="px-3 py-3.5 text-center text-rose-700">إجازات</th>
                                         <th className="px-3 py-3.5 text-center text-purple-700">دورات</th>
                                         <th className="px-3 py-3.5 text-center text-indigo-700">إيفادات</th>
-                                        <th className="px-3 py-3.5 text-center text-teal-700">خارج الشعبة</th>
+                                        <th className="px-3 py-3.5 text-center text-teal-700">خارج {org.terms.the}</th>
                                         <th className="px-3 py-3.5 text-center text-red-700">غياب</th>
                                         <th className="px-3 py-3.5 text-center">سجل الأيام</th>
                                     </tr>
@@ -887,9 +887,9 @@ export const UnitsScreen = ({ ctx }) => {
                     <div className="flex items-center gap-3">
                         <div className="text-3xl">🛒</div>
                         <div>
-                            <h4 className="font-bold text-sm">سلة العمل الإضافي الموحدة للشعبة</h4>
+                            <h4 className="font-bold text-sm">سلة العمل الإضافي الموحدة {org.terms.forThe}</h4>
                             <p className="text-xs opacity-90 mt-0.5">
-                                قمت بتحديد ({overtimeIds.length}) موظف لإدراجهم في كشف الساعات الإضافية الموحد للشعبة.
+                                قمت بتحديد ({overtimeIds.length}) موظف لإدراجهم في كشف الساعات الإضافية الموحد {org.terms.forThe}.
                             </p>
                         </div>
                     </div>

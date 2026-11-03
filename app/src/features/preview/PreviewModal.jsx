@@ -3,7 +3,7 @@ import React from 'react';
 // نافذة معاينة الجداول وتصديرها. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const PreviewModal = ({ ctx }) => {
-    const { ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printOrientation, printPreview, selectedUnit, setPreviewTitle, setPrintOrientation, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth } = ctx;
+    const { org, ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printOrientation, printPreview, selectedUnit, setPreviewTitle, setPrintOrientation, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth } = ctx;
     return (
         <div className="preview-overlay">
             <div className="preview-container">
@@ -107,7 +107,7 @@ export const PreviewModal = ({ ctx }) => {
                                             <td colSpan={getColSpan()} className="signature-footer-cell">
                                                 <div className="flex justify-between items-center text-slate-950 font-black text-sm md:text-base px-8 pt-10 pb-3">
                                                     <p className="font-black text-base md:text-lg text-slate-950">مسؤول الإدارة</p>
-                                                    <p className="font-black text-base md:text-lg text-slate-950">مسؤول الشعبة</p>
+                                                    <p className="font-black text-base md:text-lg text-slate-950">مسؤول {org.terms.the}</p>
                                                 </div>
                                                 <div className="pt-2 border-t border-slate-300 flex justify-between items-center text-[10px] text-slate-700 font-bold px-2">
                                                     <span>منظم الموقف: <strong className="text-slate-950 font-black">{dataEntryOperator || '....................'}</strong></span>
@@ -167,7 +167,7 @@ export const PreviewModal = ({ ctx }) => {
                             <p className="font-black text-base md:text-lg text-slate-950">مسؤول الإدارة</p>
                         </div>
                         <div className="text-left">
-                            <p className="font-black text-base md:text-lg text-slate-950">مسؤول الشعبة</p>
+                            <p className="font-black text-base md:text-lg text-slate-950">مسؤول {org.terms.the}</p>
                         </div>
                     </div>
 

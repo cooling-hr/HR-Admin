@@ -41,7 +41,7 @@ export const DashboardScreen = ({ ctx }) => {
                         <div>
                             <div className="flex justify-between items-center mb-4">
                                 <span className="text-xs bg-white bg-opacity-20 px-3 py-1.5 rounded-full text-blue-100 font-bold backdrop-blur-sm">
-                                    {unifiedResults !== null ? 'نتائج الاستعلام النشط' : 'إحصائيات الشعبة'}
+                                    {unifiedResults !== null ? 'نتائج الاستعلام النشط' : `إحصائيات ${org.terms.the}`}
                                 </span>
                                 <span className="text-2xl">{unifiedResults !== null ? '🔍' : '👥'}</span>
                             </div>
@@ -57,7 +57,7 @@ export const DashboardScreen = ({ ctx }) => {
                                     )}
                                 </div>
                                 <div className="text-sm mt-1.5 opacity-90 font-semibold">
-                                    {unifiedResults !== null ? 'الموظفون المطابقون للبحث' : 'إجمالي موظفي الشعبة'}
+                                    {unifiedResults !== null ? 'الموظفون المطابقون للبحث' : `إجمالي موظفي ${org.terms.the}`}
                                 </div>
                             </div>
 
@@ -77,7 +77,7 @@ export const DashboardScreen = ({ ctx }) => {
                                     <div className="mt-5 flex items-center justify-around gap-4 bg-white bg-opacity-[0.08] p-4 rounded-2xl border border-white border-opacity-10 shadow-inner">
                                         <SearchCircularProgress
                                             percent={percentTotal}
-                                            label="من ملاك الشعبة"
+                                            label={`من ملاك ${org.terms.the}`}
                                             color="text-sky-300"
                                             size={76}
                                             strokeWidth={7}
@@ -179,7 +179,7 @@ export const DashboardScreen = ({ ctx }) => {
 
                             {/* إحصائيات الملاك الكلي الثابتة */}
                             <div className="pt-4 border-t border-white border-opacity-10">
-                                <div className="text-xs text-blue-200 font-bold mb-2">🏢 إجمالي الملاك الكلي للشعبة:</div>
+                                <div className="text-xs text-blue-200 font-bold mb-2">🏢 إجمالي الملاك الكلي {org.terms.forThe}:</div>
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-1.5">
                                         <span className="w-5 h-5 rounded bg-blue-500 bg-opacity-30 flex items-center justify-center text-xs">♂</span>

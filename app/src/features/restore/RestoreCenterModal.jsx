@@ -3,7 +3,7 @@ import React from 'react';
 // مركز الاستعادة والأرشيف الزمني السحابي. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const RestoreCenterModal = ({ ctx }) => {
-    const { availableSnapshots, currentUserRole, fetchAvailableSnapshots, handleDownloadSnapshot, handleRestoreSnapshot, isLoadingSnapshots, selectedSnapshotPreview, setSelectedSnapshotPreview, setShowRestoreCenterModal, snapshotsError } = ctx;
+    const { org, availableSnapshots, currentUserRole, fetchAvailableSnapshots, handleDownloadSnapshot, handleRestoreSnapshot, isLoadingSnapshots, selectedSnapshotPreview, setSelectedSnapshotPreview, setShowRestoreCenterModal, snapshotsError } = ctx;
     return (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden animate-fadeInUp my-auto">
@@ -105,7 +105,7 @@ export const RestoreCenterModal = ({ ctx }) => {
 
                         {currentUserRole !== 'admin' && (
                             <div className="mb-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs font-bold text-amber-900">
-                                🛡️ يمكنك استعراض اللقطات وتنزيلها. اعتماد لقطة كقاعدة حية يبدّل بيانات الشعبة كلها ويبقى بيد مدير النظام.
+                                🛡️ يمكنك استعراض اللقطات وتنزيلها. اعتماد لقطة كقاعدة حية يبدّل بيانات {org.terms.the} {org.terms.whole} ويبقى بيد مدير النظام.
                             </div>
                         )}
                     {/* قائمة اللقطات المتاحة */}

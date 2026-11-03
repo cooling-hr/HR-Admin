@@ -55,7 +55,7 @@ export const NewEmployeeFormPrint = ({ ctx }) => {
                         </div>
 
                         <div className="border-b border-gray-400 pb-1 flex items-baseline col-span-2">
-                            <span className="font-bold text-gray-800 min-w-[100px]">الشعبة:</span>
+                            <span className="font-bold text-gray-800 min-w-[100px]">{org.terms.the}:</span>
                             <span className="flex-1 text-gray-800 font-semibold">{org.section}</span>
                         </div>
 

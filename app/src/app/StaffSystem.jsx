@@ -1937,19 +1937,19 @@ import { buildDatePicker } from '../ui/datePicker';
                             'الإجازات (يوم)': item.leaves,
                             'الدورات (يوم)': item.courses,
                             'الإيفادات (يوم)': item.deputations,
-                            'خارج الشعبة (يوم)': item.detached,
+                            [`خارج ${org.terms.the} (يوم)`]: item.detached,
                             'الغياب (يوم)': item.absence,
                             'أيام الاستراحة (يوم)': item.rest
                         });
                     });
 
                     setPreviewData(exportData);
-                    setVisiblePreviewColumns(['الرقم الوظيفي', 'الوحدة', 'طبيعة العمل', 'الدوام الاعتيادي (يوم)', 'الدوام الإضافي (يوم)', 'الإجازات (يوم)', 'الدورات (يوم)', 'الإيفادات (يوم)', 'خارج الشعبة (يوم)', 'الغياب (يوم)']);
+                    setVisiblePreviewColumns(['الرقم الوظيفي', 'الوحدة', 'طبيعة العمل', 'الدوام الاعتيادي (يوم)', 'الدوام الإضافي (يوم)', 'الإجازات (يوم)', 'الدورات (يوم)', 'الإيفادات (يوم)', `خارج ${org.terms.the} (يوم)`, 'الغياب (يوم)']);
                     // الفلاتر تُذكَر في العنوان: تقريران بعنوان واحد ومحتوى مختلف التباس خطر في مستند رسمي
                     const scopeParts = [];
                     if (periodUnitFilter !== 'all') scopeParts.push(periodUnitFilter);
                     if (periodWorkTypeFilter !== 'all') scopeParts.push(periodWorkTypeFilter === 'صباحي' ? 'الملاك الصباحي' : 'الملاك المناوب');
-                    const scopeLabel = scopeParts.length ? scopeParts.join(' — ') : 'كامل الشعبة';
+                    const scopeLabel = scopeParts.length ? scopeParts.join(' — ') : `كامل ${org.terms.the}`;
                     setPreviewTitle(`موقف الحضور (${scopeLabel}) للفترة من ${periodStartDate} إلى ${periodEndDate}`);
                     setShowPreview(true);
                 } catch (e) {
@@ -2048,7 +2048,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     
                     setPreviewData(exportData);
                     setVisiblePreviewColumns(['الرقم الوظيفي', 'طبيعة العمل', 'الموقف اليومي', 'الملاحظات']);
-                    setPreviewTitle(`الموقف اليومي الموحد لمنتسبي الشعبة بتاريخ ${dailyReportDate}`);
+                    setPreviewTitle(`الموقف اليومي الموحد لمنتسبي ${org.terms.the} بتاريخ ${dailyReportDate}`);
                     setShowPreview(true);
                 } catch (error) {
                     alert('❌ خطأ في تحضير الموقف للتصدير: ' + error.message);
@@ -4005,7 +4005,7 @@ import { buildDatePicker } from '../ui/datePicker';
 
                 // مسار مدير النظام المباشر
                 if (!authorizeDirectWipe()) return;
-                if (confirm('⚠️ تحذير أمني:\n\nهل أنت متأكد تماماً من تفريغ ومسح قاعدة البيانات بالكامل؟\nسيتم تعميم المسح سحابياً على جميع أجهزة الشعبة.')) {
+                if (confirm('⚠️ تحذير أمني:\n\nهل أنت متأكد تماماً من تفريغ ومسح قاعدة البيانات بالكامل؟\nسيتم تعميم المسح سحابياً على جميع أجهزة ' + org.terms.the + '.')) {
                     executeCompleteDatabaseWipe();
                 }
             };
@@ -4652,7 +4652,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     });
                     text += `━━━━━━━━━━━━━━━━━━━━\n`;
                     text += `📊 إجمالي العدد: ${count} منتسب\n`;
-                    text += `✍️ منظم الموقف: ${dataEntryOperator || 'إدارة الشعبة'}\n`;
+                    text += `✍️ منظم الموقف: ${dataEntryOperator || `إدارة ${org.terms.the}`}\n`;
                 }
 
                 const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
@@ -5073,7 +5073,7 @@ return (
                     {/* داخل قسمها. `view` نفسه لم يتغيّر ولا أيٌّ من شروطه في كل الملف —   */}
                     {/* تغيّر من يضبط قيمته فقط، فلا منطق عرض واحد مسّه هذا التعديل.       */}
                     {/* ================================================================= */}
-                    <AppNav ctx={{ observeNavHeight, periodSearchQuery, sectionMemory, setPeriodSearchQuery, setSectionMemory, setUnitsSubView, setView, stats, unitsSubView, view }} />
+                    <AppNav ctx={{ org, observeNavHeight, periodSearchQuery, sectionMemory, setPeriodSearchQuery, setSectionMemory, setUnitsSubView, setView, stats, unitsSubView, view }} />
                     
                     <main className="container mx-auto p-4">
                         {(periodAlerts.endingSoon.length > 0 || periodAlerts.endedUnconfirmed.length > 0) && <PeriodAlerts ctx={{ periodAlerts }} />}
@@ -5102,7 +5102,7 @@ return (
             {showUserManagementModal && <UserManagementModal ctx={{ AuthViews, activeSessions, currentUserRole, editingUserId, getLocalOfflineAdminPin, handleCancelUserEdit, handleDeleteUser, handleEditUserClick, handleForceEvictSession, handleSaveUser, handleToggleUserActive, isSelfUser, revealedPinUsers, sessionKeyFor, setRevealedPinUsers, setShowUserManagementModal, setShowUserPins, setUserFormLocalPart, setUserFormManualUid, setUserFormName, setUserFormPassword, setUserFormPerms, setUserFormPin, setUserFormPriority, setUserFormRole, setUserFormUid, showUserPins, systemUsers, updateLocalOfflineAdminPin, userFormLocalPart, userFormManualUid, userFormName, userFormPassword, userFormPerms, userFormPin, userFormPriority, userFormRole, userFormUid }} />}
 
             {/* نافذة مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center Modal) */}
-            {showRestoreCenterModal && <RestoreCenterModal ctx={{ availableSnapshots, currentUserRole, fetchAvailableSnapshots, handleDownloadSnapshot, handleRestoreSnapshot, isLoadingSnapshots, selectedSnapshotPreview, setSelectedSnapshotPreview, setShowRestoreCenterModal, snapshotsError }} />}
+            {showRestoreCenterModal && <RestoreCenterModal ctx={{ org, availableSnapshots, currentUserRole, fetchAvailableSnapshots, handleDownloadSnapshot, handleRestoreSnapshot, isLoadingSnapshots, selectedSnapshotPreview, setSelectedSnapshotPreview, setShowRestoreCenterModal, snapshotsError }} />}
 
                                 <DashboardScreen ctx={{ org, AuthViews, clearAllData, clearUnifiedSearch, exportBackupJSON, fileInputRef, handleOpenUserManagement, loadFile, openEditModal, performUnifiedSearch, setEditingEmployee, setPreviewData, setSelectedEmployeeCard, setShowEditModal, setShowPasteModal, setShowPreview, setShowPrintForm, setShowUnitDropdown, setUnifiedFilters, setUnifiedQuery, setUnifiedResults, setVisiblePreviewColumns, showBackupWarning, showUnitDropdown, staff, stats, unifiedFilters, unifiedQuery, unifiedResults }} />
 
@@ -5126,7 +5126,7 @@ return (
                     {/* قالب طباعة استمارة ضبط الوقت — يظهر أثناء الطباعة فقط (body.printing-timeform) */}
                     <TimeFormPrint ctx={{ org, timeFormData, timeFormKind }} />
 
-                    {showPreview && <PreviewModal ctx={{ ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printOrientation, printPreview, selectedUnit, setPreviewTitle, setPrintOrientation, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth }} />}
+                    {showPreview && <PreviewModal ctx={{ org, ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printOrientation, printPreview, selectedUnit, setPreviewTitle, setPrintOrientation, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth }} />}
                     
                     
             {/* نافذة تأكيد إعادة ضبط وتثبيت الوجبة الرئيسية */}

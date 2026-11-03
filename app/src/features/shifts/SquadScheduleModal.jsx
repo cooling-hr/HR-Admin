@@ -70,7 +70,7 @@ export const SquadScheduleModal = ({ ctx }) => {
                         <div></div>
                         <div></div>
                         <div>
-                            <div className="border-t border-black pt-1 mt-8">مسؤول الشعبة</div>
+                            <div className="border-t border-black pt-1 mt-8">مسؤول {org.terms.the}</div>
                         </div>
                     </div>
 
@@ -125,7 +125,7 @@ export const SquadScheduleModal = ({ ctx }) => {
                             <div></div>
                             <div></div>
                             <div>
-                                <div className="border-t border-black pt-1 mt-8">مسؤول الشعبة</div>
+                                <div className="border-t border-black pt-1 mt-8">مسؤول {org.terms.the}</div>
                             </div>
                         </div>
                     </div>

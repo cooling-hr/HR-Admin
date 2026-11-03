@@ -74,7 +74,7 @@ export const EditEmployeeModal = ({ ctx }) => {
                                 </div>
 
                                 <div className="bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
-                                    <div className="text-sm text-gray-600 mb-1">الشعبة (غير قابل للتعديل)</div>
+                                    <div className="text-sm text-gray-600 mb-1">{org.terms.the} (غير قابل للتعديل)</div>
                                     <div className="text-lg font-bold text-gray-800">{editingEmployee.section}</div>
                                 </div>
 

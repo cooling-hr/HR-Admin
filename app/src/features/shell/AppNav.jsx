@@ -5,7 +5,7 @@ import { Segmented } from '../../ui/Segmented';
 // شريط التنقل: أقسام في الأعلى وشرائح تصفية داخل القسم. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. يُرسم دائماً.
 export const AppNav = ({ ctx }) => {
-    const { observeNavHeight, periodSearchQuery, sectionMemory, setPeriodSearchQuery, setSectionMemory, setUnitsSubView, setView, stats, unitsSubView, view } = ctx;
+    const { org, observeNavHeight, periodSearchQuery, sectionMemory, setPeriodSearchQuery, setSectionMemory, setUnitsSubView, setView, stats, unitsSubView, view } = ctx;
     return (() => {
         const sections = [
             { id: 'dashboard', icon: 'sliders-color', label: 'لوحة التحكم',
@@ -122,7 +122,7 @@ export const AppNav = ({ ctx }) => {
                         // الكشف الشهري يبحث عنه باسمه. قُصِّر مرة لأنه كان يلتفّ داخل صندوق ضيّق،
                         // ثم أُزيل الصندوق — والتلميح وحده لا يظهر على الهاتف واللوح.
                         { value: 'roster', icon: '👥', label: 'ملاك الوحدات والعمل الإضافي',
-                          title: 'ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد للشعبة' },
+                          title: `ملاك كل وحدة — ومنه تُحدَّد أسماء كشف العمل الإضافي الموحد ${org.terms.forThe}` },
                         { value: 'dailyStatus', icon: '📋', label: 'الموقف اليومي',
                           title: 'موقف وحضور اليوم' },
                         { value: 'periodReport', icon: '📊', label: 'ضبط الوقت',

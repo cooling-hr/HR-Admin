@@ -102,7 +102,7 @@ export const WaterMemoModal = ({ ctx }) => {
 
                     <div className="grid grid-cols-3 gap-4 mt-10 text-center text-xs font-bold">
                         <div>
-                            <div className="border-t border-black pt-1 mt-8">مسؤول الشعبة</div>
+                            <div className="border-t border-black pt-1 mt-8">مسؤول {org.terms.the}</div>
                         </div>
                         <div>
                             <div className="border-t border-black pt-1 mt-8">مدير القسم</div>
