@@ -72,7 +72,7 @@ import { buildDatePicker } from '../ui/datePicker';
         // بها. هذا الملف لا يستورد أي طبقة بيانات — العزل بين النسختين يقوم على هذا وحده، ويُفحص
         // على الناتج المبني (scripts/check-shell.mjs). الربط مرة واحدة عند التحميل لا كـprop يعني
         // أن الـhook الذي يُستدعى داخل المكوّن ثابت الهوية أبداً، فلا يتبدّل ترتيب الـhooks.
-        export function createStaffSystem({ useDataLayer, AuthViews }) {
+        export function createStaffSystem({ useDataLayer, AuthViews, org }) {
         function StaffSystem() {
             const [staff, setStaff] = useState(() => {
                 const saved = safeStorage.getItem('staffData');
