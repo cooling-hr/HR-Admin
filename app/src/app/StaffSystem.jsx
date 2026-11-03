@@ -2603,7 +2603,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     const center = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
                     ws.mergeCells(1, 1, 1, lastCol);
-                    ws.getCell(1, 1).value = timeFormTitle(timeFormKind);
+                    ws.getCell(1, 1).value = timeFormTitle(timeFormKind, org);
                     ws.getCell(1, 1).font = { name: 'Arial', size: 16, bold: true };
                     ws.getCell(1, 1).alignment = center;
                     ws.getRow(1).height = 30;
@@ -3605,7 +3605,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     const ws = XLSX.utils.json_to_sheet(exportData);
                     
                     // إضافة صف العنوان
-                    XLSX.utils.sheet_add_aoa(ws, [['كادر شعبة تبريد المركز ومحطة عزل نهر بن عمر']], {origin: 'A1'});
+                    XLSX.utils.sheet_add_aoa(ws, [[`كادر ${org.section}`]], {origin: 'A1'});
                     
                     // دمج الخلايا للعنوان
                     if (!ws['!merges']) ws['!merges'] = [];
@@ -4609,7 +4609,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     const count = previewData.filter(d => d.type === 'data').length;
                     
                     text += `📋 *${previewTitle || 'بيانات المنتسبين'}*\n`;
-                    text += `🏢 شعبة تبريد المركز ومحطة عزل نهر بن عمر\n`;
+                    text += `🏢 ${org.section}\n`;
                     text += `━━━━━━━━━━━━━━━━━━━━\n`;
 
                     let itemIndex = 0;
@@ -4633,7 +4633,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 } else {
                     // حالة الموقف اليومي الموحد للشعبة
                     text += `📋 *${previewTitle || 'تقرير الموقف الموحد'}*\n`;
-                    text += `🏢 شركة نفط البصرة - شعبة تبريد المركز ومحطة عزل نهر بن عمر\n`;
+                    text += `🏢 ${org.company} - ${org.section}\n`;
                     text += `📅 التاريخ: ${dailyReportDate || new Date().toISOString().split('T')[0]}\n`;
                     text += `━━━━━━━━━━━━━━━━━━━━\n`;
                     
@@ -4824,9 +4824,9 @@ import { buildDatePicker } from '../ui/datePicker';
                     // إنشاء محتوى الوثيقة
                     const documentChildren = [
                         new Paragraph({ text: "جمهورية العراق", alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_1, spacing: { after: 100 } }),
-                        new Paragraph({ text: "وزارة النفط", alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_2, spacing: { after: 100 } }),
-                        new Paragraph({ text: "شركة نفط البصرة (شركة عامة)", alignment: AlignmentType.CENTER, spacing: { after: 100 } }),
-                        new Paragraph({ text: "شعبة تبريد المركز ومحطة عزل نهر بن عمر", alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+                        new Paragraph({ text: org.ministry, alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_2, spacing: { after: 100 } }),
+                        new Paragraph({ text: org.companyLegal, alignment: AlignmentType.CENTER, spacing: { after: 100 } }),
+                        new Paragraph({ text: org.section, alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
                         new Paragraph({ text: `جدول ${fileName}`, alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_2, spacing: { after: 300 } })
                     ];
                     
@@ -4919,7 +4919,7 @@ import { buildDatePicker } from '../ui/datePicker';
                             worksheet.columns = columns.map((col, i) => ({ key: col, width: i === 0 ? 6 : i === 1 ? 31 : i === 2 ? 13 : 21 }));
                         }
                         
-                        const titleRow = worksheet.addRow([`جدول ${fileName} - شعبة تبريد المركز ومحطة عزل نهر بن عمر`]);
+                        const titleRow = worksheet.addRow([`جدول ${fileName} - ${org.section}`]);
                         worksheet.mergeCells(1, 1, 1, columns.length);
                         titleRow.height = 25;
                         titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF6600' } };
@@ -5050,7 +5050,7 @@ return (
                 <div className="min-h-screen bg-gray-50">
 
                     {/* Splash Screen - نافذة ترحيبية متحركة */}
-                    {showWelcome && <WelcomeSplash ctx={{ proceedFromWelcome }} />}
+                    {showWelcome && <WelcomeSplash ctx={{ org, proceedFromWelcome }} />}
 
                     <AuthViews.PinScreen ctx={{ showPinScreen, getDevicePinLocks, selectedPinUid, setSelectedPinUid, pinInput, setPinInput, pinError, setPinError, setPinAttempts, isCheckingLogin, handlePinLogin, useAnotherAccount, pendingTakeover, confirmSessionTakeover, cancelSessionTakeover }} />
 
@@ -5059,7 +5059,7 @@ return (
                     {/* رأس الصفحة الكلاسيكي المطور بألوان زاهية وراقية كالسابق */}
                                 {/* إشعار طلب الحذف السحابي المعلق لمدير النظام */}
             {pendingDeletionRequest && pendingDeletionRequest.status === 'pending' && <DeletionRequestBanner ctx={{ authorizeWipeApproval, currentUserRole, executeCompleteDatabaseWipe, pendingDeletionRequest, rejectDeletionRequest }} />}
-                    <AppHeader ctx={{ AuthViews, clearDevicePinLock, cloudSyncStatus, currentUserIdRef, currentUserName, currentUserRole, fetchAvailableSnapshots, getDevicePinLockFor, handleLogout, handleOpenUserManagement, isDarkTheme, setIsDarkTheme, setShowRestoreCenterModal, setShowSyncModal, setShowUserMenu, showUserMenu, syncStatus }} />
+                    <AppHeader ctx={{ org, AuthViews, clearDevicePinLock, cloudSyncStatus, currentUserIdRef, currentUserName, currentUserRole, fetchAvailableSnapshots, getDevicePinLockFor, handleLogout, handleOpenUserManagement, isDarkTheme, setIsDarkTheme, setShowRestoreCenterModal, setShowSyncModal, setShowUserMenu, showUserMenu, syncStatus }} />
                     
                     {/* ================================================================= */}
                     {/* شريط التنقل: أقسام في الأعلى، وشرائح تصفية داخل القسم            */}
@@ -5093,7 +5093,7 @@ return (
             {/* نافذة معاينة وبطاقة ملف المنتسب الفاخرة قبل الطباعة مع خيارات التخصيص والإخفاء والإظهار التلقائي التنسيق */}
             {/* عبر portal تحت body لا داخل main: قاعدة الطباعة العامة تُخفي main، ولا يلغي
                 حفيدٌ display:none على سلفه — فكانت البطاقة تُطبع بيضاء. انظر body.printing-card. */}
-            {selectedEmployeeCard && <EmployeeCardModal ctx={{ cardFieldsVisibility, printEmployeeCard, selectedEmployeeCard, setCardFieldsVisibility, setSelectedEmployeeCard, setShowFieldCustomizer, showFieldCustomizer }} />}
+            {selectedEmployeeCard && <EmployeeCardModal ctx={{ org, cardFieldsVisibility, printEmployeeCard, selectedEmployeeCard, setCardFieldsVisibility, setSelectedEmployeeCard, setShowFieldCustomizer, showFieldCustomizer }} />}
 
             {/* نافذة تسجيل الدخول للنظام بالتعرف التلقائي الذكي على كلمة المرور */}
             {showLoginModal && <LoginModal ctx={{ AuthViews, cancelSessionTakeover, confirmSessionTakeover, handleLogin, isCheckingLogin, loginEmail, loginError, loginInputPin, loginPassword, pendingTakeover, safeStorage, setLoginEmail, setLoginInputPin, setLoginPassword, setShowLoginModal, setShowLoginPassword, showLoginPassword }} />}
@@ -5124,7 +5124,7 @@ return (
                     {showPasteModal && <PasteJsonModal ctx={{ pastedJsonText, setIncomingBundle, setIncomingStaff, setPastedJsonText, setShowMergeModal, setShowPasteModal }} />}
 
                     {/* قالب طباعة استمارة ضبط الوقت — يظهر أثناء الطباعة فقط (body.printing-timeform) */}
-                    <TimeFormPrint ctx={{ timeFormData, timeFormKind }} />
+                    <TimeFormPrint ctx={{ org, timeFormData, timeFormKind }} />
 
                     {showPreview && <PreviewModal ctx={{ ALL_CUSTOM_COLUMNS, dataEntryOperator, exportExcel, exportUnits, getColSpan, isCustomizable, previewData, previewTitle, printOrientation, printPreview, selectedUnit, setPreviewTitle, setPrintOrientation, setShowPreview, setVisiblePreviewColumns, shareViaWhatsApp, updateCell, view, visiblePreviewColumns, waterMonth }} />}
                     
@@ -5143,16 +5143,16 @@ return (
 
             {periodHistoryEmpId && <PeriodHistoryModal ctx={{ canEdit, deletePeriodFromHistory, openPeriodEdit, periodHistoryEmpId, periodSpanJsx, setPeriodHistoryEmpId, staff }} />}
 
-            {waterMemoGroup && <WaterMemoModal ctx={{ BOC_LOGO_DATA_URI, amountToArabicWords, getWaterGroupSummary, setWaterMemoGroup, waterMemoGroup, waterMonth }} />}
+            {waterMemoGroup && <WaterMemoModal ctx={{ org, BOC_LOGO_DATA_URI, amountToArabicWords, getWaterGroupSummary, setWaterMemoGroup, waterMemoGroup, waterMonth }} />}
 
-            {showSquadSchedule && <SquadScheduleModal ctx={{ BOC_LOGO_DATA_URI, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters }} />}
+            {showSquadSchedule && <SquadScheduleModal ctx={{ org, BOC_LOGO_DATA_URI, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters }} />}
 
             {showEditModal && editingEmployee && <EditEmployeeModal ctx={{ org, buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, saveEmployeeEdit, showCamera, staff, startCamera, stopCamera, updateEditField, videoRef }} />}
                     
-                    {showPrintForm && <NewEmployeeFormPrint ctx={{ setShowPrintForm }} />}
+                    {showPrintForm && <NewEmployeeFormPrint ctx={{ org, setShowPrintForm }} />}
                     
                     <footer className="bg-gray-800 text-white mt-12 py-6 text-center">
-                        <p>© 2026 شركة نفط البصرة - شعبة تبريد المركز ومحطة عزل نهر بن عمر</p>
+                        <p>© 2026 {org.company} - {org.section}</p>
                         <p className="text-xs text-blue-300 mt-2">👨‍💻 إعداد: المهندس أسامة خليل هاشم | الإصدار v9.8 Enterprise Cloud Edition</p>
                     </footer>
                 </div>

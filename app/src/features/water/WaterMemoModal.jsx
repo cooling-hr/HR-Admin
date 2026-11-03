@@ -4,7 +4,7 @@ import { daysInMonth, getArabicMonthLabel } from '../../core/dates';
 // مذكرة طلب الماء لمجموعة الدوام. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const WaterMemoModal = ({ ctx }) => {
-    const { BOC_LOGO_DATA_URI, amountToArabicWords, getWaterGroupSummary, setWaterMemoGroup, waterMemoGroup, waterMonth } = ctx;
+    const { BOC_LOGO_DATA_URI, org, amountToArabicWords, getWaterGroupSummary, setWaterMemoGroup, waterMemoGroup, waterMonth } = ctx;
     return (() => {
         const sum = getWaterGroupSummary(waterMemoGroup, waterMonth);
         const groupLabel = waterMemoGroup === 'morning' ? 'صباحي' : waterMemoGroup === 'triple' ? 'مناوبة ثلاثية' : 'مناوبة ثنائية';
@@ -30,9 +30,9 @@ export const WaterMemoModal = ({ ctx }) => {
                         <img src={BOC_LOGO_DATA_URI} alt="B.O.C" className="w-16 h-16 rounded-full object-cover border border-black" />
                         <div className="text-center">
                             <div className="font-bold">جمهورية العراق</div>
-                            <div className="font-bold">وزارة النفط</div>
-                            <div className="font-bold">شركة نفط البصرة (شركة عامة)</div>
-                            <div className="font-bold text-sm">شعبة تبريد المركز ومحطة عزل نهر بن عمر</div>
+                            <div className="font-bold">{org.ministry}</div>
+                            <div className="font-bold">{org.companyLegal}</div>
+                            <div className="font-bold text-sm">{org.section}</div>
                         </div>
                         <div>
                             <div>رمز التشكيل: BOC-ED-07-01</div>
@@ -48,7 +48,7 @@ export const WaterMemoModal = ({ ctx }) => {
                     <p className="text-sm leading-relaxed mb-2">
                         يرجى التفضل بالموافقة على شراء قناني مياه R.O من الأسواق المحلية وذلك لعدم توفرها في مخازن الشركة وحسب التفاصيل في الجدول أدناه.
                     </p>
-                    <p className="text-center font-bold text-sm mb-1">شعبة تبريد المركز ومحطة عزل نهر بن عمر</p>
+                    <p className="text-center font-bold text-sm mb-1">{org.section}</p>
                     <p className="text-center font-bold text-sm mb-3">لشهر: {getArabicMonthLabel(waterMonth)}</p>
                     <p className="text-xs font-bold mb-1">ملاحظة العدد الكلي</p>
 

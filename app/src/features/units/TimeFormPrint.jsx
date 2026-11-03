@@ -10,7 +10,7 @@ import { getTripleName } from '../../core/arabic';
 const OUT_BG = '#d9d9d9';
 
 export const TimeFormPrint = ({ ctx }) => {
-    const { timeFormData, timeFormKind } = ctx;
+    const { org, timeFormData, timeFormKind } = ctx;
     const isContracts = timeFormKind === 'contracts';
     const rows = isContracts ? timeFormData.contractRows : timeFormData.staffRows;
     const { ym, daysInMonth } = timeFormData;
@@ -18,7 +18,7 @@ export const TimeFormPrint = ({ ctx }) => {
 
     return <div className="timeform-print-only hidden bg-white text-black" style={{ direction: 'rtl' }}>
         <div style={{ textAlign: 'center', marginBottom: '3mm' }}>
-            <div style={{ fontWeight: 900, fontSize: '13pt' }}>{timeFormTitle(timeFormKind)}</div>
+            <div style={{ fontWeight: 900, fontSize: '13pt' }}>{timeFormTitle(timeFormKind, org)}</div>
             <div style={{ fontWeight: 700, fontSize: '10pt' }}>{getArabicMonthLabel(ym)}</div>
         </div>
 

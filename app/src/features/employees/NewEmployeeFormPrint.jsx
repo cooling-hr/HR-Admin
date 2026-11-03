@@ -3,7 +3,7 @@ import React from 'react';
 // معاينة وطباعة استمارة موظف جديد. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const NewEmployeeFormPrint = ({ ctx }) => {
-    const { setShowPrintForm } = ctx;
+    const { org, setShowPrintForm } = ctx;
     return (
         <div className="preview-overlay">
             <div className="preview-container" style={{maxWidth: '850px', width: '100%'}}>
@@ -22,9 +22,9 @@ export const NewEmployeeFormPrint = ({ ctx }) => {
                     {/* رأس الاستمارة الرسمي */}
                     <div className="text-center border-b-2 border-black pb-4 mb-6">
                         <h1 className="text-xl font-bold mb-1">جمهورية العراق</h1>
-                        <h1 className="text-xl font-bold mb-1">وزارة النفط / شركة نفط البصرة</h1>
-                        <h2 className="text-lg font-bold mb-1 text-gray-700">هيأة الصيانة الهندسية</h2>
-                        <h2 className="text-base font-bold mb-1 text-gray-600">قسم التكييف والتبريد / شعبة تبريد المركز ومحطة عزل نهر بن عمر</h2>
+                        <h1 className="text-xl font-bold mb-1">{org.ministry} / {org.company}</h1>
+                        <h2 className="text-lg font-bold mb-1 text-gray-700">{org.authority}</h2>
+                        <h2 className="text-base font-bold mb-1 text-gray-600">{org.department} / {org.section}</h2>
                         <div className="h-1 bg-blue-800 w-24 mx-auto my-2 no-print"></div>
                         <h2 className="text-2xl font-black mt-3 text-blue-900 border-2 border-blue-900 px-4 py-1.5 inline-block rounded-lg bg-blue-50">
                             استمارة معلومات موظف جديد
@@ -51,12 +51,12 @@ export const NewEmployeeFormPrint = ({ ctx }) => {
 
                         <div className="border-b border-gray-400 pb-1 flex items-baseline">
                             <span className="font-bold text-gray-800 min-w-[100px]">القسم:</span>
-                            <span className="flex-1 text-gray-800 font-semibold">قسم التبريد</span>
+                            <span className="flex-1 text-gray-800 font-semibold">{org.departmentShort}</span>
                         </div>
 
                         <div className="border-b border-gray-400 pb-1 flex items-baseline col-span-2">
                             <span className="font-bold text-gray-800 min-w-[100px]">الشعبة:</span>
-                            <span className="flex-1 text-gray-800 font-semibold">شعبة تبريد المركز ومحطة عزل نهر بن عمر</span>
+                            <span className="flex-1 text-gray-800 font-semibold">{org.section}</span>
                         </div>
 
                         <div className="border-b border-gray-400 pb-1 flex items-baseline">

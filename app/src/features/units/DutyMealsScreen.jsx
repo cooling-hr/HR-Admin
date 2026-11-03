@@ -114,7 +114,7 @@ export const DutyMealsScreen = ({ ctx }) => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `جدول اطعام المناوبين لشهر ${monthLabel} - قسم التكييف والتبريد.xlsx`;
+            a.download = `جدول اطعام المناوبين لشهر ${monthLabel} - ${org.department}.xlsx`;
             a.click();
             setTimeout(() => window.URL.revokeObjectURL(url), 1500);
         } catch (e) {

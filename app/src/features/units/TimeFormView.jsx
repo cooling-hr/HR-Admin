@@ -22,7 +22,7 @@ const STICKY_ROW_EDGE = 'shadow-[inset_1px_0_0_0_#94a3b8,inset_0_-2px_0_0_#64748
 
 // استمارة ضبط الوقت على الشاشة: صفّان لكل موظف (الرموز ثم الساعات الإضافية)، استمارة الملاك أو العقود
 export const TimeFormView = ({ ctx }) => {
-    const { printTimeForm, exportTimeFormExcel, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, timeFormCodeEdits, setShowCodesGuide } = ctx;
+    const { org, printTimeForm, exportTimeFormExcel, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, timeFormCodeEdits, setShowCodesGuide } = ctx;
     const isContracts = timeFormKind === 'contracts';
     const rows = isContracts ? timeFormData.contractRows : timeFormData.staffRows;
     const unknown = (isContracts ? timeFormData.warnings.contracts : timeFormData.warnings.staff).unknown;
@@ -97,7 +97,7 @@ export const TimeFormView = ({ ctx }) => {
             )}
 
             <div className="text-center">
-                <div className="font-black text-slate-800 text-base">{timeFormTitle(timeFormKind)}</div>
+                <div className="font-black text-slate-800 text-base">{timeFormTitle(timeFormKind, org)}</div>
                 <div className="font-bold text-slate-600 text-sm">{getArabicMonthLabel(ym)}</div>
             </div>
 

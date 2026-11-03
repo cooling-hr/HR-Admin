@@ -726,8 +726,8 @@ export const DashboardScreen = ({ ctx }) => {
                         <button onClick={() => {
                             setEditingEmployee({
                                 id: Date.now(), name: '', jobNumber: '', jobTitle: '',
-                                department: 'قسم التبريد',
-                                section: 'شعبة تبريد المركز ومحطة عزل نهر بن عمر',
+                                department: org.departmentShort,
+                                section: org.section,
                                 location: '', unit: '', workType: 'صباحي', status: 'نشط',
                                 workPhone: '', birthDate: '', workNumber: '', hireDate: '',
                                 education: '', graduationYear: '', specialization: '',

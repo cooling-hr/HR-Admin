@@ -6,6 +6,7 @@
 /** @type {import('../domain/org').Org} */
 export const coolingOrg = {
     ministry: 'وزارة النفط',
+    authority: 'هيأة الصيانة الهندسية',
     company: 'شركة نفط البصرة',
     companyLegal: 'شركة نفط البصرة (شركة عامة)',
     department: 'قسم التكييف والتبريد',

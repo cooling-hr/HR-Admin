@@ -755,7 +755,7 @@ export const UnitsScreen = ({ ctx }) => {
                         </div>
 
                         {periodView === 'timeForm' ? (
-                            <TimeFormView ctx={{ printTimeForm, exportTimeFormExcel, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, timeFormCodeEdits, setShowCodesGuide }} />
+                            <TimeFormView ctx={{ org, printTimeForm, exportTimeFormExcel, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, timeFormCodeEdits, setShowCodesGuide }} />
                         ) : (
                         <div className="overflow-x-auto w-full">
                             <table className="w-full text-right border-collapse text-xs md:text-sm">
@@ -920,7 +920,7 @@ export const UnitsScreen = ({ ctx }) => {
         setVisiblePreviewColumns(['الرقم الوظيفي', 'الاسم', 'العنوان الوظيفي']);
                                 const [otY, otM] = (overtimeListMonth || '').split('-').map(Number);
                                 const otMonth = otY && otM ? ` لشهر ${ARABIC_MONTH_NAMES[otM - 1]} ${otY}` : '';
-                                setPreviewTitle(`كشف الساعات الإضافية${otMonth} لشعبة تبريد المركز ومحطة عزل نهر بن عمر`);
+                                setPreviewTitle(`كشف الساعات الإضافية${otMonth} ل${org.section}`);
                                 setShowPreview(true);
                             }}
                             className="bg-white text-teal-700 hover:bg-teal-50 px-4 py-2 font-bold rounded-lg text-xs transition shadow-sm cursor-pointer"

@@ -5,7 +5,7 @@ import { formatMobileNumber } from '../../core/arabic';
 // بطاقة ملف المنتسب قبل الطباعة (عبر portal تحت body). الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const EmployeeCardModal = ({ ctx }) => {
-    const { cardFieldsVisibility, printEmployeeCard, selectedEmployeeCard, setCardFieldsVisibility, setSelectedEmployeeCard, setShowFieldCustomizer, showFieldCustomizer } = ctx;
+    const { cardFieldsVisibility, org, printEmployeeCard, selectedEmployeeCard, setCardFieldsVisibility, setSelectedEmployeeCard, setShowFieldCustomizer, showFieldCustomizer } = ctx;
     return ReactDOM.createPortal((
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 print:p-0 print:bg-white print:static card-print-root">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-fadeInUp print:shadow-none print:border-none print:max-w-none print:w-full print:max-h-none">
@@ -20,7 +20,7 @@ export const EmployeeCardModal = ({ ctx }) => {
                             )}
                         </div>
                         <div>
-                            <div className="text-[11px] font-bold text-blue-200 print:text-slate-600 mb-0.5">شركة نفط البصرة · قسم التكييف والتبريد</div>
+                            <div className="text-[11px] font-bold text-blue-200 print:text-slate-600 mb-0.5">{org.company} · {org.department}</div>
                             <h2 className="text-2xl font-black leading-tight">{selectedEmployeeCard.name}</h2>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
                                 <span className="px-2.5 py-0.5 bg-blue-500/20 text-blue-100 print:bg-slate-100 print:text-slate-800 text-xs font-bold rounded-lg border border-blue-400/20">

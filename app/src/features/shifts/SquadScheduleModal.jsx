@@ -4,7 +4,7 @@ import { getArabicDayName } from '../../core/dates';
 // جدول الوجبات. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const SquadScheduleModal = ({ ctx }) => {
-    const { BOC_LOGO_DATA_URI, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters } = ctx;
+    const { BOC_LOGO_DATA_URI, org, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters } = ctx;
     return (
         <div className="preview-overlay">
             <div className="preview-container" style={{maxWidth: '850px', width: '100%'}}>
@@ -24,9 +24,9 @@ export const SquadScheduleModal = ({ ctx }) => {
                         <img src={BOC_LOGO_DATA_URI} alt="B.O.C" className="w-16 h-16 rounded-full object-cover border border-black" />
                         <div className="text-center">
                             <div className="font-bold">جمهورية العراق</div>
-                            <div className="font-bold">وزارة النفط</div>
-                            <div className="font-bold">شركة نفط البصرة (شركة عامة)</div>
-                            <div className="font-bold text-sm">شعبة تبريد المركز ومحطة عزل نهر بن عمر</div>
+                            <div className="font-bold">{org.ministry}</div>
+                            <div className="font-bold">{org.companyLegal}</div>
+                            <div className="font-bold text-sm">{org.section}</div>
                         </div>
                         <div className="w-16"></div>
                     </div>
@@ -82,9 +82,9 @@ export const SquadScheduleModal = ({ ctx }) => {
                             <img src={BOC_LOGO_DATA_URI} alt="B.O.C" className="w-16 h-16 rounded-full object-cover border border-black" />
                             <div className="text-center">
                                 <div className="font-bold">جمهورية العراق</div>
-                                <div className="font-bold">وزارة النفط</div>
-                                <div className="font-bold">شركة نفط البصرة (شركة عامة)</div>
-                                <div className="font-bold text-sm">شعبة تبريد المركز ومحطة عزل نهر بن عمر</div>
+                                <div className="font-bold">{org.ministry}</div>
+                                <div className="font-bold">{org.companyLegal}</div>
+                                <div className="font-bold text-sm">{org.section}</div>
                             </div>
                             <div className="w-16"></div>
                         </div>

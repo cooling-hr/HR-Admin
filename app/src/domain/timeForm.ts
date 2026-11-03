@@ -3,6 +3,8 @@
 // كل الرموز الافتراضية هنا في جدول واحد، وما يغيّره المستخدم من «دليل الرموز» (4.4) يُطبَّق فوقها
 // في resolveCodeTable. المعرّف id هو الحرف الرسمي نفسه، فيبقى ثابتاً لو غيّر المستخدم الحرف.
 
+import type { Org } from './org';
+
 export type TimeCode = { id: string; letter: string; meaning: string };
 
 const official = (letter: string, meaning: string): TimeCode => ({ id: letter, letter, meaning });
@@ -220,9 +222,7 @@ export const timeFormCodeFor = (day: TimeFormDayInput, table: ResolvedCodeTable)
 };
 
 // عنوان الاستمارة كما في الملف الرسمي (بالألف في «أستمارة»)
-export const TIME_FORM_TITLE = 'أستمارة ضبط الوقت شعبة تبريد المركز';
-export const TIME_FORM_CONTRACTS_TITLE = 'أستمارة ضبط الوقت شعبة تبريد المركز — موظفو العقود';
-export const timeFormTitle = (kind: string): string => kind === 'contracts' ? TIME_FORM_CONTRACTS_TITLE : TIME_FORM_TITLE;
+export const timeFormTitle = (kind: string, org: Org): string => 'أستمارة ضبط الوقت ' + org.sectionShort + (kind === 'contracts' ? ' — موظفو العقود' : '');
 
 // الحالات الدائمة التي تُظلَّل خاناتها رمادياً في ملف Excel كما على الورق (طلب أسامة 2026-10-30):
 // سحب اليد والإجازات والمواقف الطويلة. الإجازة الاعتيادية وبدون راتب وخارج العراق والدورة والإيفاد

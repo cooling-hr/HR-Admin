@@ -3,7 +3,7 @@ import React from 'react';
 // ترويسة النظام العلوية. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. يُرسم دائماً.
 export const AppHeader = ({ ctx }) => {
-    const { AuthViews, clearDevicePinLock, cloudSyncStatus, currentUserIdRef, currentUserName, currentUserRole, fetchAvailableSnapshots, getDevicePinLockFor, handleLogout, handleOpenUserManagement, isDarkTheme, setIsDarkTheme, setShowRestoreCenterModal, setShowSyncModal, setShowUserMenu, showUserMenu, syncStatus } = ctx;
+    const { org, AuthViews, clearDevicePinLock, cloudSyncStatus, currentUserIdRef, currentUserName, currentUserRole, fetchAvailableSnapshots, getDevicePinLockFor, handleLogout, handleOpenUserManagement, isDarkTheme, setIsDarkTheme, setShowRestoreCenterModal, setShowSyncModal, setShowUserMenu, showUserMenu, syncStatus } = ctx;
     return <header className="bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-800 text-white shadow-xl relative overflow-hidden py-7 px-6 border-b-2 border-indigo-500 border-opacity-20">
         {/* توهج ضوئي خلفي ناعم */}
         <div className="absolute inset-0 bg-white opacity-5 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent pointer-events-none"></div>
@@ -15,7 +15,7 @@ export const AppHeader = ({ ctx }) => {
                     <span>نظام إدارة الملاك المتكامل</span>
                 </h1>
                 <p className="text-center md:text-right text-blue-100 mt-1.5 text-sm font-medium">
-                    شركة نفط البصرة · شعبة تبريد المركز ومحطة عزل نهر بن عمر
+                    {org.company} · {org.section}
                 </p>
             </div>
 

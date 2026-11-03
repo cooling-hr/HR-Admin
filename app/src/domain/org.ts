@@ -25,6 +25,7 @@ export interface OrgTerms {
 
 export interface Org {
   ministry: string;
+  authority: string;
   company: string;
   companyLegal: string;
   department: string;
