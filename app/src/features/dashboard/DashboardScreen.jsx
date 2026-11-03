@@ -4,11 +4,12 @@ import { SearchCircularProgress } from '../../ui/SearchCircularProgress';
 import { getJobRank } from '../../domain/sorting';
 import { getMissingFields } from '../../domain/employees';
 import { normalizeArabic, getThreeName, formatMobileNumber } from '../../core/arabic';
+import { locationNames, unitNames } from '../../domain/org';
 
 // الشاشة الرئيسية (لوحة التحكم). الحالة والمنطق كلها في StaffSystem؛ هذه الشاشة ترسم فقط
 // وتستلم ما تحتاجه عبر ctx صريح — اسمٌ يسقط من ctx يكشفه tsc برمز TS18004/TS2304.
 export const DashboardScreen = ({ ctx }) => {
-    const { AuthViews, clearAllData, clearUnifiedSearch, exportBackupJSON, fileInputRef, handleOpenUserManagement, loadFile, openEditModal, performUnifiedSearch, setEditingEmployee, setPreviewData, setSelectedEmployeeCard, setShowEditModal, setShowPasteModal, setShowPreview, setShowPrintForm, setShowUnitDropdown, setUnifiedFilters, setUnifiedQuery, setUnifiedResults, setVisiblePreviewColumns, showBackupWarning, showUnitDropdown, staff, stats, unifiedFilters, unifiedQuery, unifiedResults } = ctx;
+    const { org, AuthViews, clearAllData, clearUnifiedSearch, exportBackupJSON, fileInputRef, handleOpenUserManagement, loadFile, openEditModal, performUnifiedSearch, setEditingEmployee, setPreviewData, setSelectedEmployeeCard, setShowEditModal, setShowPasteModal, setShowPreview, setShowPrintForm, setShowUnitDropdown, setUnifiedFilters, setUnifiedQuery, setUnifiedResults, setVisiblePreviewColumns, showBackupWarning, showUnitDropdown, staff, stats, unifiedFilters, unifiedQuery, unifiedResults } = ctx;
     return (
         <>
         <PageHeader icon="sliders-color" title="لوحة التحكم" />
@@ -305,7 +306,7 @@ export const DashboardScreen = ({ ctx }) => {
                                                     </button>
                                                 )}
                                             </div>
-                                            {['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'].map(u => {
+                                            {unitNames(org).map(u => {
                                                 const isChecked = (unifiedFilters.selectedUnits || []).includes(u);
                                                 return (
                                                     <label 
@@ -618,7 +619,7 @@ export const DashboardScreen = ({ ctx }) => {
 
                 {/* مخطط توزيع الملاك وضغط العمل على المواقع */}
                 {(() => {
-                    const locations = ['نهر بن عمر', 'باب الزبير', 'المركز الثقافي النفطي', 'المكينة'];
+                    const locations = locationNames(org);
                     const data = locations.map(loc => {
                         const count = staff.filter(s => s.location === loc).length;
                         const active = staff.filter(s => s.location === loc && s.status === 'نشط').length;

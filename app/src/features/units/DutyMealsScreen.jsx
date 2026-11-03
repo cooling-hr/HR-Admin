@@ -3,7 +3,7 @@ import { PageHeader } from '../../ui/PageHeader';
 import { ARABIC_MONTH_NAMES, getArabicDayName, localDateStr } from '../../core/dates';
 import { getTripleName } from '../../core/arabic';
 import { ensureLibs } from '../../core/lazyLibs';
-import { DUTY_MEAL_HEADERS, DUTY_MEAL_SECTION, DUTY_MEAL_SITES, DUTY_MEAL_SQUADS, buildDutyMealDay, dutyMealDayTitle, dutyMealSiteLabel, isTripleShiftSite, monthDates, siteSquadMembers } from '../../domain/dutyMeals';
+import { DUTY_MEAL_HEADERS, DUTY_MEAL_SQUADS, buildDutyMealDay, dutyMealDayTitle, dutyMealSiteLabel, isTripleShiftSite, monthDates, siteSquadMembers } from '../../domain/dutyMeals';
 
 // الشهر التالي افتراضياً: الجدول يُعدّ قبل بداية شهره
 // الأحمر لما يحتاج تدخّلاً: لا مخول محدّد، أو لا حاضر من الوجبة. الاستبدال التلقائي يُذكر فقط
@@ -18,7 +18,7 @@ const nextMonthStr = () => {
 // من دورة المناوبة والموقف اليومي، وتصديره Excel بهيكل استمارة القسم أو طباعته. الحالة
 // (mealAuthorizations) في StaffSystem وتُزامَن؛ هذا المكوّن يرسم ويستلم ما يحتاجه عبر ctx صريح.
 export const DutyMealsScreen = ({ ctx }) => {
-    const { getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, setMealAuthorizations, staff } = ctx;
+    const { getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff } = ctx;
     const [month, setMonth] = React.useState(nextMonthStr);
     const [showSetup, setShowSetup] = React.useState(() => Object.keys(mealAuthorizations || {}).length === 0);
     const [exporting, setExporting] = React.useState(false);
@@ -28,8 +28,8 @@ export const DutyMealsScreen = ({ ctx }) => {
     const days = React.useMemo(() => monthDates(month).map(dateStr => ({
         dateStr,
         title: dutyMealDayTitle(dateStr, getArabicDayName(dateStr)),
-        sites: buildDutyMealDay({ staff, dateStr, authorizations: mealAuthorizations || {}, getEmployeeDailyStatus, getSquadsOnDuty })
-    })), [month, staff, mealAuthorizations, getEmployeeDailyStatus, getSquadsOnDuty]);
+        sites: buildDutyMealDay({ staff, dateStr, authorizations: mealAuthorizations || {}, getEmployeeDailyStatus, getSquadsOnDuty, org })
+    })), [month, staff, mealAuthorizations, getEmployeeDailyStatus, getSquadsOnDuty, org]);
     const warningDays = days.filter(d => d.sites.some(s => s.rows.some(r => isSeriousMealWarning(r.warning)))).length;
 
     // تحديث دالّي: اختياران متتاليان قبل إعادة الرسم (أو مع مزامنة واصلة) لا يمحو أحدهما الآخر
@@ -104,7 +104,7 @@ export const DutyMealsScreen = ({ ctx }) => {
                     }
                     r += 2;
                 });
-                ws.mergeCells(firstSiteRow, 10, r - 1, 10); ws.getCell(firstSiteRow, 10).value = DUTY_MEAL_SECTION;
+                ws.mergeCells(firstSiteRow, 10, r - 1, 10); ws.getCell(firstSiteRow, 10).value = org.departmentBare;
                 // يومان في كل صفحة أفقية
                 if (di % 2 === 1 && di < days.length - 1) ws.getRow(r - 1).addPageBreak();
                 r++;
@@ -171,9 +171,9 @@ export const DutyMealsScreen = ({ ctx }) => {
                     </button>
                     {showSetup && (
                         <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {DUTY_MEAL_SITES.map(unit => (
+                            {org.dutyMealSites.map(unit => (
                                 <div key={unit} className="border border-slate-200 rounded-xl p-3">
-                                    <div className="font-black text-slate-800 mb-2">📍 {dutyMealSiteLabel(unit)}
+                                    <div className="font-black text-slate-800 mb-2">📍 {dutyMealSiteLabel(org, unit)}
                                         <span className="text-[11px] font-bold text-slate-500 mr-2">{isTripleShiftSite(unit) ? 'وجبة واحدة 24 ساعة' : 'صباحية ومسائية'}</span>
                                     </div>
                                     <div className="space-y-2">
@@ -239,7 +239,7 @@ export const DutyMealsScreen = ({ ctx }) => {
                                             <td className={`${cell} font-mono`} dir="ltr">{row.main ? row.main.mobile : ''}</td>
                                             <td className={cell}>{row.alt ? getTripleName(row.alt.name) : ''}</td>
                                             <td className={`${cell} font-mono`} dir="ltr">{row.alt ? row.alt.mobile : ''}</td>
-                                            {si === 0 && k === 0 && <td rowSpan={day.sites.reduce((n, s) => n + (s.triple ? 1 : 2), 0)} className={cell}>{DUTY_MEAL_SECTION}</td>}
+                                            {si === 0 && k === 0 && <td rowSpan={day.sites.reduce((n, s) => n + (s.triple ? 1 : 2), 0)} className={cell}>{org.departmentBare}</td>}
                                         </tr>
                                     ));
                                 })}
@@ -283,7 +283,7 @@ export const DutyMealsScreen = ({ ctx }) => {
                                                 <td>{row.alt ? getTripleName(row.alt.name) : ''}</td>
                                                 <td dir="ltr">{row.alt ? row.alt.mobile : ''}</td>
                                             </>}
-                                        {si === 0 && k === 0 && <td rowSpan={day.sites.length * 2}>{DUTY_MEAL_SECTION}</td>}
+                                        {si === 0 && k === 0 && <td rowSpan={day.sites.length * 2}>{org.departmentBare}</td>}
                                     </tr>
                                 );
                             }))}

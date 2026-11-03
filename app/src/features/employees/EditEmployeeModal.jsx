@@ -4,7 +4,7 @@ import { CONTRACT_TITLES, isContractEmployee } from '../../domain/employees';
 // نافذة إضافة/تعديل بيانات الموظف. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const EditEmployeeModal = ({ ctx }) => {
-    const { buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, saveEmployeeEdit, showCamera, staff, startCamera, stopCamera, updateEditField, videoRef } = ctx;
+    const { buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, org, saveEmployeeEdit, showCamera, staff, startCamera, stopCamera, updateEditField, videoRef } = ctx;
     return (
                 <div className="preview-overlay">
                     <div className="preview-container" style={{maxWidth: '800px'}}>
@@ -83,10 +83,7 @@ export const EditEmployeeModal = ({ ctx }) => {
                                     <select value={editingEmployee.location}
                                         onChange={(e) => updateEditField('location', e.target.value)}
                                         className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none">
-                                        <option value="نهر بن عمر">نهر بن عمر</option>
-                                        <option value="باب الزبير">باب الزبير</option>
-                                        <option value="المركز الثقافي النفطي">المركز الثقافي النفطي</option>
-                                        <option value="المكينة">المكينة</option>
+                                        {org.locations.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
                                     </select>
                                 </div>
 
@@ -96,12 +93,7 @@ export const EditEmployeeModal = ({ ctx }) => {
                                         onChange={(e) => updateEditField('unit', e.target.value)}
                                         className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none">
                                         <option value="">-- اختر الوحدة --</option>
-                                        <option value="مقر الشعبة">مقر الشعبة</option>
-                                        <option value="تبريد باب الزبير">تبريد باب الزبير</option>
-                                        <option value="ورشة التبريد">ورشة التبريد</option>
-                                        <option value="تبريد المكينة">تبريد المكينة</option>
-                                        <option value="تبريد نهر بن عمر">تبريد نهر بن عمر</option>
-                                        <option value="تبريد المركز الثقافي">تبريد المركز الثقافي</option>
+                                        {org.units.map(u => <option key={u.name} value={u.name}>{u.name}</option>)}
                                     </select>
                                 </div>
 

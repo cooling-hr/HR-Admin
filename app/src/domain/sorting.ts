@@ -236,16 +236,8 @@ export const ensureTopTwo = (arr: Employee[]): Employee[] => {
     return [...topEmployees, ...otherEmployees];
 };
 
-export const sortByUnit = (arr: Employee[]): Employee[] => {
-    // ترتيب الوحدات المطلوب
-    const unitOrder = [
-        'مقر الشعبة',
-        'تبريد باب الزبير',
-        'ورشة التبريد',
-        'تبريد المكينة',
-        'تبريد نهر بن عمر',
-        'تبريد المركز الثقافي'
-    ];
+// unitOrder ترتيب وحدات الجهة (unitNames(org))؛ موظف بوحدة خارجه يبقى آخر القائمة بالرقم الوظيفي
+export const sortByUnit = (arr: Employee[], unitOrder: string[]): Employee[] => {
     
     // تجميع الموظفين حسب الوحدة
     const byUnit: Record<string, Employee[]> = {};

@@ -6,13 +6,14 @@
 // فمخول الموقع في يوم ما هو مخول الوجبة التي تصادف دوامها ذلك اليوم.
 // السجل: mealAuthorizations[الوحدة][الوجبة] = { main: معرّف المخول، alt: معرّف البديل }.
 
-export const DUTY_MEAL_SITES: string[] = ['تبريد باب الزبير', 'تبريد المكينة', 'تبريد المركز الثقافي', 'تبريد نهر بن عمر'];
+import type { Org } from './org';
+
 export const DUTY_MEAL_SQUADS: string[] = ['A', 'B', 'C', 'D'];
-export const DUTY_MEAL_SECTION = 'التكييف والتبريد';
 export const DUTY_MEAL_HEADERS: string[] = ['ت', 'الموقع', 'عدد المناوبين', 'مناوبة صباحية', 'مناوبة مسائية', 'اسم المخول', 'رقم الهاتف النقال', 'اسم البديل', 'رقم الهاتف النقال', 'القسم'];
 
-// اسم الموقع كما يُكتب في الجدول: بلا «تبريد» في أوله
-export const dutyMealSiteLabel = (unit: string): string => unit.replace(/^تبريد\s+/, '');
+// مواقع الجدول وترتيبها من org.dutyMealSites، وخانة القسم من org.departmentBare.
+// اسم الموقع كما يُكتب في الجدول: الاسم المختصر للوحدة (بلا «تبريد» في أوله)
+export const dutyMealSiteLabel = (org: Org, unit: string): string => org.units.find(u => u.name === unit)?.shortName ?? unit;
 export const isTripleShiftSite = (unit: string): boolean => unit.includes('نهر بن عمر');
 
 // من يغيب عن موقعه ذلك اليوم لا تُحسب له وجبة: الإجازات (عدا الزمنية) والغياب وسحب اليد
@@ -42,9 +43,10 @@ type DayDeps = {
     authorizations: MealAuthorizations;
     getEmployeeDailyStatus: (emp: Emp, dateStr: string) => string;
     getSquadsOnDuty: (dateStr: string) => { triple: string; morning: string; evening: string };
+    org: Org;
 };
 
-export const buildDutyMealDay = ({ staff, dateStr, authorizations, getEmployeeDailyStatus, getSquadsOnDuty }: DayDeps): MealSiteBlock[] => {
+export const buildDutyMealDay = ({ staff, dateStr, authorizations, getEmployeeDailyStatus, getSquadsOnDuty, org }: DayDeps): MealSiteBlock[] => {
     const onDuty = getSquadsOnDuty(dateStr);
     const person = (emp?: Emp): MealPerson => emp ? { name: emp.name || '', mobile: String(emp.mobile || '').trim() } : null;
     const present = (emp: Emp) => isPresentForMeal(getEmployeeDailyStatus(emp, dateStr));
@@ -71,10 +73,10 @@ export const buildDutyMealDay = ({ staff, dateStr, authorizations, getEmployeeDa
         return { squad, count: presentMembers.length, main: person(filled[0]), alt: person(filled[1]), warning };
     };
 
-    return DUTY_MEAL_SITES.map(unit => {
+    return org.dutyMealSites.map(unit => {
         const triple = isTripleShiftSite(unit);
         const rows = triple ? [shiftRow(unit, onDuty.triple)] : [shiftRow(unit, onDuty.morning), shiftRow(unit, onDuty.evening)];
-        return { unit, label: dutyMealSiteLabel(unit), triple, total: rows.reduce((n, r) => n + r.count, 0), rows };
+        return { unit, label: dutyMealSiteLabel(org, unit), triple, total: rows.reduce((n, r) => n + r.count, 0), rows };
     });
 };
 

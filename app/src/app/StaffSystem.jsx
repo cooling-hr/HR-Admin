@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';   // لـcreatePortal في بطاقة الموظف، لا للتركيب (التركيب في ملف المدخل)
 import { FIELD_NAMES_AR, mergeKeyOf, ownKey, ATTENDANCE_PARTS, isValidAttendanceValue, analyzeMergePeriods, analyzeMergeAttendance, analyzeMerge } from '../domain/merge';
 import { getJobRank, sortByJobNumber, sortByJobNumberOnly, sortByJobTitleHierarchy, ensureTopTwo, sortByUnit } from '../domain/sorting';
+import { headquartersUnit, locationJustification, locationNames, unitNames } from '../domain/org';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
 import { shiftLeaveCarry, shiftLeaveCarryNote } from '../domain/shiftLeave';
@@ -59,13 +60,6 @@ import { buildDatePicker } from '../ui/datePicker';
 
         const { useState, useMemo, useRef } = React;
         
-        const LOCATION_REASONS = {
-  "نهر بن عمر": "صيانة وتصليح وتنصيب اجهزة التبريد المنفصلة في قسم المختبرات والسيطرة النوعية ومحطة عزل نهر بن عمر واليمامة الرئيسية والحقلية",
-  "باب الزبير": "صيانة اجهزة التبريد في موقع باب الزبير ومواقع مراكز البصرة",
-  "المركز الثقافي النفطي": "نصب وصيانة وتشغيل اجهزة التبريد المركزي في المركز الثقافي النفطي والمشروع السكني",
-  "المكينة": "تشغيل اجهزة التبريد المركزي ومراقبة اجهزة تبريد صالة الهيأة المالية التي تحتوي على اجهزة الصرافات الالية"
-};
-        const LOCATION_ORDER = ['نهر بن عمر', 'باب الزبير', 'المركز الثقافي النفطي', 'المكينة'];
         const INITIAL_DATA = [];
 
         // المصنع: يُستدعى مرة واحدة في ملف مدخل كل نسخة بطبقة بياناتها ومكوّنات AuthViews الخاصة
@@ -1966,7 +1960,7 @@ import { buildDatePicker } from '../ui/datePicker';
 
             const exportDailyReportExcel = () => {
                 try {
-                    const unitOrder = ['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'];
+                    const unitOrder = unitNames(org);
                     const exportData = [];
                     let counter = 1;
                     
@@ -2031,7 +2025,7 @@ import { buildDatePicker } from '../ui/datePicker';
                             // نفس معيار الترتيب المعروض على الشاشة ("الوحدات والموقف" و"الموقف اليومي")،
                             // فلا يختلف التصدير/الطباعة عمّا يراه المدخِل حيّاً — والعقود تنتهي آخر كل وحدة
                             let sortedStaff = sortByJobTitleHierarchy(unitDailyStaff, unitName);
-                            if (unitName === 'مقر الشعبة') {
+                            if (unitName === headquartersUnit(org)) {
                                 sortedStaff = ensureTopTwo(sortedStaff);
                             }
                             
@@ -2472,7 +2466,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     commitBundleMetadata(s.values);
                     appliedAttendanceCount++;
                 });
-                const sorted = sortByUnit(mergedList);
+                const sorted = sortByUnit(mergedList, unitNames(org));
                 setStaff(sorted);
                 safeStorage.setItem('staffData', JSON.stringify(sorted));
                 
@@ -2548,7 +2542,7 @@ import { buildDatePicker } from '../ui/datePicker';
 
             const handleFullOverwrite = (incoming) => {
                 commitBundleMetadata(incomingBundle);
-                const sorted = sortByUnit(incoming);
+                const sorted = sortByUnit(incoming, unitNames(org));
                 setStaff(sorted);
                 setShowWelcome(false);
                 setShowMergeModal(false);
@@ -3017,7 +3011,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 const rows = periodReportData.employees;
                 if (!Array.isArray(rows) || rows.length < 2) return rows || [];
                 const position = new Map();
-                sortByUnit(rows.map(r => r.employee)).forEach((emp, i) => {
+                sortByUnit(rows.map(r => r.employee), unitNames(org)).forEach((emp, i) => {
                     if (emp && emp.id != null) position.set(emp.id, i);
                 });
                 // من لم يظهر في الترتيب (بلا معرّف مثلاً) يذهب إلى الآخر بدل أن يختفي
@@ -3032,12 +3026,12 @@ import { buildDatePicker } from '../ui/datePicker';
                 const data = search ? filtered : staff;
                 let result = [];
                 
-                if (view === 'all') result = sortByUnit(data); // ترتيب حسب الوحدات
+                if (view === 'all') result = sortByUnit(data, unitNames(org)); // ترتيب حسب الوحدات
                 else if (view === 'morning') { result = data.filter(s => s.workType === 'صباحي' && !isContractEmployee(s)); result = sortByJobNumber(result); }
                 else if (view === 'shift') {
                 result = data.filter(s => s.workType === 'مناوب');
                 // ترتيب حسب الموقع
-                const locationOrder = ['وحدة تبريد نهر بن عمر', 'وحدة تبريد باب الزبير', 'وحدة تبريد المركز الثقافي', 'وحدة تبريد المكينة', 'دار استراحة المشروع السكني'];
+                const locationOrder = org.shiftViewLocationOrder;
                 result.sort((a, b) => {
                     const indexA = locationOrder.indexOf(a.location);
                     const indexB = locationOrder.indexOf(b.location);
@@ -3068,7 +3062,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     !excludedWaterIds.has(s.id)
                 );
                 // نفس ترتيب المناوبين: حسب الموقع
-                const locationOrder = ['وحدة تبريد نهر بن عمر', 'وحدة تبريد باب الزبير', 'وحدة تبريد المركز الثقافي', 'وحدة تبريد المكينة', 'دار استراحة المشروع السكني'];
+                const locationOrder = org.shiftViewLocationOrder;
                 result.sort((a, b) => {
                     const indexA = locationOrder.indexOf(a.location);
                     const indexB = locationOrder.indexOf(b.location);
@@ -3099,7 +3093,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     const shift = result.filter(r => r.workType === 'مناوب');
                     
                     // ترتيب المناوبين حسب الوحدات: نهر بن عمر → باب الزبير → المركز الثقافي → المكينة
-                    const unitOrder = ['تبريد نهر بن عمر', 'تبريد باب الزبير', 'تبريد المركز الثقافي', 'تبريد المكينة'];
+                    const unitOrder = org.shiftUnitOrder;
                     shift.sort((a, b) => {
                         const indexA = unitOrder.indexOf(a.unit);
                         const indexB = unitOrder.indexOf(b.unit);
@@ -3473,7 +3467,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (!(await ensureLibs('xlsx'))) return;
                 try {
                     // ترتيب الموظفين حسب الوحدات
-                    const unitOrder = ['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'];
+                    const unitOrder = unitNames(org);
                     let sortedStaff = [...staff].sort((a, b) => {
                         const unitA = unitOrder.indexOf(a.unit);
                         const unitB = unitOrder.indexOf(b.unit);
@@ -3864,7 +3858,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     alert('✅ تم حفظ التعديلات بنجاح!');
                 }
                 
-                const sortedStaff = sortByUnit(updatedStaff);
+                const sortedStaff = sortByUnit(updatedStaff, unitNames(org));
                 setStaff(sortedStaff);
                 safeStorage.setItem('staffData', JSON.stringify(sortedStaff));
                 // بث مباشر وفوري للسحابة فور الضغط على حفظ
@@ -4391,7 +4385,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     let counter = 1;
                     let rowIndex = 4;
                     
-                    LOCATION_ORDER.forEach(location => {
+                    locationNames(org).forEach(location => {
                         const locationStaff = current.filter(s => s.location === location);
                         if (locationStaff.length > 0) {
                             // حساب نوع المناوبة
@@ -4423,7 +4417,7 @@ import { buildDatePicker } from '../ui/datePicker';
                                 if (view === 'shift') {
                                     rowData['الموقع'] = s.location;
                                     rowData['نوع المناوبة'] = shiftType;
-                                    rowData['مبررات التشغيل'] = idx === 0 ? (LOCATION_REASONS[location] || '') : '';
+                                    rowData['مبررات التشغيل'] = idx === 0 ? (locationJustification(org, location) || '') : '';
                                 } else if (view === 'maaShift') {
                                     rowData['نوع المناوبة'] = shiftType;
                                     rowData['ملاحظات'] = '';
@@ -4509,14 +4503,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     let counter = 1;
                     
                     // ترتيب الوحدات
-                    const unitOrder = [
-                        'مقر الشعبة',
-                        'تبريد باب الزبير',
-                        'ورشة التبريد',
-                        'تبريد المكينة',
-                        'تبريد نهر بن عمر',
-                        'تبريد المركز الثقافي'
-                    ];
+                    const unitOrder = unitNames(org);
                     
                     unitOrder.forEach(unit => {
                         const unitStaff = current.filter(s => s.unit === unit);
@@ -4759,14 +4746,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         });
                     } else {
                         // تصدير كل الوحدات
-                        const unitOrder = [
-                            'مقر الشعبة',
-                            'تبريد باب الزبير',
-                            'ورشة التبريد',
-                            'تبريد المكينة',
-                            'تبريد نهر بن عمر',
-                            'تبريد المركز الثقافي'
-                        ];
+                        const unitOrder = unitNames(org);
                         
                         unitOrder.forEach(unit => {
                             const unitStaff = current.filter(s => s.unit === unit);
@@ -5124,14 +5104,14 @@ return (
             {/* نافذة مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center Modal) */}
             {showRestoreCenterModal && <RestoreCenterModal ctx={{ availableSnapshots, currentUserRole, fetchAvailableSnapshots, handleDownloadSnapshot, handleRestoreSnapshot, isLoadingSnapshots, selectedSnapshotPreview, setSelectedSnapshotPreview, setShowRestoreCenterModal, snapshotsError }} />}
 
-                                <DashboardScreen ctx={{ AuthViews, clearAllData, clearUnifiedSearch, exportBackupJSON, fileInputRef, handleOpenUserManagement, loadFile, openEditModal, performUnifiedSearch, setEditingEmployee, setPreviewData, setSelectedEmployeeCard, setShowEditModal, setShowPasteModal, setShowPreview, setShowPrintForm, setShowUnitDropdown, setUnifiedFilters, setUnifiedQuery, setUnifiedResults, setVisiblePreviewColumns, showBackupWarning, showUnitDropdown, staff, stats, unifiedFilters, unifiedQuery, unifiedResults }} />
+                                <DashboardScreen ctx={{ org, AuthViews, clearAllData, clearUnifiedSearch, exportBackupJSON, fileInputRef, handleOpenUserManagement, loadFile, openEditModal, performUnifiedSearch, setEditingEmployee, setPreviewData, setSelectedEmployeeCard, setShowEditModal, setShowPasteModal, setShowPreview, setShowPrintForm, setShowUnitDropdown, setUnifiedFilters, setUnifiedQuery, setUnifiedResults, setVisiblePreviewColumns, showBackupWarning, showUnitDropdown, staff, stats, unifiedFilters, unifiedQuery, unifiedResults }} />
 
                             </div>
 
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
-                            <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, setMealAuthorizations, staff }} />
+                            <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
+                            <UnitsScreen ctx={{ org, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
@@ -5167,7 +5147,7 @@ return (
 
             {showSquadSchedule && <SquadScheduleModal ctx={{ BOC_LOGO_DATA_URI, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters }} />}
 
-            {showEditModal && editingEmployee && <EditEmployeeModal ctx={{ buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, saveEmployeeEdit, showCamera, staff, startCamera, stopCamera, updateEditField, videoRef }} />}
+            {showEditModal && editingEmployee && <EditEmployeeModal ctx={{ org, buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, saveEmployeeEdit, showCamera, staff, startCamera, stopCamera, updateEditField, videoRef }} />}
                     
                     {showPrintForm && <NewEmployeeFormPrint ctx={{ setShowPrintForm }} />}
                     

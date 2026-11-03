@@ -7,6 +7,7 @@ import { getMissingFields } from '../../domain/employees';
 import { isLongOrMaternityLeave } from '../../domain/periods';
 import { resolveCodeTable } from '../../domain/timeForm';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
+import { unitNames } from '../../domain/org';
 
 // خيارات قائمة الموقف اليومي مرتّبة بتكرارها كما ذكرها أسامة (2026-10-20). كل الحالات المؤرَّخة (الدورة
 // والإيفادان والإجازة خارج العراق وبدون راتب والغياب وسحب اليد، والأمومة والطويلة) ليست هنا عمداً:
@@ -82,7 +83,7 @@ const ShiftPills = ({ shifts }) => (<>
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide } = ctx;
+    const { printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org } = ctx;
     // الرموز المضافة من دليل الرموز (والرسمية المفعَّلة) خيارات في مجموعة «رموز أخرى»، تُحسب مرة واحدة لكل الموظفين
     const extraStatusOptions = Object.values(resolveCodeTable(timeFormCodeEdits).extraByMeaning).map(c => ({ value: c.meaning, label: '🔤 ' + c.meaning + ' (' + c.letter + ')', className: 'bg-white text-slate-700 font-bold' }));
     const statusGroups = [...DAILY_STATUS_GROUPS, ...(extraStatusOptions.length ? [{ label: 'رموز أخرى', options: extraStatusOptions }] : [])];
@@ -332,12 +333,7 @@ export const UnitsScreen = ({ ctx }) => {
                         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
                             {[
                                 { id: 'all', name: '🏢 كافة الوحدات', count: staff.length },
-                                { id: 'مقر الشعبة', name: '📍 مقر الشعبة', count: staff.filter(s => s.unit === 'مقر الشعبة').length },
-                                { id: 'تبريد باب الزبير', name: '❄️ باب الزبير', count: staff.filter(s => s.unit === 'تبريد باب الزبير').length },
-                                { id: 'ورشة التبريد', name: '🔧 ورشة التبريد', count: staff.filter(s => s.unit === 'ورشة التبريد').length },
-                                { id: 'تبريد المكينة', name: '🏭 تبريد المكينة', count: staff.filter(s => s.unit === 'تبريد المكينة').length },
-                                { id: 'تبريد نهر بن عمر', name: '🌊 نهر بن عمر', count: staff.filter(s => s.unit === 'تبريد نهر بن عمر').length },
-                                { id: 'تبريد المركز الثقافي', name: '🏛️ المركز الثقافي', count: staff.filter(s => s.unit === 'تبريد المركز الثقافي').length }
+                                ...org.units.map(u => ({ id: u.name, name: u.tabLabel, count: staff.filter(s => s.unit === u.name).length }))
                             ].map(u => {
                                 const isActive = selectedDailyUnitTab === u.id;
                                 return (
@@ -394,7 +390,7 @@ export const UnitsScreen = ({ ctx }) => {
                     {/* البحث من شريط الشاشات يُبقي صفوف المطابقين وحدها */}
                     {searchActive && (() => {
                         // يُحسب مما تعرضه القائمة أدناه فعلاً: الوحدات الست الثابتة وحدها
-                        const DAILY_UNITS = ['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'];
+                        const DAILY_UNITS = unitNames(org);
                         const shown = staff.filter(s => DAILY_UNITS.includes(s.unit) && matchesStaffSearch(s, periodSearchQuery)
                             && !isLongOrMaternityLeave(getEmployeeDailyStatus(s, dailyReportDate))).length;
                         return (
@@ -410,7 +406,7 @@ export const UnitsScreen = ({ ctx }) => {
 
                     {/* كشوفات الموظفين مجمعة حسب الوحدات */}
                     <div className="space-y-6">
-                        {['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'].map(unitName => {
+                        {unitNames(org).map(unitName => {
                              // البحث يشمل كل الوحدات مهما كان التبويب المختار (حقله فوق التبويبات)
                              if (!searchActive && selectedDailyUnitTab !== 'all' && selectedDailyUnitTab !== unitName) return null;
                             const unitStaff = staff.filter(s => s.unit === unitName);
@@ -640,7 +636,7 @@ export const UnitsScreen = ({ ctx }) => {
                                         className="w-full bg-white border-2 border-slate-300 rounded-xl px-3 py-2 shadow-sm font-bold text-slate-800 text-xs md:text-sm outline-none cursor-pointer focus:border-indigo-500"
                                     >
                                         <option value="all">🏢 جميع الوحدات</option>
-                                        {['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'].map(u => (
+                                        {unitNames(org).map(u => (
                                             <option key={u} value={u}>📍 {u}</option>
                                         ))}
                                     </select>
@@ -948,7 +944,7 @@ export const UnitsScreen = ({ ctx }) => {
             {searchActive ? (
                 // نتائج البحث من كل الوحدات، بترتيب الوحدات ثم الهرمية كما في ملاك كل وحدة
                 (() => {
-                    const UNIT_ORDER = ['مقر الشعبة', 'تبريد باب الزبير', 'ورشة التبريد', 'تبريد المكينة', 'تبريد نهر بن عمر', 'تبريد المركز الثقافي'];
+                    const UNIT_ORDER = unitNames(org);
                     const units = [...UNIT_ORDER, ...[...new Set(staff.map(s => s.unit).filter(u => u && !UNIT_ORDER.includes(u)))]];
                     const results = units.flatMap(u => sortByJobTitleHierarchy(staff.filter(s => s.unit === u && matchesStaffSearch(s, periodSearchQuery)), u));
                     return (
@@ -1015,14 +1011,7 @@ export const UnitsScreen = ({ ctx }) => {
 
                     <div className="p-8">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {[
-                                {name: 'مقر الشعبة', icon: '🏢', color: 'blue', gradient: 'from-blue-500 to-blue-600'},
-                                {name: 'تبريد باب الزبير', icon: '❄️', color: 'indigo', gradient: 'from-indigo-500 to-indigo-600'},
-                                {name: 'ورشة التبريد', icon: '🔧', color: 'purple', gradient: 'from-purple-500 to-purple-600'},
-                                {name: 'تبريد المكينة', icon: '⚙️', color: 'pink', gradient: 'from-pink-500 to-pink-600'},
-                                {name: 'تبريد نهر بن عمر', icon: '💧', color: 'cyan', gradient: 'from-cyan-500 to-cyan-600'},
-                                {name: 'تبريد المركز الثقافي', icon: '🎭', color: 'teal', gradient: 'from-teal-500 to-teal-600'}
-                            ].map(unit => {
+                            {org.units.map(u => ({ name: u.name, icon: u.cardIcon, gradient: u.cardGradient })).map(unit => {
                                 const unitStaff = staff.filter(s => s.unit === unit.name);
                                 const activeCount = unitStaff.filter(s => s.status === 'نشط').length;
                                 
