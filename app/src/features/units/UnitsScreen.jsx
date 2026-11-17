@@ -1182,6 +1182,19 @@ export const UnitsScreen = ({ ctx }) => {
                                                 <span>{sortedStaff.filter(s => overtimeIds.includes(s.id)).length}</span>
                                             </span>
                                         )}
+                                        {/* تعداد المناوبين اليوم والمرشحين لفترة قادمة (طلب أسامة 2026-11-17)؛ المجدَّد له مسبقاً يُعدّ في الاثنين */}
+                                        {sortedStaff.filter(s => s.workType === 'مناوب').length > 0 && (
+                                            <span className="bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded text-xs inline-flex items-center gap-1">
+                                                <span>🔄 مناوبون حالياً:</span>
+                                                <span>{sortedStaff.filter(s => s.workType === 'مناوب').length}</span>
+                                            </span>
+                                        )}
+                                        {sortedStaff.filter(s => pendingNomPoint(s)).length > 0 && (
+                                            <span className="bg-amber-100 text-amber-800 font-bold px-2.5 py-0.5 rounded text-xs inline-flex items-center gap-1">
+                                                <span>🎯 مرشحون:</span>
+                                                <span>{sortedStaff.filter(s => pendingNomPoint(s)).length}</span>
+                                            </span>
+                                        )}
                                     </>
                                 }
                                 actions={
