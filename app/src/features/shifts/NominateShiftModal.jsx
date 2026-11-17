@@ -17,7 +17,8 @@ export const NominateShiftModal = ({ ctx }) => {
     const isEdit = nominateModal.mode === 'edit';
     const todayStr = localDateStr();
     // دورة مفتوحة قائمة: تُقترح تاريخاها افتراضياً عند ترشيح جديد
-    const open = !isEdit ? (nominationCycles[0] || null) : null;
+    // لا تُقترح دورة بدأت فعلاً: تاريخ بدايتها يسبق اليوم فتفشل النافذة في فحصها هي
+    const open = !isEdit ? (nominationCycles.find(c => c.start >= todayStr) || null) : null;
     const initStart = isEdit ? nominateModal.start : (open ? open.start : '');
     const [start, setStart] = useState(initStart || '');
     const [duration, setDuration] = useState(isEdit || open ? 'manual' : '6');
