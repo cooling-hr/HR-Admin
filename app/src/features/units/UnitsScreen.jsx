@@ -100,6 +100,27 @@ export const UnitsScreen = ({ ctx }) => {
         setOvertimeIds(updated);
         safeStorage.setItem('overtimeSelectedIds', JSON.stringify(updated));
     };
+    // زر الإضافي: المناوب حالياً لا يُشمل بالإضافي (قرار أسامة 2026-11-17)؛ المرشح للمناوبة يُشمل لأنه صباحي اليوم.
+    // ومناوب أُدرج قبل هذا القرار يظهر له زر إخراج فقط.
+    const renderOvertimeControl = (s) => {
+        const inOvertime = overtimeIds.includes(s.id);
+        if (s.workType === 'مناوب') {
+            return inOvertime ? (
+                <button onClick={() => toggleOvertime(s.id)} title="المناوب حالياً لا يُشمل بالإضافي؛ اضغط لإخراجه من السلة"
+                    className="px-2.5 py-1 bg-red-100 text-red-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer">
+                    <span>✕ إخراج (مناوب)</span>
+                </button>
+            ) : <span className="text-[11px] font-bold text-slate-400">لا يُشمل (مناوب)</span>;
+        }
+        return (
+            <button onClick={() => toggleOvertime(s.id)}
+                className={inOvertime
+                    ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
+                    : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
+                <span>{inOvertime ? '✓ مشمول' : '➕ إضافة'}</span>
+            </button>
+        );
+    };
     // ترشيح مسبق قائم قبل بدايته (من السجل المحفوظ في الموظف المشتق)
     const pendingNomPoint = (s) => (s.workHistory || []).find(p => p.from && p.from > todayStr && p.workType === 'مناوب' && p.squad === '');
     // زر الترشيح للصباحي: يبدّل وجوده في السلة؛ والمرشح شارة تلغي ترشيحه قبل البداية؛ المناوب لا زر له
@@ -1079,14 +1100,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                         </td>
                                                         <td className="px-4 py-3 text-gray-700">{s.jobTitle}</td>
                                                         <td className="px-4 py-3 text-gray-700 font-bold">{s.unit || '—'}</td>
-                                                        <td className="px-4 py-3 no-print">
-                                                            <button onClick={() => toggleOvertime(s.id)}
-                                                                className={overtimeIds.includes(s.id)
-                                                                    ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
-                                                                    : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
-                                                                <span>{overtimeIds.includes(s.id) ? '✓ مشمول' : '➕ إضافة'}</span>
-                                                            </button>
-                                                        </td>
+                                                        <td className="px-4 py-3 no-print">{renderOvertimeControl(s)}</td>
                                                         <td className="px-4 py-3 no-print">{renderNominateControl(s)}</td>
                                                     </tr>
                                                 ))}
@@ -1257,31 +1271,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                         </td>
                                                         <td className="px-4 py-3 text-gray-700">{s.jobTitle}</td>
                                                         <td className="px-4 py-3 text-gray-400"></td>
-                                                        <td className="px-4 py-3 no-print">
-                                                            {overtimeIds.includes(s.id) ? (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const updated = overtimeIds.filter(id => id !== s.id);
-                                                                        setOvertimeIds(updated);
-                                                                        safeStorage.setItem('overtimeSelectedIds', JSON.stringify(updated));
-                                                                    }}
-                                                                    className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer"
-                                                                >
-                                                                    <span>✓ مشمول</span>
-                                                                </button>
-                                                            ) : (
-                                                                <button 
-                                                                    onClick={() => {
-                                                                        const updated = [...overtimeIds, s.id];
-                                                                        setOvertimeIds(updated);
-                                                                        safeStorage.setItem('overtimeSelectedIds', JSON.stringify(updated));
-                                                                    }}
-                                                                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer"
-                                                                >
-                                                                    <span>➕ إضافة</span>
-                                                                </button>
-                                                            )}
-                                                        </td>
+                                                        <td className="px-4 py-3 no-print">{renderOvertimeControl(s)}</td>
                                                         <td className="px-4 py-3 no-print">{renderNominateControl(s)}</td>
                                                     </tr>
                                                     );
