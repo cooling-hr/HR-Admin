@@ -101,6 +101,9 @@ import { buildDatePicker } from '../ui/datePicker';
                     pushDataToCloud();
                 }
             }, [staff]);
+            // نسخة «اليوم» المشتقة في الذاكرة للشاشات بلا تاريخ؛ الكتابة والحفظ تبقى على staff الخام
+            const todayStr = localDateStr();
+            const staffToday = useMemo(() => staff.map(s => employeeOn(s, todayStr)), [staff, todayStr]);
             const [view, setView] = useState('dashboard');
 
             // حركة فتح التبويب: تُعاد بضبط الصنف يدوياً لا بـ key={view}.
@@ -584,9 +587,9 @@ import { buildDatePicker } from '../ui/datePicker';
             const [unifiedResultsRaw, setUnifiedResults] = useState(null);
             const unifiedResults = useMemo(() => {
                 if (unifiedResultsRaw === null) return null;
-                const byId = new Map(staff.map(s => [s.id, s]));
+                const byId = new Map(staffToday.map(s => [s.id, s]));
                 return unifiedResultsRaw.map(r => (r && r.id) ? byId.get(r.id) : r).filter(Boolean);
-            }, [unifiedResultsRaw, staff]);
+            }, [unifiedResultsRaw, staffToday]);
             const [editingEmployee, setEditingEmployee] = useState(null);
             const [selectedEmployeeCard, setSelectedEmployeeCard] = useState(null);
             // صنف عزل طباعة البطاقة لا يبقى بعد إغلاقها: لو بقي (متصفح لم يُطلق afterprint)
@@ -826,9 +829,11 @@ import { buildDatePicker } from '../ui/datePicker';
             const squadRosters = useMemo(() => {
                 const mk = () => ({ A: [], B: [], C: [], D: [] });
                 const triple = mk(), doubleFlat = mk();
-                staff.forEach(s => {
+                staff.forEach(raw => {
+                    // الحالة بتاريخ بداية الفترة (نوع الدوام والوجبة ونوع المناوبة)
+                    const s = employeeOn(raw, periodStartDate);
                     if (s.workType !== 'مناوب' || s.status !== 'نشط') return;
-                    const bucket = (s.location && s.location.includes('نهر بن عمر')) ? triple : doubleFlat;
+                    const bucket = isThreeShiftOn(raw, periodStartDate) ? triple : doubleFlat;
                     if (bucket[s.squad]) bucket[s.squad].push({ id: s.id, name: s.name, unit: String(s.unit || '').trim() || 'غير محدد' });
                 });
                 Object.values(triple).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name, 'ar')));
@@ -846,7 +851,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     double[q] = orderedUnits.map(u => ({ unit: u, employees: byUnit[u] }));
                 });
                 return { triple, double };
-            }, [staff]);
+            }, [staff, periodStartDate]);
 
 
 
@@ -2929,53 +2934,53 @@ import { buildDatePicker } from '../ui/datePicker';
             }, [staff]);
             
             const stats = useMemo(() => ({
-                total: staff.length,
-                shift: staff.filter(s => s.workType === 'مناوب').length,
-                morning: staff.filter(s => s.workType === 'صباحي' && !isContractEmployee(s)).length,
-                contract: staff.filter(s => isContractEmployee(s)).length,
-                contract315: staff.filter(s => contractTypeOf(s) === 'عقد 315').length,
-                contractGov: staff.filter(s => contractTypeOf(s) === 'عقد المحافظة').length,
-                contractUnclassified: staff.filter(s => contractTypeOf(s) === 'غير مصنّف').length,
-                maaMorning: staff.filter(s =>
+                total: staffToday.length,
+                shift: staffToday.filter(s => s.workType === 'مناوب').length,
+                morning: staffToday.filter(s => s.workType === 'صباحي' && !isContractEmployee(s)).length,
+                contract: staffToday.filter(s => isContractEmployee(s)).length,
+                contract315: staffToday.filter(s => contractTypeOf(s) === 'عقد 315').length,
+                contractGov: staffToday.filter(s => contractTypeOf(s) === 'عقد المحافظة').length,
+                contractUnclassified: staffToday.filter(s => contractTypeOf(s) === 'غير مصنّف').length,
+                maaMorning: staffToday.filter(s =>
                     s.workType === 'صباحي' &&
                     !excludedWaterIds.has(s.id)
                 ).length,
-                maaShift: staff.filter(s =>
+                maaShift: staffToday.filter(s =>
                     s.workType === 'مناوب' &&
                     !excludedWaterIds.has(s.id)
                 ).length,
-                evaluation: staff.filter(s => {
+                evaluation: staffToday.filter(s => {
                     if (isContractEmployee(s)) return false;
                     const p = getActivePeriod(s, localDateStr());
                     return !(p && (LONG_ABSENCE_TYPES.includes(p.type)));
                 }).length,
-                active: staff.filter(s => s.status === 'نشط').length,
-                inCourse: staff.filter(s => s.status === 'في دورة').length,
-                male: staff.filter(s => s.gender === 'ذكر').length,
-                female: staff.filter(s => s.gender === 'أنثى').length,
-                safety: staff.filter(isInSafetyRoster).length,
-                missingData: staff.filter(s => getMissingFields(s).length > 0).length
-            }), [staff, waterMonth, excludedWaterIds]);
+                active: staffToday.filter(s => s.status === 'نشط').length,
+                inCourse: staffToday.filter(s => s.status === 'في دورة').length,
+                male: staffToday.filter(s => s.gender === 'ذكر').length,
+                female: staffToday.filter(s => s.gender === 'أنثى').length,
+                safety: staffToday.filter(isInSafetyRoster).length,
+                missingData: staffToday.filter(s => getMissingFields(s).length > 0).length
+            }), [staffToday, waterMonth, excludedWaterIds]);
 
             const filtered = useMemo(() => {
-                if (!search) return staff;
+                if (!search) return staffToday;
                 const normalizedSearch = normalizeArabic(search);
                 
                 // البحث عن الجنس (مع توحيد الأحرف)
                 // نبحث عن "انث" فقط لتشمل: انثى، انثي، اناث
                 if (normalizedSearch.includes('انث') || normalizedSearch.includes('نساء')) {
-                    return staff.filter(s => s.gender === 'أنثى');
+                    return staffToday.filter(s => s.gender === 'أنثى');
                 }
                 if (normalizedSearch.includes('ذكور') || normalizedSearch.includes('ذكر') || normalizedSearch.includes('رجال')) {
-                    return staff.filter(s => s.gender === 'ذكر');
+                    return staffToday.filter(s => s.gender === 'ذكر');
                 }
                 
                 // البحث العادي
-                return staff.filter(s => 
+                return staffToday.filter(s => 
                     normalizeArabic(s.name).includes(normalizedSearch) || 
                     s.jobNumber.includes(search)
                 );
-            }, [staff, search]);
+            }, [staffToday, search]);
             
             const statsFiltered = useMemo(() => {
                 if (!statsQuery) return [];
@@ -3034,7 +3039,7 @@ import { buildDatePicker } from '../ui/datePicker';
             }, [periodReportData]);
             
             const current = useMemo(() => {
-                const data = search ? filtered : staff;
+                const data = search ? filtered : staffToday;
                 let result = [];
                 
                 if (view === 'all') result = sortByUnit(data, unitNames(org)); // ترتيب حسب الوحدات
@@ -3127,20 +3132,20 @@ import { buildDatePicker } from '../ui/datePicker';
                     const nonContracts = result.filter(s => !isContractEmployee(s));
                     return [...nonContracts, ...contracts];
                 }
-            }, [staff, filtered, search, view, waterMonth, excludedWaterIds, safetyFilter]);
+            }, [staffToday, filtered, search, view, waterMonth, excludedWaterIds, safetyFilter]);
 
             // أعداد خيارات فلتر السلامة من نفس القائمة التي يُصفّيها (بعد البحث، قبل الفلتر)
             const safetyGroupCounts = useMemo(() => {
                 const counts = { all: 0, renewal: 0, never: 0 };
                 if (view !== 'safety') return counts;
-                (search ? filtered : staff).forEach(s => {
+                (search ? filtered : staffToday).forEach(s => {
                     if (!isInSafetyRoster(s)) return;
                     counts.all++;
                     const group = safetyFilterGroup(s);
                     if (group !== 'ok') counts[group]++;
                 });
                 return counts;
-            }, [staff, filtered, search, view]);
+            }, [staffToday, filtered, search, view]);
             
             const loadFile = (e) => {
                 const file = e.target.files[0];
@@ -3479,7 +3484,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 try {
                     // ترتيب الموظفين حسب الوحدات
                     const unitOrder = unitNames(org);
-                    let sortedStaff = [...staff].sort((a, b) => {
+                    let sortedStaff = [...staffToday].sort((a, b) => {
                         const unitA = unitOrder.indexOf(a.unit);
                         const unitB = unitOrder.indexOf(b.unit);
                         if (unitA !== unitB) {
@@ -3591,7 +3596,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (!(await ensureLibs('xlsx'))) return;
                 try {
                     // فلترة الموظفين (ذكور نشطين، مع العقود، استثناء الإداريين المعفَين)
-                    let safetyStaff = staff.filter(isInSafetyRoster);
+                    let safetyStaff = staffToday.filter(isInSafetyRoster);
                     
                     // ترتيب حسب الرقم الوظيفي مع العقود في النهاية
                     safetyStaff = sortByJobNumber(safetyStaff);
@@ -3634,7 +3639,7 @@ import { buildDatePicker } from '../ui/datePicker';
             };
 
             const performAdvancedSearch = () => {
-                let results = staff;
+                let results = staffToday;
                 
                 // فلتر حسب العنوان الوظيفي — مع توحيد الأحرف (ة/ه، أإآ/ا)
                 if (advancedSearch.jobTitle) {
@@ -3679,7 +3684,7 @@ import { buildDatePicker } from '../ui/datePicker';
 
             // بحث حسب التحصيل الدراسي أو سنة التخرج أو تاريخ التعيين
             const performEduSearch = () => {
-                let results = staff;
+                let results = staffToday;
                 const { education, graduationYear, hireYear } = eduSearch;
                 if (education) {
                     results = results.filter(s => s.education && s.education.includes(education));
@@ -3700,7 +3705,7 @@ import { buildDatePicker } from '../ui/datePicker';
 
 
             const performUnifiedSearch = () => {
-                let results = staff;
+                let results = staffToday;
                 const rawQ = unifiedQuery.trim();
                 const qNormalized = normalizeArabic(rawQ);
                 const q = qNormalized.replace(/\s+/g, ''); // إزالة المسافات للبحث المرن بالأسماء المركبة
@@ -3753,7 +3758,9 @@ import { buildDatePicker } from '../ui/datePicker';
             };
             
             const openEditModal = (employee) => {
-                setEditingEmployee({...employee});
+                // يُفتح السجل الخام لا المشتق، فلا تُكتب قيم «اليوم» في السجل عند الحفظ
+                const raw = staff.find(s => s.id === employee.id) || employee;
+                setEditingEmployee({...raw});
                 setShowEditModal(true);
             };
             
@@ -5115,16 +5122,16 @@ return (
             {/* نافذة مركز الاستعادة والأرشيف الزمني السحابي (Time-Machine Restore Center Modal) */}
             {showRestoreCenterModal && <RestoreCenterModal ctx={{ org, availableSnapshots, currentUserRole, fetchAvailableSnapshots, handleDownloadSnapshot, handleRestoreSnapshot, isLoadingSnapshots, selectedSnapshotPreview, setSelectedSnapshotPreview, setShowRestoreCenterModal, snapshotsError }} />}
 
-                                <DashboardScreen ctx={{ org, AuthViews, clearAllData, clearUnifiedSearch, exportBackupJSON, fileInputRef, handleOpenUserManagement, loadFile, openEditModal, performUnifiedSearch, setEditingEmployee, setPreviewData, setSelectedEmployeeCard, setShowEditModal, setShowPasteModal, setShowPreview, setShowPrintForm, setShowUnitDropdown, setUnifiedFilters, setUnifiedQuery, setUnifiedResults, setVisiblePreviewColumns, showBackupWarning, showUnitDropdown, staff, stats, unifiedFilters, unifiedQuery, unifiedResults }} />
+                                <DashboardScreen ctx={{ org, AuthViews, clearAllData, clearUnifiedSearch, exportBackupJSON, fileInputRef, handleOpenUserManagement, loadFile, openEditModal, performUnifiedSearch, setEditingEmployee, setPreviewData, setSelectedEmployeeCard, setShowEditModal, setShowPasteModal, setShowPreview, setShowPrintForm, setShowUnitDropdown, setUnifiedFilters, setUnifiedQuery, setUnifiedResults, setVisiblePreviewColumns, showBackupWarning, showUnitDropdown, staff: staffToday, stats, unifiedFilters, unifiedQuery, unifiedResults }} />
 
                             </div>
 
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
-                            <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff }} />
+                            <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff: staffToday }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ org, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
+                            <UnitsScreen ctx={{ staff: staffToday, org, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
                         ) : (
-                            <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
+                            <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff: staffToday, staffRaw: staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
                         </div>
                     </main>

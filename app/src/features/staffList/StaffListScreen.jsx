@@ -12,7 +12,7 @@ import { Segmented } from '../../ui/Segmented';
 // جدول واحد تتبدّل أعمدته وفلاتره بشرط view. الحالة والمنطق في StaffSystem؛ هذا المكوّن
 // يرسم فقط ويستلم ما يحتاجه عبر ctx صريح.
 export const StaffListScreen = ({ ctx }) => {
-    const { applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth } = ctx;
+    const { applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff, staffRaw, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth } = ctx;
     return (
         <div className="space-y-4">
             <div className="sticky-search bg-white rounded-xl shadow-lg p-4">
@@ -703,7 +703,7 @@ export const StaffListScreen = ({ ctx }) => {
                                                                     // القيد بعد التأكيد النهائي لا قبله: السجل غير قابل للتصحيح
                                                                     logAuditEvent('delete_employee:' + (s.jobNumber || s.id), currentUserName);
                                                                     updateTombstones({ addEmployees: [{ job: s.jobNumber, name: s.name }] });
-                                                                    setStaff(staff.filter(emp => emp.id !== s.id));
+                                                                    setStaff(staffRaw.filter(emp => emp.id !== s.id));
                                                                     alert('✅ تم حذف الموظف من النظام');
                                                                 } else {
                                                                     alert('❌ تم إلغاء عملية الحذف\n\nالاسم المدخل غير مطابق.');
