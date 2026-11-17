@@ -96,7 +96,7 @@ export const ShiftAssignmentModal = ({ ctx }) => {
                                     <p className="text-xs font-black text-slate-700">المرشحون ({noms.length}):</p>
                                     {noms.map(e => (
                                         <div key={e.id} className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2">
-                                            <div className="flex-1 min-w-0 text-xs font-black text-slate-900 truncate">{e.name}</div>
+                                            <div className="flex-1 min-w-0 text-xs font-black text-slate-900 truncate">{e.name}{curOf(e).workType === 'مناوب' && <> <span className="text-[10px] font-bold text-slate-500">(وجبته الحالية: {curOf(e).squad || '—'})</span></>}</div>
                                             {squadSelect(squads[e.id] || '', (v) => setSquads({ ...squads, [e.id]: v }))}
                                         </div>
                                     ))}

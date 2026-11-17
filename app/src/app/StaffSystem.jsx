@@ -4319,25 +4319,24 @@ import { buildDatePicker } from '../ui/datePicker';
                 const updated = staff.map(s => {
                     if (!ids.includes(s.id)) return s;
                     let next;
-                    if (workOn(s, p.start).workType === 'مناوب') next = s;
-                    else {
-                        const [by, bm, bd] = p.start.split('-').map(Number);
-                        let prev = workOn(s, localDateStr(new Date(by, bm - 1, bd - 1)));
-                        // فجوة بين نهاية فترته الحالية وبداية الجديدة: اليوم السابق للبداية صباحي، فتُؤخذ وجبته من حالته اليوم
-                        if (prev.workType !== 'مناوب') prev = workOn(s, todayStr);
-                        if (prev.workType === 'مناوب' && prev.squad) next = renewShift(s, { start: p.start, until: p.until, squad: prev.squad, shiftKind: (p.kinds && p.kinds[s.id]) || prev.shiftKind || p.shiftKind });
-                        else next = nominate(s, { start: p.start, until: p.until, shiftKind: (p.kinds && p.kinds[s.id]) || p.shiftKind });
-                    }
+                    const [by, bm, bd] = p.start.split('-').map(Number);
+                    let prev = workOn(s, localDateStr(new Date(by, bm - 1, bd - 1)));
+                    // فجوة بين نهاية فترته الحالية وبداية الجديدة: اليوم السابق للبداية صباحي، فيُنظر إلى حالته اليوم
+                    if (prev.workType !== 'مناوب') prev = workOn(s, todayStr);
+                    // المناوب الحالي المعاد ترشيحه يبدأ من لحظة الترشيح: وجبة فارغة تُحدَّد عند التوزيع، والنقطة الجديدة تقطع فترته القديمة عند البداية
+                    if (prev.workType === 'مناوب') next = renewShift(s, { start: p.start, until: p.until, squad: '', shiftKind: (p.kinds && p.kinds[s.id]) || prev.shiftKind || p.shiftKind });
+                    else if (workOn(s, p.start).workType === 'مناوب') next = s;
+                    else next = nominate(s, { start: p.start, until: p.until, shiftKind: (p.kinds && p.kinds[s.id]) || p.shiftKind });
                     if (next === s) return s;
                     done++;
                     return { ...next, lastModified: now };
                 });
                 if (!done) {
-                    alert('⚠️ لم يُرشَّح أحد: كل من اخترتهم مناوبون أصلاً في تاريخ البداية.');
+                    alert('⚠️ لم يُرشَّح أحد: كل من اخترتهم مرشحون أصلاً لهذه البداية.');
                     return false;
                 }
                 commitNominationStaff(updated);
-                if (done < ids.length) alert('⚠️ رُشِّح ' + done + ' من ' + ids.length + '؛ الباقون مناوبون أصلاً في تاريخ البداية.');
+                if (done < ids.length) alert('⚠️ رُشِّح ' + done + ' من ' + ids.length + '؛ الباقون مرشحون أصلاً لهذه البداية.');
                 return true;
             };
 

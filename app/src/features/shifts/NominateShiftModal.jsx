@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { localDateStr, addMonthsClamped } from '../../core/dates';
 import { isTripleShiftSite } from '../../domain/dutyMeals';
-import { workOn } from '../../domain/workHistory';
 
 // نهاية فترة بالتقويم الميلادي: اليوم السابق لذكرى البداية بعد عدد من الأشهر
 const untilAfterMonths = (start, months) => {
@@ -107,10 +106,7 @@ export const NominateShiftModal = ({ ctx }) => {
                                         <div className="text-xs font-black text-slate-900 truncate">{s.name}</div>
                                         <div className="text-[10px] font-bold text-slate-500">{s.unit || '—'}</div>
                                         {s.workType === 'مناوب' && (
-                                            <div className="text-[10px] font-black text-indigo-700">🔄 مناوب حالياً (وجبته: {s.squad || '—'}) — يُجدَّد بوجبته الحالية</div>
-                                        )}
-                                        {s.workType === 'مناوب' && start && workOn(s, start).workType === 'مناوب' && (
-                                            <div className="text-[10px] font-black text-rose-700">فترته الحالية تمتد إلى ما بعد البداية — لن يُرشَّح</div>
+                                            <div className="text-[10px] font-black text-indigo-700">🔄 مناوب حالياً (وجبته: {s.squad || '—'}) — يُجدَّد له، وتُحدَّد وجبته عند التوزيع</div>
                                         )}
                                     </div>
                                     <select value={kindOf(s)} onChange={(e) => setKinds({ ...kinds, [s.id]: e.target.value })}
