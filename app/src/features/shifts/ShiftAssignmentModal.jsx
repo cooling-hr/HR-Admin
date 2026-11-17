@@ -40,7 +40,8 @@ export const ShiftAssignmentModal = ({ ctx }) => {
     const dayBefore = addDaysStr(cycle.start, -1);
     const close = () => setShiftAssignmentKey(null);
     const unitIdx = (u) => { const i = org.units.findIndex(x => x.name === u); return i === -1 ? 999 : i; };
-    const units = [...new Set(cycle.nominees.map(e => e.unit || ''))].sort((a, b) => unitIdx(a) - unitIdx(b));
+    // وحدات المرشحين والمناوبين الحاليين معاً، فلا يبقى مناوب بلا أزرار قرار إن تغيّر حصر pendingNominations
+    const units = [...new Set([...cycle.nominees, ...cycle.outgoing].map(e => e.unit || ''))].sort((a, b) => unitIdx(a) - unitIdx(b));
     const curOf = (e) => workOn(e, dayBefore);
     const renewSquadOf = (e) => renewSquads[e.id] || curOf(e).squad || '';
     const undecided = cycle.outgoing.filter(e => !decisions[e.id]);
