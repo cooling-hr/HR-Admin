@@ -32,6 +32,13 @@ const baseHistory = (emp: Employee): WorkPoint[] =>
 // نسخة من الموظف بسجل جديد
 const withHistory = (emp: Employee, pts: WorkPoint[]): Employee => ({ ...emp, workHistory: pts });
 
+// النقطة السارية في date (آخر from <= date) إن لم تنتهِ بـ until، وإلا undefined
+const activePointOn = (emp: Employee, date: string): WorkPoint | undefined => {
+  let hit: WorkPoint | undefined;
+  for (const p of sortPoints(emp.workHistory || [])) { if (p.from <= date) hit = p; }
+  return hit && !(hit.until && date > hit.until) ? hit : undefined;
+};
+
 // حالة الموظف في تاريخ date: آخر نقطة from <= date، وتنتهي بـ until فيعود صباحياً
 export const workOn = (emp: Employee, date: string): WorkState => {
   const pts = emp.workHistory;
@@ -109,7 +116,9 @@ export const setWorkFrom = (
   const pt: WorkPoint = { from, workType, squad: patch.squad ?? cur.squad };
   const kind = patch.shiftKind ?? cur.shiftKind;
   if (kind) pt.shiftKind = kind;
-  if (patch.until) pt.until = patch.until;
+  // النهاية: تُمرَّر صراحةً (والفارغ يعني بلا نهاية)، وإلا تبقى نهاية النقطة السارية إن بقي مناوباً
+  const until = 'until' in patch ? (patch.until || undefined) : (workType === 'مناوب' ? activePointOn(emp, from)?.until : undefined);
+  if (until) pt.until = until;
   return withHistory(emp, putPoint(baseHistory(emp), pt));
 };
 
@@ -121,6 +130,9 @@ export const pendingNominations = (staff: Employee[], today: string): Nomination
   for (const emp of staff) {
     for (const p of emp.workHistory || []) {
       if (p.from === '' || p.workType !== 'مناوب' || p.squad !== '') continue;
+      // دورة انتهت، أو حلّ محلّها قرار لاحق سرى (تجديد أو عودة صباحية): لا تُعدّ معلّقة
+      if (p.until && p.until < today) continue;
+      if ((emp.workHistory || []).some(x => x.from > p.from && x.from <= today)) continue;
       const until = p.until || '';
       const key = p.from + '|' + until;
       let g = groups.get(key);
