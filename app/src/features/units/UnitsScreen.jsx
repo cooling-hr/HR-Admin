@@ -989,6 +989,18 @@ export const UnitsScreen = ({ ctx }) => {
                                 className="bg-white text-teal-800 rounded px-1.5 py-0.5 font-mono font-black outline-none cursor-pointer"
                             />
                         </label>
+                        {nominatePeriod ? (
+                            <button onClick={() => setNominateModal({ mode: 'period', start: nominatePeriod.start, until: nominatePeriod.until })}
+                                title="تغيير فترة ترشيح المناوبين"
+                                className="flex items-center gap-1.5 bg-teal-700/60 hover:bg-teal-800 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer">
+                                <span>🎯 المناوبون:</span>
+                                <span className="bg-white text-teal-800 rounded px-1.5 py-0.5 font-mono font-black">{nominatePeriod.start} ← {nominatePeriod.until}</span>
+                                <span>✏️</span>
+                            </button>
+                        ) : (
+                            <button onClick={() => setNominateModal({ mode: 'period' })}
+                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer shadow-sm">🎯 ترشيح المناوبين</button>
+                        )}
                         {overtimeIds.length > 0 && (<>
                         <button
                             onClick={() => {
@@ -1026,18 +1038,6 @@ export const UnitsScreen = ({ ctx }) => {
                             🗑️ تصفير السلة
                         </button>
                         </>)}
-                        {nominatePeriod ? (
-                            <button onClick={() => setNominateModal({ mode: 'period', start: nominatePeriod.start, until: nominatePeriod.until })}
-                                title="تغيير فترة ترشيح المناوبين"
-                                className="flex items-center gap-1.5 bg-teal-700/60 hover:bg-teal-800 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer">
-                                <span>🎯 المناوبون:</span>
-                                <span className="bg-white text-teal-800 rounded px-1.5 py-0.5 font-mono font-black">{nominatePeriod.start} ← {nominatePeriod.until}</span>
-                                <span>✏️</span>
-                            </button>
-                        ) : (
-                            <button onClick={() => setNominateModal({ mode: 'period' })}
-                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer shadow-sm">🎯 ترشيح المناوبين</button>
-                        )}
                     </div>
                 </div>
             {searchActive ? (
