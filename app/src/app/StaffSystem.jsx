@@ -3887,11 +3887,12 @@ import { buildDatePicker } from '../ui/datePicker';
                         alert('⛔ نهاية المناوبة غير صالحة أو سابقة لتاريخ «اعتباراً من».');
                         return;
                     }
-                }
-                const wfFroms = (editingEmployee.workHistory || []).map(p => p.from);
-                if (new Set(wfFroms).size !== wfFroms.length) {
-                    alert('⛔ في سجل طبيعة العمل نقطتان بتاريخ واحد. غيّر تاريخ «اعتباراً من».');
-                    return;
+                    // داخل الشرط فقط: سجل وارد تالف بنقطتين بتاريخ واحد لا يمنع حفظ تعديل لا يمسّ الدوام (النقال، الاسم...)
+                    const wfFroms = (editingEmployee.workHistory || []).map(p => p.from);
+                    if (new Set(wfFroms).size !== wfFroms.length) {
+                        alert('⛔ في سجل طبيعة العمل نقطتان بتاريخ واحد. غيّر تاريخ «اعتباراً من».');
+                        return;
+                    }
                 }
 
                 // التحقق من رقم النقال
