@@ -113,14 +113,14 @@ export const UnitsScreen = ({ ctx }) => {
                 </button>
             );
         }
-        if (s.workType === 'مناوب') return null;
+        if (s.workType === 'مناوب') return <span className="text-xs font-bold text-slate-400">مناوب حالياً</span>;
         const inBasket = nominateBasket.includes(s.id);
         return (
             <button onClick={() => setNominateBasket(inBasket ? nominateBasket.filter(x => x !== s.id) : [...nominateBasket, s.id])}
                 className={inBasket
                     ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
                     : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
-                <span>{inBasket ? '✓ في سلة الترشيح' : '🎯 ترشيح للمناوبة'}</span>
+                <span>{inBasket ? '✓ في السلة' : '🎯 ترشيح'}</span>
             </button>
         );
     };
@@ -1018,6 +1018,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                     <th className="px-4 py-3 text-right font-bold text-gray-700">العنوان الوظيفي</th>
                                                     <th className="px-4 py-3 text-right font-bold text-gray-700">الوحدة</th>
                                                     <th className="px-4 py-3 text-right font-bold text-gray-700 w-32 no-print">العمل الإضافي</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-amber-800 w-32 no-print">ترشيح للمناوبة</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1033,16 +1034,14 @@ export const UnitsScreen = ({ ctx }) => {
                                                         <td className="px-4 py-3 text-gray-700">{s.jobTitle}</td>
                                                         <td className="px-4 py-3 text-gray-700 font-bold">{s.unit || '—'}</td>
                                                         <td className="px-4 py-3 no-print">
-                                                            <div className="flex flex-col items-start gap-1">
                                                             <button onClick={() => toggleOvertime(s.id)}
                                                                 className={overtimeIds.includes(s.id)
                                                                     ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
                                                                     : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
                                                                 <span>{overtimeIds.includes(s.id) ? '✓ مشمول' : '➕ إضافة'}</span>
                                                             </button>
-                                                            {renderNominateControl(s)}
-                                                            </div>
                                                         </td>
+                                                        <td className="px-4 py-3 no-print">{renderNominateControl(s)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -1188,6 +1187,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                     <th className="px-4 py-3 text-right font-bold text-gray-700">العنوان الوظيفي</th>
                                                     <th className="px-4 py-3 text-right font-bold text-gray-700">الملاحظات</th>
                                                     <th className="px-4 py-3 text-right font-bold text-gray-700 w-32 no-print">العمل الإضافي</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-amber-800 w-32 no-print">ترشيح للمناوبة</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1212,7 +1212,6 @@ export const UnitsScreen = ({ ctx }) => {
                                                         <td className="px-4 py-3 text-gray-700">{s.jobTitle}</td>
                                                         <td className="px-4 py-3 text-gray-400"></td>
                                                         <td className="px-4 py-3 no-print">
-                                                            <div className="flex flex-col items-start gap-1">
                                                             {overtimeIds.includes(s.id) ? (
                                                                 <button
                                                                     onClick={() => {
@@ -1236,9 +1235,8 @@ export const UnitsScreen = ({ ctx }) => {
                                                                     <span>➕ إضافة</span>
                                                                 </button>
                                                             )}
-                                                            {renderNominateControl(s)}
-                                                            </div>
                                                         </td>
+                                                        <td className="px-4 py-3 no-print">{renderNominateControl(s)}</td>
                                                     </tr>
                                                     );
                                                 })}
