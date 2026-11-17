@@ -14,36 +14,43 @@ const untilAfterMonths = (start, months) => {
 // نافذة ترشيح المناوبين مسبقاً (جديد) أو تعديل تاريخي دورة مرشحة (edit). الحالة والمعالجة في StaffSystem؛
 // الحقول المحلية هنا مسودة النافذة فقط. شرط الظهور يبقى عند موضع الاستدعاء.
 export const NominateShiftModal = ({ ctx }) => {
-    const { nominateModal, setNominateModal, nominateBasket, setNominateBasket, staff, nominationCycles, nominateEmployees, editNominationCycle } = ctx;
+    const { nominateModal, setNominateModal, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, staff, nominationCycles, nominateEmployees, editNominationCycle } = ctx;
     const isEdit = nominateModal.mode === 'edit';
+    const isPeriod = nominateModal.mode === 'period';
+    const isNew = !isEdit && !isPeriod;
     const todayStr = localDateStr();
     // دورة مفتوحة قائمة: تُقترح تاريخاها افتراضياً عند ترشيح جديد
     // لا تُقترح دورة بدأت فعلاً: تاريخ بدايتها يسبق اليوم فتفشل النافذة في فحصها هي
-    const open = !isEdit ? (nominationCycles.find(c => c.start >= todayStr) || null) : null;
-    const initStart = isEdit ? nominateModal.start : (open ? open.start : '');
+    const open = isPeriod && !nominateModal.start ? (nominationCycles.find(c => c.start >= todayStr) || null) : null;
+    const initStart = isNew ? nominatePeriod.start : (isEdit || nominateModal.start) ? nominateModal.start : (open ? open.start : '');
     const [start, setStart] = useState(initStart || '');
-    const [duration, setDuration] = useState(isEdit || open ? 'manual' : '6');
-    const [manualEnd, setManualEnd] = useState(isEdit ? nominateModal.until : (open ? open.until : ''));
+    const [duration, setDuration] = useState(isEdit || open || nominateModal.until ? 'manual' : '6');
+    const [manualEnd, setManualEnd] = useState(isEdit || nominateModal.until ? nominateModal.until : (open ? open.until : ''));
     const [kinds, setKinds] = useState({});
-    const nominees = isEdit ? [] : staff.filter(s => nominateBasket.includes(s.id));
+    const nominees = !isNew ? [] : staff.filter(s => nominateBasket.includes(s.id));
     const kindOf = (s) => kinds[s.id] || (s.workType === 'مناوب' && s.shiftKind) || (isTripleShiftSite(s.unit || '') ? '24h' : '12h');
-    const until = duration === 'manual' ? manualEnd : untilAfterMonths(start, Number(duration));
+    const until = isNew ? nominatePeriod.until : duration === 'manual' ? manualEnd : untilAfterMonths(start, Number(duration));
     let problem = '';
     if (!start) problem = 'حدّد تاريخ البداية.';
-    else if (start < todayStr && !(isEdit && start === nominateModal.start)) problem = 'تاريخ البداية يجب ألا يسبق اليوم.';
+    else if (start < todayStr && !(!isNew && start === nominateModal.start)) problem = 'تاريخ البداية يجب ألا يسبق اليوم.';
     else if (!until) problem = 'حدّد تاريخ النهاية.';
     else if (until < start) problem = 'تاريخ النهاية قبل البداية.';
-    else if (!isEdit && nominees.length === 0) problem = 'لا يوجد مرشحون في السلة.';
+    else if (isNew && nominees.length === 0) problem = 'لا يوجد مرشحون في السلة.';
     const close = () => setNominateModal(null);
     const save = () => {
         if (problem) return;
         let ok;
         if (isEdit) ok = editNominationCycle(nominateModal.start, nominateModal.until, start, until);
-        else {
+        else if (isPeriod) {
+            // اعتماد الفترة: يبدأ وضع الترشيح بسلة فارغة
+            setNominatePeriod({ start, until });
+            setNominateBasket([]);
+            ok = true;
+        } else {
             const kindMap = {};
             nominees.forEach(s => { kindMap[s.id] = kindOf(s); });
             ok = nominateEmployees(nominees.map(s => s.id), { start, until, shiftKind: '12h', kinds: kindMap });
-            if (ok) setNominateBasket([]);
+            if (ok) { setNominateBasket([]); setNominatePeriod(null); }
         }
         if (ok) close();
     };
@@ -57,7 +64,7 @@ export const NominateShiftModal = ({ ctx }) => {
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[130] flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
                 <div className="bg-gradient-to-r from-indigo-700 to-blue-800 p-4 text-white flex-shrink-0 flex items-center justify-between">
-                    <h3 className="text-base font-black flex items-center gap-2"><span>🎯</span><span>{isEdit ? 'تعديل تاريخي دورة الترشيح' : 'ترشيح للمناوبة'}</span></h3>
+                    <h3 className="text-base font-black flex items-center gap-2"><span>🎯</span><span>{isEdit ? 'تعديل تاريخي دورة الترشيح' : (isPeriod ? 'فترة ترشيح المناوبين' : 'ترشيح للمناوبة')}</span></h3>
                     <button type="button" onClick={close} aria-label="إغلاق" title="إغلاق"
                         className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-bold transition cursor-pointer flex-shrink-0">✕</button>
                 </div>
@@ -67,6 +74,7 @@ export const NominateShiftModal = ({ ctx }) => {
                             توجد دورة مرشحة مفتوحة ({open.start} ← {open.until || 'بلا نهاية'}): اقتُرح تاريخاها ليكون الجميع في دورة واحدة. يمكنك تغييرهما.
                         </div>
                     )}
+                    {!isNew && <>
                     <div className="space-y-1">
                         <label className="block text-xs font-black text-slate-700">📅 بداية المناوبة:</label>
                         <input type="date" value={start} onChange={(e) => setStart(e.target.value)}
@@ -84,12 +92,13 @@ export const NominateShiftModal = ({ ctx }) => {
                                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-indigo-600" />
                         )}
                     </div>
+                    </>}
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 leading-relaxed">
                         {problem ? <span className="text-rose-700">{problem}</span> : (
                             <span>الفترة: <span className="font-mono text-indigo-800">{start}</span> ← <span className="font-mono text-indigo-800">{until}</span> (بعدها يعود المرشح صباحياً). لا يتغير شيء قبل تاريخ البداية.</span>
                         )}
                     </div>
-                    {!isEdit && (
+                    {isNew && (
                         <div className="space-y-2">
                             <p className="text-xs font-black text-slate-700">المرشحون ({nominees.length}) — الوجبة تُحدَّد لاحقاً عند اقتراب البداية:</p>
                             {nominees.map(s => (
@@ -120,7 +129,7 @@ export const NominateShiftModal = ({ ctx }) => {
                 <div className="flex gap-2 p-5 pt-3 border-t border-slate-100 flex-shrink-0">
                     <button type="button" onClick={save} disabled={!!problem}
                         className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs shadow transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">
-                        {isEdit ? '💾 حفظ التاريخين' : '🎯 ترشيح'}
+                        {isEdit ? '💾 حفظ التاريخين' : (isPeriod ? '⏳ اعتماد الفترة واختيار الأشخاص' : '🎯 ترشيح')}
                     </button>
                     <button type="button" onClick={close} className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black rounded-xl text-xs transition cursor-pointer">
                         ✕ إلغاء

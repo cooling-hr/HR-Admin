@@ -84,7 +84,7 @@ const ShiftPills = ({ shifts }) => (<>
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { pendingNomCycles, setShiftAssignmentKey, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle } = ctx;
+    const { pendingNomCycles, setShiftAssignmentKey, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle } = ctx;
     // الرموز المضافة من دليل الرموز (والرسمية المفعَّلة) خيارات في مجموعة «رموز أخرى»، تُحسب مرة واحدة لكل الموظفين
     const extraStatusOptions = Object.values(resolveCodeTable(timeFormCodeEdits).extraByMeaning).map(c => ({ value: c.meaning, label: '🔤 ' + c.meaning + ' (' + c.letter + ')', className: 'bg-white text-slate-700 font-bold' }));
     const statusGroups = [...DAILY_STATUS_GROUPS, ...(extraStatusOptions.length ? [{ label: 'رموز أخرى', options: extraStatusOptions }] : [])];
@@ -113,6 +113,10 @@ export const UnitsScreen = ({ ctx }) => {
                 </button>
             );
         }
+        // خارج وضع الترشيح لا زر اختيار
+        if (!nominatePeriod) {
+            return s.workType === 'مناوب' ? <span className="text-[10px] font-black text-indigo-700">مناوب حالياً{s.squad ? ' · ' + s.squad : ''}</span> : null;
+        }
         const inBasket = nominateBasket.includes(s.id);
         const toggleBasket = () => setNominateBasket(inBasket ? nominateBasket.filter(x => x !== s.id) : [...nominateBasket, s.id]);
         if (s.workType === 'مناوب') {
@@ -133,7 +137,7 @@ export const UnitsScreen = ({ ctx }) => {
                             className={inBasket
                                 ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
                                 : 'px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
-                            <span>{inBasket ? '✓ في السلة' : '🔄 إعادة ترشيح'}</span>
+                            <span>{inBasket ? '✓ مختار' : '🔄 إعادة ترشيح'}</span>
                         </button>
                     )}
                 </div>
@@ -144,7 +148,7 @@ export const UnitsScreen = ({ ctx }) => {
                 className={inBasket
                     ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
                     : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
-                <span>{inBasket ? '✓ في السلة' : '🎯 ترشيح'}</span>
+                <span>{inBasket ? '✓ مختار' : '🎯 اختيار'}</span>
             </button>
         );
     };
@@ -933,7 +937,7 @@ export const UnitsScreen = ({ ctx }) => {
             ) : (
                 <div className="space-y-4">
             {/* ترشيح المناوبين: دورات قائمة وسلة الترشيح */}
-            {(nominationCycles.length > 0 || nominateBasket.length > 0) && (
+            {(nominationCycles.length > 0 || nominatePeriod) && (
                 <div className="space-y-2 no-print">
                     {nominationCycles.map(c => (
                         <div key={c.start + '|' + c.until} className="p-3 bg-amber-50 border-2 border-amber-400 rounded-xl text-xs font-black text-amber-900 flex flex-wrap items-center justify-between gap-2">
@@ -946,21 +950,28 @@ export const UnitsScreen = ({ ctx }) => {
                             </span>
                         </div>
                     ))}
-                    {nominateBasket.length > 0 && (
-                        // شريط ثابت أسفل الشاشة: زر الترشيح في الصف يضيف إلى السلة فقط، واختيار المدة في نافذة هذا الشريط؛
-                        // وهو في أعلى الصفحة لا يراه من نزل في قائمة طويلة.
+                    {nominatePeriod && (
+                        // شريط ثابت أسفل الشاشة طوال وضع الترشيح: الفترة معتمدة مسبقاً والصفوف تختار الأشخاص فقط
                         <div className="fixed bottom-4 inset-x-3 z-40 flex justify-center pointer-events-none no-print">
                             <div className="pointer-events-auto w-full max-w-xl p-3 bg-amber-50 border-2 border-amber-400 rounded-2xl shadow-2xl text-xs font-black text-amber-900 flex flex-wrap items-center justify-between gap-2">
-                                <span>🎯 سلة الترشيح: {nominateBasket.length} موظف — اختر مدة الترشيح من «متابعة»</span>
+                                <span>🎯 ترشيح للفترة {nominatePeriod.start} ← {nominatePeriod.until}: {nominateBasket.length} مختار</span>
                                 <span className="flex gap-2">
-                                    <button onClick={() => setNominateModal({ mode: 'new' })}
-                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer">⏳ متابعة: اختيار المدة</button>
-                                    <button onClick={() => setNominateBasket([])}
-                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">تفريغ السلة</button>
+                                    <button onClick={() => setNominateModal({ mode: 'new' })} disabled={nominateBasket.length === 0}
+                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">✓ مراجعة وحفظ</button>
+                                    <button onClick={() => setNominateModal({ mode: 'period', start: nominatePeriod.start, until: nominatePeriod.until })}
+                                        className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">✏️ تغيير الفترة</button>
+                                    <button onClick={() => { setNominateBasket([]); setNominatePeriod(null); }}
+                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">✕ إلغاء الترشيح</button>
                                 </span>
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+            {!nominatePeriod && (
+                <div className="no-print">
+                    <button onClick={() => setNominateModal({ mode: 'period' })}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer">🎯 ترشيح المناوبين</button>
                 </div>
             )}
             {overtimeIds.length > 0 && (
