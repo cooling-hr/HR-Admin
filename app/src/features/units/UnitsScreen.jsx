@@ -100,18 +100,18 @@ export const UnitsScreen = ({ ctx }) => {
         setOvertimeIds(updated);
         safeStorage.setItem('overtimeSelectedIds', JSON.stringify(updated));
     };
-    // زر الإضافي: المناوب حالياً لا يُشمل بالإضافي (قرار أسامة 2026-11-17)؛ المرشح للمناوبة يُشمل لأنه صباحي اليوم.
-    // ومناوب أُدرج قبل هذا القرار يظهر له زر إخراج فقط.
+    // المناوب حالياً لا يُشمل بالإضافي (قرار أسامة 2026-11-17)؛ المرشح للمناوبة يُشمل لأنه صباحي اليوم.
+    // من صار مناوباً وهو في السلة (أُدرج قبل القرار، أو بدأت فترته) يُخرج منها تلقائياً.
+    const shiftInOvertime = staff.filter(s => s.workType === 'مناوب' && overtimeIds.includes(s.id)).map(s => s.id);
+    React.useEffect(() => {
+        if (!shiftInOvertime.length) return;
+        const updated = overtimeIds.filter(id => !shiftInOvertime.includes(id));
+        setOvertimeIds(updated);
+        safeStorage.setItem('overtimeSelectedIds', JSON.stringify(updated));
+    }, [shiftInOvertime.join(',')]);
     const renderOvertimeControl = (s) => {
         const inOvertime = overtimeIds.includes(s.id);
-        if (s.workType === 'مناوب') {
-            return inOvertime ? (
-                <button onClick={() => toggleOvertime(s.id)} title="المناوب حالياً لا يُشمل بالإضافي؛ اضغط لإخراجه من السلة"
-                    className="px-2.5 py-1 bg-red-100 text-red-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer">
-                    <span>✕ إخراج (مناوب)</span>
-                </button>
-            ) : <span className="text-[11px] font-bold text-slate-400">لا يُشمل (مناوب)</span>;
-        }
+        if (s.workType === 'مناوب') return <span className="text-[11px] font-bold text-slate-400">لا يُشمل (مناوب)</span>;
         return (
             <button onClick={() => toggleOvertime(s.id)}
                 className={inOvertime
