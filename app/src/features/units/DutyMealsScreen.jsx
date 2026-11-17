@@ -178,7 +178,7 @@ export const DutyMealsScreen = ({ ctx }) => {
                                     </div>
                                     <div className="space-y-2">
                                         {DUTY_MEAL_SQUADS.map(squad => {
-                                            const members = siteSquadMembers(staff, unit, squad);
+                                            const members = siteSquadMembers(staff, unit, squad, localDateStr());
                                             const pick = (mealAuthorizations && mealAuthorizations[unit] && mealAuthorizations[unit][squad]) || {};
                                             return (
                                                 <div key={squad} className="grid grid-cols-[2.5rem_1fr_1fr] gap-2 items-center">

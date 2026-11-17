@@ -7,6 +7,7 @@
 // السجل: mealAuthorizations[الوحدة][الوجبة] = { main: معرّف المخول، alt: معرّف البديل }.
 
 import type { Org } from './org';
+import { employeeOn } from './workHistory';
 
 export const DUTY_MEAL_SQUADS: string[] = ['A', 'B', 'C', 'D'];
 export const DUTY_MEAL_HEADERS: string[] = ['ت', 'الموقع', 'عدد المناوبين', 'مناوبة صباحية', 'مناوبة مسائية', 'اسم المخول', 'رقم الهاتف النقال', 'اسم البديل', 'رقم الهاتف النقال', 'القسم'];
@@ -33,9 +34,10 @@ export type MealPerson = { name: string; mobile: string } | null;
 export type MealShiftRow = { squad: string; count: number; main: MealPerson; alt: MealPerson; warning: string };
 export type MealSiteBlock = { unit: string; label: string; triple: boolean; total: number; rows: MealShiftRow[] };
 
-// مناوبو موقع في وجبة بعينها — قائمة الاختيار في إعداد المخولين
-export const siteSquadMembers = (staff: Emp[], unit: string, squad: string): Emp[] =>
-    staff.filter(s => s.workType === 'مناوب' && String(s.unit || '').trim() === unit && s.squad === squad);
+// مناوبو موقع في وجبة بعينها في تاريخ date — قائمة الاختيار في إعداد المخولين
+export const siteSquadMembers = (staff: Emp[], unit: string, squad: string, date: string): Emp[] =>
+    staff.map(s => employeeOn(s as any, date) as Emp)
+        .filter(s => s.workType === 'مناوب' && String(s.unit || '').trim() === unit && s.squad === squad);
 
 type DayDeps = {
     staff: Emp[];
@@ -53,7 +55,7 @@ export const buildDutyMealDay = ({ staff, dateStr, authorizations, getEmployeeDa
 
     const shiftRow = (unit: string, squad: string): MealShiftRow => {
         if (!squad) return { squad: '', count: 0, main: null, alt: null, warning: 'دورة المناوبة غير مضبوطة' };
-        const members = siteSquadMembers(staff, unit, squad);
+        const members = siteSquadMembers(staff, unit, squad, dateStr);
         const presentMembers = members.filter(present);
         const pick = (authorizations[unit] && authorizations[unit][squad]) || {};
         const byId = (id?: string) => (id ? members.find(m => m.id === id) : undefined);

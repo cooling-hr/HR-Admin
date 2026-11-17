@@ -5,6 +5,7 @@ import { getJobRank, sortByJobNumber, sortByJobNumberOnly, sortByJobTitleHierarc
 import { headquartersUnit, locationJustification, locationNames, unitNames } from '../domain/org';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
+import { employeeOn, isThreeShiftOn } from '../domain/workHistory';
 import { shiftLeaveCarry, shiftLeaveCarryNote } from '../domain/shiftLeave';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
@@ -949,7 +950,8 @@ import { buildDatePicker } from '../ui/datePicker';
             };
 
             // الحصول على الموقف الطبيعي الافتراضي للمنتسب بدون أي تعديلات (الحضور/الدوام الأصلي)
-            const getEmployeeDefaultNaturalStatus = (emp, dateStr) => {
+            const getEmployeeDefaultNaturalStatus = (empRaw, dateStr) => {
+                const emp = employeeOn(empRaw, dateStr);
                 const activePeriod = getActivePeriod(emp, dateStr);
                 if (activePeriod) {
                     return activePeriod.type;
@@ -972,9 +974,10 @@ import { buildDatePicker } from '../ui/datePicker';
             };
 
             // موقف المناوب من دورة وجبته وحدها، بلا تعديل يومي ولا فترة
-            const getShiftCycleStatus = (emp, dateStr) => {
+            const getShiftCycleStatus = (empRaw, dateStr) => {
+                const emp = employeeOn(empRaw, dateStr);
                 if (!emp.squad) return 'مناوب (الوجبة غير محددة)';
-                const isThreeShift = emp.location && emp.location.includes('نهر بن عمر');
+                const isThreeShift = isThreeShiftOn(empRaw, dateStr);
                 const diffDays = getDaysBetweenDates(dateStr, anchorDate);
 
                 if (isThreeShift) {
@@ -1011,23 +1014,25 @@ import { buildDatePicker } from '../ui/datePicker';
             };
 
             // امتداد إجازة المناوب إلى يوم استراحته (domain/shiftLeave.ts): null إن كان في اليوم تعديل يومي أو فترة
-            const getShiftLeaveCarry = (emp, dateStr) => {
+            const getShiftLeaveCarry = (empRaw, dateStr) => {
+                const emp = employeeOn(empRaw, dateStr);
                 if (emp.workType !== 'مناوب' || !emp.squad || !dateStr) return null;
                 if (dailyStatusOverrides[dateStr] && dailyStatusOverrides[dateStr][emp.id]) return null;
                 if (getActivePeriod(emp, dateStr)) return null;
                 return shiftLeaveCarry(dateStr, {
-                    isThreeShift: !!(emp.location && emp.location.includes('نهر بن عمر')),
-                    cycleStatus: (d) => getShiftCycleStatus(emp, d),
+                    isThreeShift: isThreeShiftOn(empRaw, dateStr),
+                    cycleStatus: (d) => getShiftCycleStatus(empRaw, d),
                     overrideOf: (d) => dailyStatusOverrides[d] && dailyStatusOverrides[d][emp.id],
                     workedOn: (d) => {
-                        const st = getEmployeeDailyStatus(emp, d);
+                        const st = getEmployeeDailyStatus(empRaw, d);
                         return isShiftOnDutyStatus(st) || st.includes('إضافي') || ['دوام صباحي', 'حضور فعلي', 'ورقة عمل', 'مكلف بواجب', 'إجازة زمنية'].includes(st);
                     },
                 });
             };
 
             // ignoreOverride: الموقف الطبيعي بلا التعديل اليومي، لرمز المناوب في استمارة ضبط الوقت (المواصفة 6.5)
-            const getEmployeeDailyStatus = (emp, dateStr, ignoreOverride = false) => {
+            const getEmployeeDailyStatus = (empRaw, dateStr, ignoreOverride = false) => {
+                const emp = employeeOn(empRaw, dateStr);
                 // 1. التعديلات الاستثنائية المباشرة للموظف
                 if (!ignoreOverride && dailyStatusOverrides[dateStr] && dailyStatusOverrides[dateStr][emp.id]) {
                     const ov = dailyStatusOverrides[dateStr][emp.id];
@@ -1170,9 +1175,11 @@ import { buildDatePicker } from '../ui/datePicker';
                 }
                 // shiftType ليس حقلاً مخزَّناً فعلياً في سجل الموظف — يُشتقّ من الموقع في كل موضع آخر
                 // بالملف (نهر بن عمر = ثلاثية، غيرها = ثنائية)، وهذا الاشتقاق نفسه يُستخدَم هنا
+                // القراءة من أول الشهر (قرار أسامة: الدخول من الشهر التالي)
+                const monthFirst = monthStr + '-01';
                 const inGroup = groupKey === 'triple'
-                    ? (s => s.workType === 'مناوب' && s.location && s.location.includes('نهر بن عمر') && s.squad)
-                    : (s => s.workType === 'مناوب' && s.location && !s.location.includes('نهر بن عمر') && s.squad);
+                    ? (s => { const e = employeeOn(s, monthFirst); return e.workType === 'مناوب' && e.location && isThreeShiftOn(s, monthFirst) && e.squad; })
+                    : (s => { const e = employeeOn(s, monthFirst); return e.workType === 'مناوب' && e.location && !isThreeShiftOn(s, monthFirst) && e.squad; });
                 const members = staff.filter(inGroup);
                 if (members.length === 0) return 0;
                 const counts = members.map(emp => {
@@ -1192,11 +1199,13 @@ import { buildDatePicker } from '../ui/datePicker';
 
             // ملخص استمارة تجهيز المياه المعدنية لمجموعة واحدة (صباحي/ثلاثية/ثنائية) بشهر معيّن
             const getWaterGroupSummary = (groupKey, monthStr) => {
+                // القراءة من أول الشهر (قرار أسامة: الدخول من الشهر التالي)
+                const monthFirst = monthStr + '-01';
                 const inGroup = groupKey === 'morning'
-                    ? (s => s.workType === 'صباحي')
+                    ? (s => employeeOn(s, monthFirst).workType === 'صباحي')
                     : groupKey === 'triple'
-                        ? (s => s.workType === 'مناوب' && s.location && s.location.includes('نهر بن عمر'))
-                        : (s => s.workType === 'مناوب' && s.location && !s.location.includes('نهر بن عمر'));
+                        ? (s => employeeOn(s, monthFirst).workType === 'مناوب' && s.location && isThreeShiftOn(s, monthFirst))
+                        : (s => employeeOn(s, monthFirst).workType === 'مناوب' && s.location && !isThreeShiftOn(s, monthFirst));
                 const headcount = staff.filter(s => inGroup(s) && (monthStr === waterMonth ? !excludedWaterIds.has(s.id) : !isExcludedFromWater(s, monthStr))).length;
                 const manualDays = waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey];
                 const isAuto = manualDays === undefined || manualDays === null;
@@ -1276,7 +1285,7 @@ import { buildDatePicker } from '../ui/datePicker';
                     });
                 };
 
-                if (emp && emp.workType === 'صباحي' && dateStr && (status.includes('إجازة اعتيادية') || status.includes('إجازة مرضية') || status.includes('إجازة خارج العراق'))) {
+                if (emp && employeeOn(emp, dateStr).workType === 'صباحي' && dateStr && (status.includes('إجازة اعتيادية') || status.includes('إجازة مرضية') || status.includes('إجازة خارج العراق'))) {
                     try {
                         const parts = dateStr.split('-');
                         const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
@@ -1526,7 +1535,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 const isExcuse = statusValue === 'تعذر حضور' || (statusValue && statusValue.includes('تعذر'));
                 
                 // تعذر الحضور يشمل الصباحي فقط ولا يشمل المناوبين
-                const morningStaffInUnit = targetStaff.filter(s => s.workType === 'صباحي');
+                const morningStaffInUnit = targetStaff.filter(s => employeeOn(s, dailyReportDate).workType === 'صباحي');
                 if (isExcuse && morningStaffInUnit.length === 0) {
                     alert(`ℹ️ وحدة (${unitName}) لا تحتوي على موظفين صباحيين لتسليط تعذر الحضور عليهم.\nالمناوبون يتبعون جدول وجباتهم ولا يشملهم تعذر الحضور.`);
                     return;
@@ -1543,8 +1552,8 @@ import { buildDatePicker } from '../ui/datePicker';
                 // ما يُحذف من مواقف الوحدة يُسجَّل: الافتراضي لكل من له موقف، وتعذر الحضور المُزال عن المناوبين؛ وما يُسلَّط يُزيل تذكرته
                 const dayBeforeBulk = dailyStatusOverrides[dailyReportDate] || {};
                 const removedByBulk = targetStaff.filter(emp => dayBeforeBulk[emp.id] && (isDefault
-                    || (isExcuse && emp.workType !== 'صباحي' && String(dayBeforeBulk[emp.id]).includes('تعذر'))));
-                const setByBulk = isExcuse ? targetStaff.filter(emp => emp.workType === 'صباحي') : [];
+                    || (isExcuse && employeeOn(emp, dailyReportDate).workType !== 'صباحي' && String(dayBeforeBulk[emp.id]).includes('تعذر'))));
+                const setByBulk = isExcuse ? targetStaff.filter(emp => employeeOn(emp, dailyReportDate).workType === 'صباحي') : [];
                 updateTombstones({
                     addDays: removedByBulk.map(emp => tombstoneKeyOfDay(dailyReportDate, emp.jobNumber)),
                     removeDays: setByBulk.map(emp => tombstoneKeyOfDay(dailyReportDate, emp.jobNumber))
@@ -1558,7 +1567,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         if (isDefault) {
                             delete dateOverrides[emp.id];
                         } else if (isExcuse) {
-                            if (emp.workType === 'صباحي') {
+                            if (employeeOn(emp, dailyReportDate).workType === 'صباحي') {
                                 dateOverrides[emp.id] = statusValue;
                             } else {
                                 // المناوب لا يشمله تعذر الحضور نهائياً ويُحذف أي تعذر مسلط عليه سابقاً
@@ -1717,7 +1726,7 @@ import { buildDatePicker } from '../ui/datePicker';
 
                 let filteredStaff = staff.filter(s => {
                     if (periodUnitFilter !== 'all' && s.unit !== periodUnitFilter) return false;
-                    if (periodWorkTypeFilter !== 'all' && s.workType !== periodWorkTypeFilter) return false;
+                    if (periodWorkTypeFilter !== 'all' && employeeOn(s, periodEndDate).workType !== periodWorkTypeFilter) return false;
                     return matchesStaffSearch(s, periodSearchQuery);
                 });
 
@@ -1779,7 +1788,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         const fromPeriod = !!activePeriod && activePeriod.type === status && isOverride !== status;
                         const otRaw = overtimeHoursRecords[dateStr] && overtimeHoursRecords[dateStr][emp.id];
                         const otRecordedHours = (otRaw != null && otRaw !== '' && isFinite(Number(otRaw))) ? Number(otRaw) : null;
-                        const naturalStatus = (emp.workType === 'مناوب' && status.includes('إضافي')) ? getEmployeeDailyStatus(emp, dateStr, true) : status;
+                        const naturalStatus = (employeeOn(emp, dateStr).workType === 'مناوب' && status.includes('إضافي')) ? getEmployeeDailyStatus(emp, dateStr, true) : status;
                         // استراحة بعد إجازة في وجبة المناوب: تبقى استراحة وتُعدّ في الإجازات (domain/shiftLeave.ts)
                         const carry = status === 'استراحة مناوبة' ? getShiftLeaveCarry(emp, dateStr) : null;
                         const countedLeaveNote = shiftLeaveCarryNote(carry);
@@ -1861,7 +1870,6 @@ import { buildDatePicker } from '../ui/datePicker';
                 const buildRow = (item) => {
                     const logByDate = {};
                     item.dailyLog.forEach(d => { logByDate[d.dateStr] = d; });
-                    const isShift = item.employee.workType === 'مناوب';
                     const cells = [];
                     let totalHours = 0;
                     for (let day = 1; day <= 31; day++) {
@@ -1871,6 +1879,7 @@ import { buildDatePicker } from '../ui/datePicker';
                             cells.push({ day, code: '', status: '', hours: null, inMonth: day <= monthDays, outOfPeriod: day <= monthDays, isFuture: false });
                             continue;
                         }
+                        const isShift = employeeOn(item.employee, dateStr).workType === 'مناوب';
                         const code = timeFormCodeFor({ status: log.status, dateStr, fromPeriod: log.fromPeriod, isShift, naturalStatus: log.naturalStatus }, table);
                         const hours = log.status.includes('إضافي') ? log.otRecordedHours : null;
                         if (hours) totalHours += hours;
@@ -1978,7 +1987,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         // وحدة سُلّط عليها تعذر الحضور تُعامل معاملة يوم العطلة: عدم الحضور هو
                         // الحال الطبيعي فيُخفى، ومن حضر رغم الإغلاق هو الاستثناء الذي يستحق الذكر.
                         const unitHasNoAccess = unitStaff.some(s => {
-                            if (s.workType === 'مناوب') return false;
+                            if (employeeOn(s, dailyReportDate).workType === 'مناوب') return false;
                             const st = getEmployeeDailyStatus(s, dailyReportDate);
                             return st && st.includes('تعذر');
                         });
@@ -1988,7 +1997,7 @@ import { buildDatePicker } from '../ui/datePicker';
                             if (isLongOrMaternityLeave(status)) return false;
 
                             // المناوبون يظهرون دائماً (سواء بالدوام أو استراحة المناوبة)
-                            if (s.workType === 'مناوب') {
+                            if (employeeOn(s, dailyReportDate).workType === 'مناوب') {
                                 return true;
                             }
                             
@@ -2036,8 +2045,8 @@ import { buildDatePicker } from '../ui/datePicker';
                                     'ت': counter++,
                                     'الاسم الكامل': getTripleName(s.name),
                                     'الرقم الوظيفي': s.jobNumber || '',
-                                    'طبيعة العمل': s.workType || '',
-                                    'الموقف اليومي': dailyReportStatusLabel(status, s.workType, isOffDay),
+                                    'طبيعة العمل': employeeOn(s, dailyReportDate).workType || '',
+                                    'الموقف اليومي': dailyReportStatusLabel(status, employeeOn(s, dailyReportDate).workType, isOffDay),
                                     'الملاحظات': dailyStatusNote(status,
                                         hourlyLeaveTimings[dailyReportDate] && hourlyLeaveTimings[dailyReportDate][s.id],
                                         overtimeHoursRecords[dailyReportDate] && overtimeHoursRecords[dailyReportDate][s.id])
