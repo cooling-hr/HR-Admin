@@ -958,8 +958,6 @@ export const UnitsScreen = ({ ctx }) => {
                                 <span className="flex gap-2">
                                     <button onClick={() => setNominateModal({ mode: 'new' })} disabled={nominateBasket.length === 0}
                                         className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">✓ مراجعة وحفظ</button>
-                                    <button onClick={() => setNominateModal({ mode: 'period', start: nominatePeriod.start, until: nominatePeriod.until })}
-                                        className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">✏️ تغيير الفترة</button>
                                     <button onClick={() => { setNominateBasket([]); setNominatePeriod(null); }}
                                         className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">✕ إلغاء الترشيح</button>
                                 </span>
@@ -968,26 +966,22 @@ export const UnitsScreen = ({ ctx }) => {
                     )}
                 </div>
             )}
-            {!nominatePeriod && (
-                <div className="no-print">
-                    <button onClick={() => setNominateModal({ mode: 'period' })}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer">🎯 ترشيح المناوبين</button>
-                </div>
-            )}
-            {overtimeIds.length > 0 && (
+            {/* الشريط الأخضر: إعدادات الاختيار من الوحدات — شهر العمل الإضافي (شهري) وفترة ترشيح المناوبين (3 أو 6 أشهر) */}
                 <div className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4 rounded-xl shadow-lg mb-6 flex flex-wrap gap-4 items-center justify-between no-print animate-fadeIn">
                     <div className="flex items-center gap-3">
                         <div className="text-3xl">🛒</div>
                         <div>
                             <h4 className="font-bold text-sm">سلة العمل الإضافي الموحدة {org.terms.forThe}</h4>
                             <p className="text-xs opacity-90 mt-0.5">
-                                قمت بتحديد ({overtimeIds.length}) موظف لإدراجهم في كشف الساعات الإضافية الموحد {org.terms.forThe}.
+                                {overtimeIds.length > 0
+                                    ? `قمت بتحديد (${overtimeIds.length}) موظف لإدراجهم في كشف الساعات الإضافية الموحد ${org.terms.forThe}.`
+                                    : 'لم تحدد أحداً بعد: اضغط «➕ إضافة» أمام الموظف في الوحدات.'}
                             </p>
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <label className="flex items-center gap-1.5 bg-teal-700/60 px-3 py-1.5 rounded-lg text-xs font-bold" title="شهر الكشف — يظهر في عنوانه">
-                            <span>📅 شهر الكشف:</span>
+                        <label className="flex items-center gap-1.5 bg-teal-700/60 px-3 py-1.5 rounded-lg text-xs font-bold" title="شهر كشف العمل الإضافي — يظهر في عنوانه">
+                            <span>📅 العمل الإضافي:</span>
                             <input
                                 type="month"
                                 value={overtimeListMonth}
@@ -995,7 +989,8 @@ export const UnitsScreen = ({ ctx }) => {
                                 className="bg-white text-teal-800 rounded px-1.5 py-0.5 font-mono font-black outline-none cursor-pointer"
                             />
                         </label>
-                        <button 
+                        {overtimeIds.length > 0 && (<>
+                        <button
                             onClick={() => {
                                 const selectedEmployees = staff.filter(s => overtimeIds.includes(s.id));
                                 const sortedSelected = sortByJobTitleHierarchy(selectedEmployees, 'كشف الإضافي');
@@ -1030,9 +1025,21 @@ export const UnitsScreen = ({ ctx }) => {
                         >
                             🗑️ تصفير السلة
                         </button>
+                        </>)}
+                        {nominatePeriod ? (
+                            <button onClick={() => setNominateModal({ mode: 'period', start: nominatePeriod.start, until: nominatePeriod.until })}
+                                title="تغيير فترة ترشيح المناوبين"
+                                className="flex items-center gap-1.5 bg-teal-700/60 hover:bg-teal-800 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer">
+                                <span>🎯 المناوبون:</span>
+                                <span className="bg-white text-teal-800 rounded px-1.5 py-0.5 font-mono font-black">{nominatePeriod.start} ← {nominatePeriod.until}</span>
+                                <span>✏️</span>
+                            </button>
+                        ) : (
+                            <button onClick={() => setNominateModal({ mode: 'period' })}
+                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer shadow-sm">🎯 ترشيح المناوبين</button>
+                        )}
                     </div>
                 </div>
-            )}
             {searchActive ? (
                 // نتائج البحث من كل الوحدات، بترتيب الوحدات ثم الهرمية كما في ملاك كل وحدة
                 (() => {
