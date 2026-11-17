@@ -165,7 +165,12 @@ export const pendingNominations = (staff: Employee[], today: string): Nomination
   const out: NominationCycle[] = [];
   for (const g of groups.values()) {
     if (g.start > limit) continue;
-    const units = new Set(g.nominees.map(e => e.unit));
+    // وحدات الدورة: وحدات المرشحين ووحدات من جُدِّد له مسبقاً للفترة نفسها، فلا يُنسى مناوب لم يُجدَّد له
+    // في وحدة لم يُرشَّح منها جديد. لا وحدة مثبتة: أي وحدة يُرشَّح منها أو يُجدَّد فيها تدخل.
+    const cycle = g;
+    const renewedFor = (e: Employee) => (e.workHistory || []).some(x =>
+      x.from === cycle.start && x.workType === 'مناوب' && x.squad !== '' && (x.until || '') === cycle.until);
+    const units = new Set([...g.nominees, ...staff.filter(renewedFor)].map(e => e.unit));
     const dayBefore = addDays(g.start, -1);
     g.outgoing = staff.filter(e =>
       units.has(e.unit) &&

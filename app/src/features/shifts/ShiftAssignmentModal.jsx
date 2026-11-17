@@ -35,8 +35,9 @@ export const ShiftAssignmentModal = ({ ctx }) => {
     const [squads, setSquads] = useState({});
     const [decisions, setDecisions] = useState({});
     const [renewSquads, setRenewSquads] = useState({});
-    const [leaveUndecided, setLeaveUndecided] = useState(false);
     if (!cycle) return null;
+    // من لم يُختر للتجديد يعود صباحياً من بداية الفترة (قرار أسامة 2026-11-17): «يعود صباحياً» مختار سلفاً
+    const decisionOf = (e) => decisions[e.id] || 'morning';
     const dayBefore = addDaysStr(cycle.start, -1);
     const close = () => setShiftAssignmentKey(null);
     const unitIdx = (u) => { const i = org.units.findIndex(x => x.name === u); return i === -1 ? 999 : i; };
@@ -44,22 +45,20 @@ export const ShiftAssignmentModal = ({ ctx }) => {
     const units = [...new Set([...cycle.nominees, ...cycle.outgoing].map(e => e.unit || ''))].sort((a, b) => unitIdx(a) - unitIdx(b));
     const curOf = (e) => workOn(e, dayBefore);
     const renewSquadOf = (e) => renewSquads[e.id] || curOf(e).squad || '';
-    const undecided = cycle.outgoing.filter(e => !decisions[e.id]);
     const missingNominee = cycle.nominees.filter(e => !squads[e.id]);
-    const renewMissing = cycle.outgoing.filter(e => decisions[e.id] === 'renew' && !renewSquadOf(e));
+    const renewMissing = cycle.outgoing.filter(e => decisionOf(e) === 'renew' && !renewSquadOf(e));
     let problem = '';
     if (missingNominee.length) problem = 'حدّد وجبة كل مرشح (' + missingNominee.length + ' بلا وجبة).';
     else if (renewMissing.length) problem = 'حدّد وجبة كل من يُجدَّد له.';
-    else if (undecided.length && !leaveUndecided) problem = 'قرّر لكل مناوب حالي، أو أشّر على ترك من لم يُقرَّر له.';
     const save = () => {
         if (problem) return;
         const changes = [];
         cycle.nominees.forEach(e => changes.push({ id: e.id, action: 'squad', squad: squads[e.id], start: cycle.start }));
         cycle.outgoing.forEach(e => {
-            if (decisions[e.id] === 'renew') {
+            if (decisionOf(e) === 'renew') {
                 const kind = curOf(e).shiftKind || (isTripleShiftSite(e.unit || '') ? '24h' : '12h');
                 changes.push({ id: e.id, action: 'renew', squad: renewSquadOf(e), start: cycle.start, until: cycle.until, shiftKind: kind });
-            } else if (decisions[e.id] === 'morning') {
+            } else {
                 changes.push({ id: e.id, action: 'morning', start: cycle.start });
             }
         });
@@ -74,7 +73,7 @@ export const ShiftAssignmentModal = ({ ctx }) => {
     );
     const choiceBtn = (e, val, label) => (
         <button type="button" onClick={() => setDecisions({ ...decisions, [e.id]: val })}
-            className={`px-2 py-1 rounded-lg text-[11px] font-black border transition cursor-pointer ${decisions[e.id] === val ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
+            className={`px-2 py-1 rounded-lg text-[11px] font-black border transition cursor-pointer ${decisionOf(e) === val ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
             {label}
         </button>
     );
@@ -126,11 +125,10 @@ export const ShiftAssignmentModal = ({ ctx }) => {
                             </div>
                         );
                     })}
-                    {undecided.length > 0 && (
-                        <label className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 leading-relaxed cursor-pointer">
-                            <input type="checkbox" checked={leaveUndecided} onChange={(e) => setLeaveUndecided(e.target.checked)} className="mt-0.5" />
-                            <span>ترك من لم يُقرَّر له ({undecided.length}): يعود صباحياً بنهاية فترته الحالية دون تغيير في سجله.</span>
-                        </label>
+                    {cycle.outgoing.length > 0 && (
+                        <p className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 leading-relaxed">
+                            المناوب الحالي الذي لا تختار له «يُجدَّد له» يعود صباحياً من {cycle.start}.
+                        </p>
                     )}
                     {problem && <div className="text-xs font-bold text-rose-700">{problem}</div>}
                 </div>
