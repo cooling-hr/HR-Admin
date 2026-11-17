@@ -113,10 +113,28 @@ export const UnitsScreen = ({ ctx }) => {
                 </button>
             );
         }
-        if (s.workType === 'مناوب') return <span className="text-xs font-bold text-slate-400">مناوب حالياً</span>;
         const inBasket = nominateBasket.includes(s.id);
+        const toggleBasket = () => setNominateBasket(inBasket ? nominateBasket.filter(x => x !== s.id) : [...nominateBasket, s.id]);
+        if (s.workType === 'مناوب') {
+            const renewal = (s.workHistory || []).find(p => p.from && p.from > todayStr && p.workType === 'مناوب' && p.squad);
+            return (
+                <div className="flex flex-col items-start gap-1">
+                    <span className="text-[10px] font-black text-indigo-700">مناوب حالياً{s.squad ? ' · ' + s.squad : ''}</span>
+                    {renewal ? (
+                        <span className="text-xs font-bold text-slate-400">🔄 مُجدَّد من {renewal.from}</span>
+                    ) : (
+                        <button onClick={toggleBasket}
+                            className={inBasket
+                                ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
+                                : 'px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
+                            <span>{inBasket ? '✓ في السلة' : '🔄 إعادة ترشيح'}</span>
+                        </button>
+                    )}
+                </div>
+            );
+        }
         return (
-            <button onClick={() => setNominateBasket(inBasket ? nominateBasket.filter(x => x !== s.id) : [...nominateBasket, s.id])}
+            <button onClick={toggleBasket}
                 className={inBasket
                     ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
                     : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
@@ -1023,7 +1041,7 @@ export const UnitsScreen = ({ ctx }) => {
                                             </thead>
                                             <tbody>
                                                 {results.map((s, i) => (
-                                                    <tr key={s.id} className={`border-b hover:bg-gray-50 transition ${overtimeIds.includes(s.id) ? 'bg-emerald-100' : ''}`}>
+                                                    <tr key={s.id} className={`border-b hover:bg-gray-50 transition ${overtimeIds.includes(s.id) ? 'bg-emerald-100' : (s.workType === 'مناوب' ? 'bg-indigo-50' : '')}`}>
                                                         <td className="px-4 py-3 text-gray-600">{i + 1}</td>
                                                         <td className="px-4 py-3 font-mono text-blue-600 font-semibold">{s.jobNumber}</td>
                                                         <td className="px-4 py-3">
@@ -1194,7 +1212,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                 {sortedStaff.map((s, i) => {
                                                     const missingFields = getMissingFields(s);
                                                     return (
-        <tr key={s.id} className={`border-b hover:bg-gray-50 transition ${overtimeIds.includes(s.id) ? 'bg-emerald-100' : ''}`}>
+        <tr key={s.id} className={`border-b hover:bg-gray-50 transition ${overtimeIds.includes(s.id) ? 'bg-emerald-100' : (s.workType === 'مناوب' ? 'bg-indigo-50' : '')}`}>
                                                         <td className="px-4 py-3 text-gray-600">{i + 1}</td>
                                                         <td className="px-4 py-3 font-mono text-blue-600 font-semibold">{s.jobNumber}</td>
                                                         <td className="px-4 py-3 font-bold text-gray-800">

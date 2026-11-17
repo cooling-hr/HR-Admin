@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { localDateStr, addMonthsClamped } from '../../core/dates';
 import { isTripleShiftSite } from '../../domain/dutyMeals';
+import { workOn } from '../../domain/workHistory';
 
 // نهاية فترة بالتقويم الميلادي: اليوم السابق لذكرى البداية بعد عدد من الأشهر
 const untilAfterMonths = (start, months) => {
@@ -24,8 +25,8 @@ export const NominateShiftModal = ({ ctx }) => {
     const [duration, setDuration] = useState(isEdit || open ? 'manual' : '6');
     const [manualEnd, setManualEnd] = useState(isEdit ? nominateModal.until : (open ? open.until : ''));
     const [kinds, setKinds] = useState({});
-    const nominees = isEdit ? [] : staff.filter(s => nominateBasket.includes(s.id) && s.workType !== 'مناوب');
-    const kindOf = (s) => kinds[s.id] || (isTripleShiftSite(s.unit || '') ? '24h' : '12h');
+    const nominees = isEdit ? [] : staff.filter(s => nominateBasket.includes(s.id));
+    const kindOf = (s) => kinds[s.id] || (s.workType === 'مناوب' && s.shiftKind) || (isTripleShiftSite(s.unit || '') ? '24h' : '12h');
     const until = duration === 'manual' ? manualEnd : untilAfterMonths(start, Number(duration));
     let problem = '';
     if (!start) problem = 'حدّد تاريخ البداية.';
@@ -96,6 +97,12 @@ export const NominateShiftModal = ({ ctx }) => {
                                     <div className="flex-1 min-w-0">
                                         <div className="text-xs font-black text-slate-900 truncate">{s.name}</div>
                                         <div className="text-[10px] font-bold text-slate-500">{s.unit || '—'}</div>
+                                        {s.workType === 'مناوب' && (
+                                            <div className="text-[10px] font-black text-indigo-700">🔄 مناوب حالياً (وجبته: {s.squad || '—'}) — يُجدَّد بوجبته الحالية</div>
+                                        )}
+                                        {s.workType === 'مناوب' && start && workOn(s, start).workType === 'مناوب' && (
+                                            <div className="text-[10px] font-black text-rose-700">فترته الحالية تمتد إلى ما بعد البداية — لن يُرشَّح</div>
+                                        )}
                                     </div>
                                     <select value={kindOf(s)} onChange={(e) => setKinds({ ...kinds, [s.id]: e.target.value })}
                                         className="border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold outline-none focus:border-indigo-600">
