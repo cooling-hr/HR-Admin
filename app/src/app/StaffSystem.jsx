@@ -2591,7 +2591,8 @@ import { buildDatePicker } from '../ui/datePicker';
                     const lastCol = firstDayCol + days.length; // مجموع الساعات
                     const wb = new ExcelJS.Workbook();
                     const ws = wb.addWorksheet('استمارة ضبط الوقت', {
-                        views: [{ rightToLeft: true, state: 'frozen', xSplit: 3, ySplit: 3 }],
+                        // الورقة من اليسار إلى اليمين (طلب أسامة 2026-11-17): التسلسل والرقم والاسم عند اليسار
+                        views: [{ rightToLeft: false, state: 'frozen', xSplit: 3, ySplit: 3 }],
                         pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true,
                             printTitlesRow: '3:3', margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } }
                     });

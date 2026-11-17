@@ -16,9 +16,9 @@ const CELL = 'border border-slate-300 text-center';
 const ROW_END = 'border-b-2 border-b-slate-500';
 // اسم اليوم بلا «ال» وبحرفين: الأحد والأربعاء كانا يظهران معاً «الأ»
 // حدود الخانة الثابتة في border-collapse يرسمها الجدول فلا تتحرك معها عند التمرير، فيُرسم خطّها
-// الأيسر (جهة الأيام) والسفلي بظلّ داخلي يتحرك معها
-const STICKY_HEAD_EDGE = 'shadow-[inset_1px_0_0_0_#94a3b8]';
-const STICKY_ROW_EDGE = 'shadow-[inset_1px_0_0_0_#94a3b8,inset_0_-2px_0_0_#64748b]';
+// الأيمن (جهة الأيام، والجدول من اليسار إلى اليمين) والسفلي بظلّ داخلي يتحرك معها
+const STICKY_HEAD_EDGE = 'shadow-[inset_-1px_0_0_0_#94a3b8]';
+const STICKY_ROW_EDGE = 'shadow-[inset_-1px_0_0_0_#94a3b8,inset_0_-2px_0_0_#64748b]';
 
 // استمارة ضبط الوقت على الشاشة: صفّان لكل موظف (الرموز ثم الساعات الإضافية)، استمارة الملاك أو العقود
 export const TimeFormView = ({ ctx }) => {
@@ -101,13 +101,14 @@ export const TimeFormView = ({ ctx }) => {
                 <div className="font-bold text-slate-600 text-sm">{getArabicMonthLabel(ym)}</div>
             </div>
 
-            <div className="overflow-x-auto w-full">
+            {/* الجدول من اليسار إلى اليمين (طلب أسامة 2026-11-17): التسلسل والرقم والاسم عند اليسار والأيام 1..31 نحو اليمين */}
+            <div className="overflow-x-auto w-full" dir="ltr">
                 <table className="border-collapse text-xs">
                     <thead>
                         <tr className="bg-slate-100 text-slate-800 font-black">
                             <th className={`${CELL} px-2 py-1`}>التسلسل</th>
                             <th className={`${CELL} px-2 py-1`}>الرقم الوظيفي</th>
-                            <th className={`${CELL} px-2 py-1 min-w-[150px] sticky right-0 z-10 bg-slate-100 ${STICKY_HEAD_EDGE}`}>الاسم الثلاثي</th>
+                            <th className={`${CELL} px-2 py-1 min-w-[150px] sticky left-0 z-10 bg-slate-100 ${STICKY_HEAD_EDGE}`}>الاسم الثلاثي</th>
                             <th className={`${CELL} px-2 py-1`}>نوع الحركة</th>
                             {days.map(day => {
                                 const out = day > daysInMonth;
@@ -127,7 +128,7 @@ export const TimeFormView = ({ ctx }) => {
                                 <tr>
                                     <td rowSpan={2} className={`${CELL} ${ROW_END} px-2 font-mono`}>{idx + 1}</td>
                                     <td rowSpan={2} className={`${CELL} ${ROW_END} px-2 font-mono`}>{row.employee.jobNumber}</td>
-                                    <td rowSpan={2} className={`${CELL} ${ROW_END} px-2 text-right font-bold whitespace-nowrap sticky right-0 z-10 bg-white ${STICKY_ROW_EDGE}`}>{getTripleName(row.employee.name)}</td>
+                                    <td rowSpan={2} className={`${CELL} ${ROW_END} px-2 text-right font-bold whitespace-nowrap sticky left-0 z-10 bg-white ${STICKY_ROW_EDGE}`}>{getTripleName(row.employee.name)}</td>
                                     <td rowSpan={2} className={`${CELL} ${ROW_END} px-2`}></td>
                                     {row.cells.map(cell => {
                                         if (!cell.inMonth) return <td key={cell.day} className={`${CELL} bg-slate-200`}></td>;

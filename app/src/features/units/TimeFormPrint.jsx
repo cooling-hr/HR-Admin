@@ -22,7 +22,8 @@ export const TimeFormPrint = ({ ctx }) => {
             <div style={{ fontWeight: 700, fontSize: '10pt' }}>{getArabicMonthLabel(ym)}</div>
         </div>
 
-        <table style={{ fontSize: '7pt', tableLayout: 'fixed', width: '100%' }}>
+        {/* الجدول من اليسار إلى اليمين (طلب أسامة 2026-11-17)، وبقية الصفحة (العنوان والتواقيع) تبقى من اليمين */}
+        <table style={{ fontSize: '7pt', tableLayout: 'fixed', width: '100%', direction: 'ltr' }}>
             <colgroup>
                 <col style={{ width: '7mm' }} />
                 <col style={{ width: '14mm' }} />
