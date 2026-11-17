@@ -872,7 +872,8 @@ import { buildDatePicker } from '../ui/datePicker';
                         } else if (p.to < today) {
                             // لا يُسأل عن مباشرة الصباحي إلا بعد أن يمضي أول يوم دوام يلي الانتهاء (لا في الجمعة
                             // والسبت والعطل الرسمية)؛ وإلا كان الجواب تخميناً (قرار أسامة 2026-10-30)
-                            if (emp.workType !== 'مناوب') {
+                            // نوع دوامه في اليوم التالي للانتهاء (قد يعود مناوباً بترشيح مسبق)
+                            if (employeeOn(emp, localDateStr(new Date(p.to).getTime() + 86400000)).workType !== 'مناوب') {
                                 let firstWork = p.to;
                                 for (let i = 0; i < 31; i++) {
                                     firstWork = localDateStr(new Date(firstWork).getTime() + 86400000);
@@ -921,7 +922,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 // غياب «لا» يبدأ للصباحي من أول يوم دوام يلي الانتهاء لا من الجمعة أو العطلة (قرار أسامة 2026-10-30)؛
                 // والمناوب من اليوم التالي كما كان
                 let absenceFrom = dayAfter;
-                if (emp.workType !== 'مناوب') {
+                if (employeeOn(emp, dayAfter).workType !== 'مناوب') {
                     for (let i = 0; i < 31; i++) {
                         const dow = new Date(absenceFrom + 'T00:00:00').getDay();
                         if (dow !== 5 && dow !== 6 && !officialHolidays.includes(absenceFrom)) break;
@@ -1940,7 +1941,7 @@ import { buildDatePicker } from '../ui/datePicker';
                             'الاسم الكامل': getTripleName(emp.name),
                             'الرقم الوظيفي': emp.jobNumber || '',
                             'الوحدة': emp.unit || '',
-                            'طبيعة العمل': emp.workType || '',
+                            'طبيعة العمل': employeeOn(emp, periodEndDate).workType || '',
                             'الدوام الاعتيادي (يوم)': item.regularDuty,
                             'الدوام الإضافي (يوم)': item.overtimeDuty,
                             'الإجازات (يوم)': item.leaves,
