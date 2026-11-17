@@ -42,9 +42,9 @@ export const NominateShiftModal = ({ ctx }) => {
         let ok;
         if (isEdit) ok = editNominationCycle(nominateModal.start, nominateModal.until, start, until);
         else if (isPeriod) {
-            // اعتماد الفترة: يبدأ وضع الترشيح بسلة فارغة
+            // اعتماد الفترة: بدء وضع الترشيح يكون بسلة فارغة، أما تغيير الفترة فيُبقي المختارين
+            if (!nominatePeriod) setNominateBasket([]);
             setNominatePeriod({ start, until });
-            setNominateBasket([]);
             ok = true;
         } else {
             const kindMap = {};
