@@ -3876,7 +3876,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 }
                 // تعديل نوع الدوام/الوجبة «اعتباراً من»: تاريخ صالح، ونهاية صالحة وغير سابقة له، وبلا نقطتين بتاريخ واحد
                 if (editWorkPatch) {
-                    const okDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
+                    const okDate = isValidYmd;
                     if (!okDate(editWorkFrom)) {
                         alert('⛔ تاريخ «اعتباراً من» غير صالح. اكتبه بصيغة السنة-الشهر-اليوم.');
                         return;
@@ -4046,7 +4046,15 @@ import { buildDatePicker } from '../ui/datePicker';
                 const t = workOn(upd, localDateStr());
                 setEditingEmployee(prev => ({ ...prev, workHistory: upd.workHistory, workType: t.workType, squad: t.squad }));
             };
-            const isValidYmd = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
+            // تاريخ تقويمي صحيح بصيغة YYYY-MM-DD (لا الشكل وحده: 2026-02-30 مرفوض)
+            const isValidYmd = d => {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(d || '')) return false;
+                const [y, m, day] = d.split('-').map(Number);
+                const t = new Date(y, m - 1, day);
+                return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === day;
+            };
+            // نهاية المناوبة تُطبَّق على المعاينة فقط إن كانت صالحة وغير سابقة لـ«اعتباراً من» (وإلا انقلب النوع صباحياً وأُخفيت حقولها)
+            const untilApplicable = (until, from) => !until || (isValidYmd(until) && until >= from);
             const updateEditWork = (change) => {
                 const base = staff.find(s => s.id === editingEmployee.id);
                 if (!base) { setEditingEmployee({ ...editingEmployee, ...change }); return; }
@@ -4054,12 +4062,12 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (change.workType === 'صباحي') patch = { workType: 'صباحي', squad: '', until: '' };
                 else if (change.workType === 'مناوب' && !('squad' in patch)) patch.squad = '';
                 setEditWorkPatch(patch);
-                if (isValidYmd(editWorkFrom) && (!patch.until || isValidYmd(patch.until))) applyEditWork(base, editWorkFrom, patch);
+                if (isValidYmd(editWorkFrom) && untilApplicable(patch.until, editWorkFrom)) applyEditWork(base, editWorkFrom, patch);
             };
             const setEditWorkFrom = (date) => {
                 setEditWorkFromState(date);
                 const base = editingEmployee && staff.find(s => s.id === editingEmployee.id);
-                if (base && editWorkPatch && isValidYmd(date) && (!editWorkPatch.until || isValidYmd(editWorkPatch.until))) applyEditWork(base, date, editWorkPatch);
+                if (base && editWorkPatch && isValidYmd(date) && untilApplicable(editWorkPatch.until, date)) applyEditWork(base, date, editWorkPatch);
             };
             // ما تعرضه نافذة التعديل لنوع الدوام: حالته في تاريخ «اعتباراً من» لا الحقل الخام وحده
             const editWork = (() => {
