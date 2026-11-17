@@ -111,7 +111,7 @@ export const ShiftAssignmentModal = ({ ctx }) => {
                                                     {choiceBtn(e, 'renew', 'يُجدَّد له')}
                                                     {choiceBtn(e, 'morning', 'يعود صباحياً')}
                                                 </div>
-                                                {decisions[e.id] === 'renew' && (
+                                                {decisionOf(e) === 'renew' && (
                                                     <div className="flex items-center gap-2 flex-wrap text-[11px] font-bold text-slate-600">
                                                         <span>الوجبة المقترحة:</span>
                                                         {squadSelect(renewSquadOf(e), (v) => setRenewSquads({ ...renewSquads, [e.id]: v }))}
