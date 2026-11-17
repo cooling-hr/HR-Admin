@@ -38,6 +38,18 @@ export interface StatusPeriod {
   legacy?: boolean;                             // فترة مشتقّة من emp.status، غير مخزَّنة
 }
 
+// نوع المناوبة: 24 ساعة (ثلاثية الوجبات) أو 12 ساعة (ثنائية)
+export type ShiftKind = '24h' | '12h';
+
+// نقطة تغيير مؤرَّخة لنوع الدوام والوجبة (from = '' تعني «منذ الأزل»)
+export interface WorkPoint {
+  from: string;                                 // YYYY-MM-DD أو ''
+  workType: 'صباحي' | 'مناوب';
+  squad: string;
+  shiftKind?: ShiftKind;
+  until?: string;                               // آخر يوم شامل؛ بعده يعود صباحياً
+}
+
 export interface Employee {
   id: string | number;
   name?: string;
@@ -55,6 +67,7 @@ export interface Employee {
   mobile?: string;
   squad?: string;
   workType?: string;
+  workHistory?: WorkPoint[];                    // سجل نوع الدوام والوجبة المؤرَّخ (emp.workType/squad يبقيان)
   lastModified?: string;
   // أولوية ترتيب صريحة تتجاوز الترتيب الهرمي الاعتيادي حسب العنوان الوظيفي —
   // الأصغر يظهر أولاً. اختيارية: تبقى القائمة العادية لمن لا يحمل قيمة هنا.
