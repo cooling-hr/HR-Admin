@@ -8,6 +8,7 @@ import { isLongOrMaternityLeave } from '../../domain/periods';
 import { resolveCodeTable } from '../../domain/timeForm';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
 import { unitNames } from '../../domain/org';
+import { PendingNominationAlert } from '../shifts/ShiftAssignmentModal';
 
 // خيارات قائمة الموقف اليومي مرتّبة بتكرارها كما ذكرها أسامة (2026-10-20). كل الحالات المؤرَّخة (الدورة
 // والإيفادان والإجازة خارج العراق وبدون راتب والغياب وسحب اليد، والأمومة والطويلة) ليست هنا عمداً:
@@ -83,7 +84,7 @@ const ShiftPills = ({ shifts }) => (<>
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle } = ctx;
+    const { pendingNomCycles, setShiftAssignmentKey, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle } = ctx;
     // الرموز المضافة من دليل الرموز (والرسمية المفعَّلة) خيارات في مجموعة «رموز أخرى»، تُحسب مرة واحدة لكل الموظفين
     const extraStatusOptions = Object.values(resolveCodeTable(timeFormCodeEdits).extraByMeaning).map(c => ({ value: c.meaning, label: '🔤 ' + c.meaning + ' (' + c.letter + ')', className: 'bg-white text-slate-700 font-bold' }));
     const statusGroups = [...DAILY_STATUS_GROUPS, ...(extraStatusOptions.length ? [{ label: 'رموز أخرى', options: extraStatusOptions }] : [])];
@@ -125,6 +126,7 @@ export const UnitsScreen = ({ ctx }) => {
     };
     return (
         <div className="space-y-5 animate-fadeIn">
+            <PendingNominationAlert ctx={{ pendingNomCycles, setShiftAssignmentKey }} />
             {/* شاشات القسم الثلاث انتقلت إلى الشريط الملتصق أعلى الصفحة، في صفّ تحت
                 الأقسام، فتبقى ظاهرة مع التمرير — انظر «شاشات الوحدات والموقف» داخل <nav>. */}
 

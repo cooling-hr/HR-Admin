@@ -5,7 +5,7 @@ import { getJobRank, sortByJobNumber, sortByJobNumberOnly, sortByJobTitleHierarc
 import { headquartersUnit, locationJustification, locationNames, unitNames } from '../domain/org';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
-import { employeeOn, isThreeShiftOn, nominate, cancelNomination, setWorkFrom } from '../domain/workHistory';
+import { employeeOn, isThreeShiftOn, nominate, cancelNomination, setWorkFrom, assignSquad, renewShift, returnToMorning, pendingNominations } from '../domain/workHistory';
 import { shiftLeaveCarry, shiftLeaveCarryNote } from '../domain/shiftLeave';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
@@ -21,6 +21,7 @@ import { PageHeader } from '../ui/PageHeader';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { UnitsScreen } from '../features/units/UnitsScreen';
 import { NominateShiftModal } from '../features/shifts/NominateShiftModal';
+import { ShiftAssignmentModal } from '../features/shifts/ShiftAssignmentModal';
 import { LoginModal } from '../features/auth/LoginModal';
 import { EditEmployeeModal } from '../features/employees/EditEmployeeModal';
 import { EmployeeCardModal } from '../features/employees/EmployeeCardModal';
@@ -121,6 +122,9 @@ import { buildDatePicker } from '../ui/datePicker';
                 }
                 return [...groups.values()].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
             }, [staff, todayStr]);
+            // دورات الترشيح التي اقتربت أو بدأت ولم تُوزَّع وجباتها (من السجل الخام): تنبيه تبويب الوحدات
+            const pendingNomCycles = useMemo(() => pendingNominations(staff, todayStr), [staff, todayStr]);
+            const [shiftAssignmentKey, setShiftAssignmentKey] = useState(null);
             const [view, setView] = useState('dashboard');
 
             // حركة فتح التبويب: تُعاد بضبط الصنف يدوياً لا بـ key={view}.
@@ -4300,6 +4304,34 @@ import { buildDatePicker } from '../ui/datePicker';
                 return true;
             };
 
+            // تطبيق توزيع الوجبات وقرارات التجديد/العودة الصباحية على السجل الخام وحفظها مرة واحدة. يرجع true عند النجاح
+            const applyShiftAssignments = (changes) => {
+                if (!canEdit('staffMaster')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات الملاك العام والمنتسبين!');
+                    return false;
+                }
+                const byId = new Map(changes.map(c => [c.id, c]));
+                const now = new Date().toISOString();
+                let done = 0;
+                const updated = staff.map(s => {
+                    const c = byId.get(s.id);
+                    if (!c) return s;
+                    let next = s;
+                    if (c.action === 'squad' && c.squad) next = assignSquad(s, c.start, c.squad);
+                    else if (c.action === 'renew' && c.squad) next = renewShift(s, { start: c.start, until: c.until || '', squad: c.squad, shiftKind: c.shiftKind });
+                    else if (c.action === 'morning') next = returnToMorning(s, c.start);
+                    if (next === s) return s;
+                    done++;
+                    return { ...next, lastModified: now };
+                });
+                if (!done) {
+                    alert('⚠️ لم يتغير شيء.');
+                    return false;
+                }
+                commitNominationStaff(updated);
+                return true;
+            };
+
             const changeStatus = (id, newStatus) => {
                 if (!canEdit('staffMaster')) {
                     alert('⛔ عذراً، ليس لديك صلاحية تعديل موقف المنتسبين!');
@@ -5244,9 +5276,9 @@ return (
                             </div>
 
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
-                            <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff: staffToday }} />
+                            <DutyMealsScreen ctx={{ pendingNomCycles, setShiftAssignmentKey, getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff: staffToday }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ staff: staffToday, org, nominateBasket, setNominateBasket, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
+                            <UnitsScreen ctx={{ pendingNomCycles, setShiftAssignmentKey, staff: staffToday, org, nominateBasket, setNominateBasket, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff: staffToday, staffRaw: staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
@@ -5279,6 +5311,8 @@ return (
             {periodHistoryEmpId && <PeriodHistoryModal ctx={{ canEdit, deletePeriodFromHistory, openPeriodEdit, periodHistoryEmpId, periodSpanJsx, setPeriodHistoryEmpId, staff }} />}
 
             {waterMemoGroup && <WaterMemoModal ctx={{ org, BOC_LOGO_DATA_URI, amountToArabicWords, getWaterGroupSummary, setWaterMemoGroup, waterMemoGroup, waterMonth }} />}
+
+            {shiftAssignmentKey && <ShiftAssignmentModal ctx={{ shiftAssignmentKey, setShiftAssignmentKey, pendingNomCycles, applyShiftAssignments, org }} />}
 
             {nominateModal && <NominateShiftModal ctx={{ nominateModal, setNominateModal, nominateBasket, setNominateBasket, staff: staffToday, nominationCycles, nominateEmployees, editNominationCycle }} />}
 

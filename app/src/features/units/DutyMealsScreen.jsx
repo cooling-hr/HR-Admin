@@ -1,5 +1,6 @@
 import React from 'react';
 import { PageHeader } from '../../ui/PageHeader';
+import { PendingNominationAlert } from '../shifts/ShiftAssignmentModal';
 import { ARABIC_MONTH_NAMES, getArabicDayName, localDateStr } from '../../core/dates';
 import { getTripleName } from '../../core/arabic';
 import { ensureLibs } from '../../core/lazyLibs';
@@ -18,7 +19,7 @@ const nextMonthStr = () => {
 // من دورة المناوبة والموقف اليومي، وتصديره Excel بهيكل استمارة القسم أو طباعته. الحالة
 // (mealAuthorizations) في StaffSystem وتُزامَن؛ هذا المكوّن يرسم ويستلم ما يحتاجه عبر ctx صريح.
 export const DutyMealsScreen = ({ ctx }) => {
-    const { getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff } = ctx;
+    const { pendingNomCycles, setShiftAssignmentKey, getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff } = ctx;
     const [month, setMonth] = React.useState(nextMonthStr);
     const [showSetup, setShowSetup] = React.useState(() => Object.keys(mealAuthorizations || {}).length === 0);
     const [exporting, setExporting] = React.useState(false);
@@ -143,6 +144,7 @@ export const DutyMealsScreen = ({ ctx }) => {
     const cell = 'border border-slate-300 px-2 py-1.5 text-center';
     return (
         <div className="space-y-5 animate-fadeIn">
+            <PendingNominationAlert ctx={{ pendingNomCycles, setShiftAssignmentKey }} />
             <div className="bg-white rounded-xl shadow-lg p-4 md:p-6">
                 <PageHeader icon={<span className="text-xl">🍽️</span>} title="جدول إطعام المناوبين"
                     description={`لشهر ${monthLabel} — يُولَّد من دورة المناوبة والموقف اليومي، ويُطرح من العدد المجاز والغائب`}
