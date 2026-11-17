@@ -4319,7 +4319,9 @@ import { buildDatePicker } from '../ui/datePicker';
                     if (workOn(s, p.start).workType === 'مناوب') next = s;
                     else {
                         const [by, bm, bd] = p.start.split('-').map(Number);
-                        const prev = workOn(s, localDateStr(new Date(by, bm - 1, bd - 1)));
+                        let prev = workOn(s, localDateStr(new Date(by, bm - 1, bd - 1)));
+                        // فجوة بين نهاية فترته الحالية وبداية الجديدة: اليوم السابق للبداية صباحي، فتُؤخذ وجبته من حالته اليوم
+                        if (prev.workType !== 'مناوب') prev = workOn(s, todayStr);
                         if (prev.workType === 'مناوب' && prev.squad) next = renewShift(s, { start: p.start, until: p.until, squad: prev.squad, shiftKind: (p.kinds && p.kinds[s.id]) || prev.shiftKind || p.shiftKind });
                         else next = nominate(s, { start: p.start, until: p.until, shiftKind: (p.kinds && p.kinds[s.id]) || p.shiftKind });
                     }

@@ -116,7 +116,13 @@ export const UnitsScreen = ({ ctx }) => {
         const inBasket = nominateBasket.includes(s.id);
         const toggleBasket = () => setNominateBasket(inBasket ? nominateBasket.filter(x => x !== s.id) : [...nominateBasket, s.id]);
         if (s.workType === 'مناوب') {
-            const renewal = (s.workHistory || []).find(p => p.from && p.from > todayStr && p.workType === 'مناوب' && p.squad);
+            // تجديد مسبق: نقطة مستقبلية بوجبة تلي فترة سابقة انتهت قبلها؛ تغيير وجبة داخل الفترة نفسها ليس تجديداً
+            const hist = s.workHistory || [];
+            const renewal = hist.find(p => {
+                if (!(p.from && p.from > todayStr && p.workType === 'مناوب' && p.squad)) return false;
+                const before = hist.filter(x => x.from && x.from < p.from).sort((a, b) => (a.from < b.from ? -1 : 1)).pop();
+                return !!(before && before.workType === 'مناوب' && before.until && before.until < p.from);
+            });
             return (
                 <div className="flex flex-col items-start gap-1">
                     <span className="text-[10px] font-black text-indigo-700">مناوب حالياً{s.squad ? ' · ' + s.squad : ''}</span>
