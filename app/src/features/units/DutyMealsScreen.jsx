@@ -178,7 +178,12 @@ export const DutyMealsScreen = ({ ctx }) => {
                                     </div>
                                     <div className="space-y-2">
                                         {DUTY_MEAL_SQUADS.map(squad => {
-                                            const members = siteSquadMembers(staff, unit, squad, localDateStr());
+                                            // أعضاء الوجبة في أول الشهر المعروض أو آخره (يظهر من يبدأ المناوبة أو ينتهي في منتصفه)، بلا تكرار
+                                            const monthDays = monthDates(month);
+                                            const firstDay = monthDays[0] || localDateStr();
+                                            const lastDay = monthDays[monthDays.length - 1] || firstDay;
+                                            const members = [...siteSquadMembers(staff, unit, squad, firstDay), ...siteSquadMembers(staff, unit, squad, lastDay)]
+                                                .filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i);
                                             const pick = (mealAuthorizations && mealAuthorizations[unit] && mealAuthorizations[unit][squad]) || {};
                                             return (
                                                 <div key={squad} className="grid grid-cols-[2.5rem_1fr_1fr] gap-2 items-center">
