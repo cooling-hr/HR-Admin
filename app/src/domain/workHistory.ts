@@ -17,7 +17,7 @@ const addDays = (dateStr: string, n: number): string => {
 
 // ترتيب النقاط بـ from ('' أقدم من كل تاريخ) دون تعديل الأصل
 const sortPoints = (pts: WorkPoint[]): WorkPoint[] =>
-  [...pts].sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+  pts.filter(p => p && typeof p === 'object').sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
 
 // وضع نقطة: الأحدث تحل محل أي نقطة بالتاريخ نفسه، والترتيب محفوظ
 const putPoint = (pts: WorkPoint[], p: WorkPoint): WorkPoint[] =>

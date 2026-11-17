@@ -2,7 +2,9 @@ import { getActivePeriod, periodEndOf, periodIdentityOf, periodMergeKeyOf, perio
 import { normalizeArabicText, normalizeJobNumber } from '../core/arabic.js';
 import { ISO_DAY } from '../core/dates.js';
 import { normalizeTimeFormCodeEdits, resolveCodeTable } from './timeForm.js';
-import { describeWorkHistory } from './workHistory.js';
+import { describeWorkHistory, workOn } from './workHistory.js';
+import { localDateStr } from '../core/dates.js';
+import type { WorkPoint } from './workHistory.js';
 import type { TimeFormCodeEdits } from './timeForm.js';
 import type {
     Employee, LocalAttendanceState, MergeAttendanceItem, MergeAttendanceResult,
@@ -322,14 +324,33 @@ export const analyzeMerge = (
                 // سجل طبيعة العمل حقل منظَّم: يُقارَن بنصّ JSON مرتَّب المفاتيح ويُطبَّق كما هو، ويُعرض ملخصاً عربياً
                 if (field === 'workHistory') {
                     const incKey = workHistoryKey(inc.workHistory);
-                    if (incKey === '' || incKey === workHistoryKey(existing.workHistory)) return;
+                    const extKey = workHistoryKey(existing.workHistory);
+                    if (incKey === '' || incKey === extKey) return;
+                    // الوصف من النقاط المنقّاة لا من المصفوفة الخام (قد تحمل عناصر فارغة)
+                    const incPts = JSON.parse(incKey);
+                    const incEmp = { ...inc, workHistory: incPts };
+                    let oldVal = 'فارغ';
+                    let wasEmpty = true;
+                    if (extKey !== '') {
+                        oldVal = describeWorkHistory({ ...existing, workHistory: JSON.parse(extKey) }) || 'فارغ';
+                        wasEmpty = false;
+                    } else {
+                        // لا سجل محلياً: القيمة القديمة هي التعيين القديم (workType/squad)، ولا يُؤشَّر السجل
+                        // مسبقاً إن كانت حالته الحالية تغيّر تعيين الموظف المحلي
+                        const today = localDateStr();
+                        const norm = (s: { workType: string; squad: string; shiftKind?: string }) =>
+                            [s.workType || 'صباحي', s.squad || '', s.workType === 'مناوب' ? (s.shiftKind || '') : ''].join('|');
+                        const legacy = { ...workOn(existing, today), shiftKind: existing.shiftKind };
+                        oldVal = describeWorkHistory({ ...existing, workHistory: [{ from: '', workType: (existing.workType || 'صباحي') as WorkPoint['workType'], squad: existing.squad || '' }] }) || 'فارغ';
+                        if (norm(workOn(incEmp, today)) !== norm(legacy)) wasEmpty = false;
+                    }
                     employeeChanges.push({
                         field: field,
                         fieldNameAr: FIELD_NAMES_AR[field],
-                        oldVal: describeWorkHistory(existing) || 'فارغ',
-                        newVal: describeWorkHistory(inc),
-                        newValTyped: JSON.parse(incKey),
-                        wasEmpty: workHistoryKey(existing.workHistory) === '',
+                        oldVal,
+                        newVal: describeWorkHistory(incEmp),
+                        newValTyped: incPts,
+                        wasEmpty,
                         cosmeticOnly: false
                     });
                     return;
