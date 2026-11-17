@@ -2,6 +2,7 @@ import { getActivePeriod, periodEndOf, periodIdentityOf, periodMergeKeyOf, perio
 import { normalizeArabicText, normalizeJobNumber } from '../core/arabic.js';
 import { ISO_DAY } from '../core/dates.js';
 import { normalizeTimeFormCodeEdits, resolveCodeTable } from './timeForm.js';
+import { describeWorkHistory } from './workHistory.js';
 import type { TimeFormCodeEdits } from './timeForm.js';
 import type {
     Employee, LocalAttendanceState, MergeAttendanceItem, MergeAttendanceResult,
@@ -40,7 +41,18 @@ export const FIELD_NAMES_AR: Record<string, string> = {
     // حقول الأولويات والاستثناء: بلا هذه السطور لا تنتقل بين الأوفلاين والسحابية إطلاقاً وبصمت.
     globalPriorityRank: 'أولوية الترتيب العامة',
     unitPriorityRank: 'أولوية الترتيب ضمن الوحدة',
-    safetyRosterExempt: 'استثناء من قائمة معدات السلامة'
+    safetyRosterExempt: 'استثناء من قائمة معدات السلامة',
+    // حقل منظَّم (مصفوفة نقاط) يُعالَج في analyzeMerge معالجة خاصة لا كنصّ
+    workHistory: 'سجل طبيعة العمل'
+};
+
+// نصّ JSON ثابت لسجل طبيعة العمل: النقاط مرتّبة بـfrom والمفاتيح مرتّبة؛ فارغ إن لا سجل
+export const workHistoryKey = (wh: unknown): string => {
+    if (!Array.isArray(wh) || wh.length === 0) return '';
+    const pts = wh.filter(p => p && typeof p === 'object')
+        .map(p => Object.fromEntries(Object.keys(p).sort().filter(k => p[k] !== undefined).map(k => [k, p[k]])))
+        .sort((a, b) => (String(a.from || '') < String(b.from || '') ? -1 : String(a.from || '') > String(b.from || '') ? 1 : 0));
+    return pts.length ? JSON.stringify(pts) : '';
 };
 
 // الحقول الثلاثة أعلاه ليست نصوصاً كبقية الحقول، ومعاملتها كنصّ تُنتج أخطاء لا مجرد نوع غير مرتَّب:
@@ -307,6 +319,21 @@ export const analyzeMerge = (
         } else {
             const employeeChanges: MergeFieldChange[] = [];
             fieldsToCompare.forEach(field => {
+                // سجل طبيعة العمل حقل منظَّم: يُقارَن بنصّ JSON مرتَّب المفاتيح ويُطبَّق كما هو، ويُعرض ملخصاً عربياً
+                if (field === 'workHistory') {
+                    const incKey = workHistoryKey(inc.workHistory);
+                    if (incKey === '' || incKey === workHistoryKey(existing.workHistory)) return;
+                    employeeChanges.push({
+                        field: field,
+                        fieldNameAr: FIELD_NAMES_AR[field],
+                        oldVal: describeWorkHistory(existing) || 'فارغ',
+                        newVal: describeWorkHistory(inc),
+                        newValTyped: JSON.parse(incKey),
+                        wasEmpty: workHistoryKey(existing.workHistory) === '',
+                        cosmeticOnly: false
+                    });
+                    return;
+                }
                 // الحقول المُنمَّطة مسار مستقل: بقية الحقول نصوص وسلوكها لا يتغيّر بحرف
                 const typedKind = TYPED_MERGE_FIELDS[field];
                 if (typedKind) {

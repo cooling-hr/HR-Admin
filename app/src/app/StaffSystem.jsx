@@ -3458,6 +3458,19 @@ import { buildDatePicker } from '../ui/datePicker';
                                 squadVal = existingEmp.squad || '';
                             }
 
+                            // سجل طبيعة العمل: يُحمل من الموجود؛ وإن اختلف المستورد عن حالة اليوم تُضاف نقطة لا يُكتب الحقلان وحدهما
+                            let workHistoryVal = existingEmp ? existingEmp.workHistory : undefined;
+                            if (existingEmp && Array.isArray(workHistoryVal) && workHistoryVal.length) {
+                                const curWork = workOn(existingEmp, localDateStr());
+                                const newType = (hasCol(['طبيعة العمل']) && workTypeVal) ? workTypeVal : curWork.workType;
+                                let newSquad = curWork.squad;
+                                if (newType !== 'مناوب') newSquad = '';
+                                else if (hasSquadCol && squadVal) newSquad = squadVal;
+                                if (newType !== curWork.workType || newSquad !== curWork.squad) {
+                                    workHistoryVal = setWorkFrom(existingEmp, localDateStr(), { workType: newType, squad: newSquad }).workHistory;
+                                }
+                            }
+
                             return {
                                 id: 'emp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + '_' + index,
                                 name: String(row['الاسم الكامل'] || ''),
@@ -3489,6 +3502,7 @@ import { buildDatePicker } from '../ui/datePicker';
                                 address: addressVal,
                                 relativePhone: relativePhoneVal,
                                 statusPeriods: existingEmp ? existingEmp.statusPeriods : undefined,
+                                workHistory: workHistoryVal,
                                 excludeFromWaterLists: existingEmp ? existingEmp.excludeFromWaterLists : undefined
                             };
                         });

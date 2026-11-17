@@ -113,7 +113,7 @@ export interface MergeFieldChange {
   newVal: string;
   // القيمة بنوعها الحقيقي للحقول غير النصية (انظر TYPED_MERGE_FIELDS). newVal نصّ للعرض
   // وحده هنا؛ التطبيق يسند هذه، وإلا صار الاستثناء المنطقي نصّ "false" وهو قيمة صادقة.
-  newValTyped?: number | boolean;
+  newValTyped?: number | boolean | WorkPoint[];
   wasEmpty: boolean;
   cosmeticOnly: boolean;
 }
