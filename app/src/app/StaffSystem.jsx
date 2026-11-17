@@ -4247,13 +4247,21 @@ import { buildDatePicker } from '../ui/datePicker';
                 commitNominationStaff(staff.map(s => (s.id === id ? { ...cancelNomination(s, start), lastModified: now } : s)));
             };
 
+            // نقطة الترشيح التي تنتمي إلى دورة (البداية، النهاية) كما يعرضها الشريط: بلا وجبة، لم تنتهِ، ولم يحلّ محلّها قرار سارٍ
+            const nominationPointIn = (s, start, until) => {
+                const pts = s.workHistory || [];
+                if (until && until < todayStr) return undefined;
+                if (pts.some(x => x.from > start && x.from <= todayStr)) return undefined;
+                return pts.find(x => x.from === start && x.squad === '' && x.workType === 'مناوب' && (x.until || '') === until);
+            };
+
             // إلغاء كل ترشيحات دورة (بدايتها ونهايتها)
             const cancelNominationCycle = (start, until) => {
                 if (!canEdit('staffMaster')) {
                     alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات الملاك العام والمنتسبين!');
                     return;
                 }
-                const isIn = (s) => (s.workHistory || []).some(x => x.from === start && x.squad === '' && x.workType === 'مناوب' && (x.until || '') === until);
+                const isIn = (s) => !!nominationPointIn(s, start, until);
                 const n = staff.filter(isIn).length;
                 if (!n) return;
                 if (!confirm('❓ إلغاء ترشيح كل المرشحين (' + n + ') للفترة من ' + start + (until ? ' إلى ' + until : '') + '؟')) return;
@@ -4270,14 +4278,15 @@ import { buildDatePicker } from '../ui/datePicker';
                 const now = new Date().toISOString();
                 let moved = 0;
                 const updated = staff.map(s => {
-                    const pt = (s.workHistory || []).find(x => x.from === oldStart && x.squad === '' && x.workType === 'مناوب' && (x.until || '') === oldUntil);
+                    const pt = nominationPointIn(s, oldStart, oldUntil);
                     if (!pt) return s;
                     let next;
                     if (newStart === oldStart) next = setWorkFrom(s, oldStart, { until: newUntil });
                     else {
-                        const nn = nominate(cancelNomination(s, oldStart), { start: newStart, until: newUntil, shiftKind: pt.shiftKind || '12h' });
-                        // رُفض الترشيح الجديد (مناوب أصلاً في البداية الجديدة): يبقى ترشيحه كما كان
-                        next = (nn.workHistory || []).some(x => x.from === newStart) ? nn : s;
+                        const cancelled = cancelNomination(s, oldStart);
+                        const nn = nominate(cancelled, { start: newStart, until: newUntil, shiftKind: pt.shiftKind || '12h' });
+                        // رُفض الترشيح الجديد (مناوب أصلاً في البداية الجديدة، فأعادت nominate المدخل نفسه): يبقى ترشيحه كما كان
+                        next = nn !== cancelled ? nn : s;
                     }
                     if (next === s) return s;
                     moved++;
