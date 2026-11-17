@@ -4309,6 +4309,20 @@ import { buildDatePicker } from '../ui/datePicker';
             };
 
             // ترشيح معرّفات لدورة واحدة؛ p.kinds اختياري يحدد نوع المناوبة لكل معرّف وإلا p.shiftKind. يرجع true عند نجاح الحفظ
+            // ترشيح موظف واحد لفترة (start, until)، يستعمله الترشيح وتعديل تاريخي الدورة معاً. يرجع المدخل نفسه عند الرفض.
+            // من له في start نفسه قرار بوجبة محددة لا يُمسّ (لا تُكتب فوقه وجبة فارغة). المناوب الحالي المعاد ترشيحه يبدأ من لحظة
+            // الترشيح: وجبة فارغة تُحدَّد عند التوزيع، والنقطة الجديدة تقطع فترته القديمة عند البداية. والصباحي يُرشَّح ما لم يكن مرشحاً لها.
+            const nominateOne = (s, start, until, kind, fallbackKind) => {
+                if ((s.workHistory || []).some(x => x.from === start && x.workType === 'مناوب' && x.squad)) return s;
+                const [by, bm, bd] = start.split('-').map(Number);
+                let prev = workOn(s, localDateStr(new Date(by, bm - 1, bd - 1)));
+                // فجوة بين نهاية فترته الحالية وبداية الجديدة: اليوم السابق للبداية صباحي، فيُنظر إلى حالته اليوم
+                if (prev.workType !== 'مناوب') prev = workOn(s, todayStr);
+                if (prev.workType === 'مناوب') return renewShift(s, { start, until, squad: '', shiftKind: kind || prev.shiftKind || fallbackKind });
+                if (workOn(s, start).workType === 'مناوب') return s;
+                return nominate(s, { start, until, shiftKind: kind || fallbackKind });
+            };
+
             const nominateEmployees = (ids, p) => {
                 if (!canEdit('staffMaster')) {
                     alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات الملاك العام والمنتسبين!');
@@ -4318,15 +4332,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 let done = 0;
                 const updated = staff.map(s => {
                     if (!ids.includes(s.id)) return s;
-                    let next;
-                    const [by, bm, bd] = p.start.split('-').map(Number);
-                    let prev = workOn(s, localDateStr(new Date(by, bm - 1, bd - 1)));
-                    // فجوة بين نهاية فترته الحالية وبداية الجديدة: اليوم السابق للبداية صباحي، فيُنظر إلى حالته اليوم
-                    if (prev.workType !== 'مناوب') prev = workOn(s, todayStr);
-                    // المناوب الحالي المعاد ترشيحه يبدأ من لحظة الترشيح: وجبة فارغة تُحدَّد عند التوزيع، والنقطة الجديدة تقطع فترته القديمة عند البداية
-                    if (prev.workType === 'مناوب') next = renewShift(s, { start: p.start, until: p.until, squad: '', shiftKind: (p.kinds && p.kinds[s.id]) || prev.shiftKind || p.shiftKind });
-                    else if (workOn(s, p.start).workType === 'مناوب') next = s;
-                    else next = nominate(s, { start: p.start, until: p.until, shiftKind: (p.kinds && p.kinds[s.id]) || p.shiftKind });
+                    const next = nominateOne(s, p.start, p.until, p.kinds && p.kinds[s.id], p.shiftKind);
                     if (next === s) return s;
                     done++;
                     return { ...next, lastModified: now };
@@ -4390,8 +4396,9 @@ import { buildDatePicker } from '../ui/datePicker';
                     if (newStart === oldStart) next = setWorkFrom(s, oldStart, { until: newUntil });
                     else {
                         const cancelled = cancelNomination(s, oldStart);
-                        const nn = nominate(cancelled, { start: newStart, until: newUntil, shiftKind: pt.shiftKind || '12h' });
-                        // رُفض الترشيح الجديد (مناوب أصلاً في البداية الجديدة، فأعادت nominate المدخل نفسه): يبقى ترشيحه كما كان
+                        // القاعدة نفسها للترشيح: المناوب الحالي المعاد ترشيحه ينتقل إلى البداية الجديدة بوجبة فارغة
+                        const nn = nominateOne(cancelled, newStart, newUntil, pt.shiftKind, '12h');
+                        // رُفض الترشيح الجديد (فأعادت nominateOne المدخل نفسه): يبقى ترشيحه كما كان
                         next = nn !== cancelled ? nn : s;
                     }
                     if (next === s) return s;
