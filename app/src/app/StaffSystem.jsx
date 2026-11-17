@@ -5,7 +5,7 @@ import { getJobRank, sortByJobNumber, sortByJobNumberOnly, sortByJobTitleHierarc
 import { headquartersUnit, locationJustification, locationNames, unitNames } from '../domain/org';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
-import { employeeOn, isThreeShiftOn } from '../domain/workHistory';
+import { employeeOn, isThreeShiftOn, nominate, cancelNomination, setWorkFrom } from '../domain/workHistory';
 import { shiftLeaveCarry, shiftLeaveCarryNote } from '../domain/shiftLeave';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
@@ -20,6 +20,7 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { PageHeader } from '../ui/PageHeader';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { UnitsScreen } from '../features/units/UnitsScreen';
+import { NominateShiftModal } from '../features/shifts/NominateShiftModal';
 import { LoginModal } from '../features/auth/LoginModal';
 import { EditEmployeeModal } from '../features/employees/EditEmployeeModal';
 import { EmployeeCardModal } from '../features/employees/EmployeeCardModal';
@@ -104,6 +105,22 @@ import { buildDatePicker } from '../ui/datePicker';
             // نسخة «اليوم» المشتقة في الذاكرة للشاشات بلا تاريخ؛ الكتابة والحفظ تبقى على staff الخام
             const todayStr = localDateStr();
             const staffToday = useMemo(() => staff.map(s => employeeOn(s, todayStr)), [staff, todayStr]);
+            // دورات الترشيح القائمة (من السجل الخام): نقاط مناوب بلا وجبة لم تنتهِ ولم يحلّ محلّها قرار سارٍ، مجمّعة بزوج (البداية، النهاية)
+            const nominationCycles = useMemo(() => {
+                const groups = new Map();
+                for (const e of staff) {
+                    const pts = e.workHistory || [];
+                    for (const p of pts) {
+                        if (!p.from || p.workType !== 'مناوب' || p.squad !== '') continue;
+                        if (p.until && p.until < todayStr) continue;
+                        if (pts.some(x => x.from > p.from && x.from <= todayStr)) continue;
+                        const key = p.from + '|' + (p.until || '');
+                        if (!groups.has(key)) groups.set(key, { start: p.from, until: p.until || '', ids: [] });
+                        groups.get(key).ids.push(e.id);
+                    }
+                }
+                return [...groups.values()].sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+            }, [staff, todayStr]);
             const [view, setView] = useState('dashboard');
 
             // حركة فتح التبويب: تُعاد بضبط الصنف يدوياً لا بـ key={view}.
@@ -452,6 +469,9 @@ import { buildDatePicker } from '../ui/datePicker';
             const [periodView, setPeriodView] = useState('summary');
             const [timeFormKind, setTimeFormKind] = useState('staff');
             const [showSquadSchedule, setShowSquadSchedule] = useState(false);
+            // ترشيح المناوبين: سلة المعرّفات ونافذة الترشيح/تعديل الدورة (null أو {mode:'new'|'edit', start, until})
+            const [nominateBasket, setNominateBasket] = useState([]);
+            const [nominateModal, setNominateModal] = useState(null);
             const [periodSearchQuery, setPeriodSearchQuery] = useState('');
             const [expandedEmpPeriod, setExpandedEmpPeriod] = useState(null);
 
@@ -4183,6 +4203,94 @@ import { buildDatePicker } from '../ui/datePicker';
 
 
 
+            // حفظ قائمة الملاك بعد ترشيح/إلغاء ترشيح: يكتب السجل الخام كما يفعل saveEmployeeEdit (محلياً ثم السحابة)
+            const commitNominationStaff = (updated) => {
+                setStaff(updated);
+                safeStorage.setItem('staffData', JSON.stringify(updated));
+                pushDataToCloud(buildCloudBundle({ staffData: updated }));
+            };
+
+            // ترشيح معرّفات لدورة واحدة؛ p.kinds اختياري يحدد نوع المناوبة لكل معرّف وإلا p.shiftKind. يرجع true عند نجاح الحفظ
+            const nominateEmployees = (ids, p) => {
+                if (!canEdit('staffMaster')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات الملاك العام والمنتسبين!');
+                    return false;
+                }
+                const now = new Date().toISOString();
+                let done = 0;
+                const updated = staff.map(s => {
+                    if (!ids.includes(s.id)) return s;
+                    const next = nominate(s, { start: p.start, until: p.until, shiftKind: (p.kinds && p.kinds[s.id]) || p.shiftKind });
+                    if (next === s) return s;
+                    done++;
+                    return { ...next, lastModified: now };
+                });
+                if (!done) {
+                    alert('⚠️ لم يُرشَّح أحد: كل من اخترتهم مناوبون أصلاً في تاريخ البداية.');
+                    return false;
+                }
+                commitNominationStaff(updated);
+                if (done < ids.length) alert('⚠️ رُشِّح ' + done + ' من ' + ids.length + '؛ الباقون مناوبون أصلاً في تاريخ البداية.');
+                return true;
+            };
+
+            // إلغاء ترشيح موظف واحد (قبل بدايته)
+            const cancelNominationFor = (id, start) => {
+                if (!canEdit('staffMaster')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات الملاك العام والمنتسبين!');
+                    return;
+                }
+                const emp = staff.find(s => s.id === id);
+                if (!emp) return;
+                if (!confirm('❓ إلغاء ترشيح «' + emp.name + '» للمناوبة من ' + start + '؟')) return;
+                const now = new Date().toISOString();
+                commitNominationStaff(staff.map(s => (s.id === id ? { ...cancelNomination(s, start), lastModified: now } : s)));
+            };
+
+            // إلغاء كل ترشيحات دورة (بدايتها ونهايتها)
+            const cancelNominationCycle = (start, until) => {
+                if (!canEdit('staffMaster')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات الملاك العام والمنتسبين!');
+                    return;
+                }
+                const isIn = (s) => (s.workHistory || []).some(x => x.from === start && x.squad === '' && x.workType === 'مناوب' && (x.until || '') === until);
+                const n = staff.filter(isIn).length;
+                if (!n) return;
+                if (!confirm('❓ إلغاء ترشيح كل المرشحين (' + n + ') للفترة من ' + start + (until ? ' إلى ' + until : '') + '؟')) return;
+                const now = new Date().toISOString();
+                commitNominationStaff(staff.map(s => (isIn(s) ? { ...cancelNomination(s, start), lastModified: now } : s)));
+            };
+
+            // تعديل تاريخي دورة: نقطة كل مرشح فيها. النهاية وحدها تُعدَّل في النقطة نفسها (setWorkFrom)؛ وتغيّر البداية ينقل النقطة
+            const editNominationCycle = (oldStart, oldUntil, newStart, newUntil) => {
+                if (!canEdit('staffMaster')) {
+                    alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات الملاك العام والمنتسبين!');
+                    return false;
+                }
+                const now = new Date().toISOString();
+                let moved = 0;
+                const updated = staff.map(s => {
+                    const pt = (s.workHistory || []).find(x => x.from === oldStart && x.squad === '' && x.workType === 'مناوب' && (x.until || '') === oldUntil);
+                    if (!pt) return s;
+                    let next;
+                    if (newStart === oldStart) next = setWorkFrom(s, oldStart, { until: newUntil });
+                    else {
+                        const nn = nominate(cancelNomination(s, oldStart), { start: newStart, until: newUntil, shiftKind: pt.shiftKind || '12h' });
+                        // رُفض الترشيح الجديد (مناوب أصلاً في البداية الجديدة): يبقى ترشيحه كما كان
+                        next = (nn.workHistory || []).some(x => x.from === newStart) ? nn : s;
+                    }
+                    if (next === s) return s;
+                    moved++;
+                    return { ...next, lastModified: now };
+                });
+                if (!moved) {
+                    alert('⚠️ لم يتغير شيء.');
+                    return false;
+                }
+                commitNominationStaff(updated);
+                return true;
+            };
+
             const changeStatus = (id, newStatus) => {
                 if (!canEdit('staffMaster')) {
                     alert('⛔ عذراً، ليس لديك صلاحية تعديل موقف المنتسبين!');
@@ -5129,7 +5237,7 @@ return (
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
                             <DutyMealsScreen ctx={{ getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff: staffToday }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ staff: staffToday, org, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
+                            <UnitsScreen ctx={{ staff: staffToday, org, nominateBasket, setNominateBasket, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff: staffToday, staffRaw: staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
@@ -5162,6 +5270,8 @@ return (
             {periodHistoryEmpId && <PeriodHistoryModal ctx={{ canEdit, deletePeriodFromHistory, openPeriodEdit, periodHistoryEmpId, periodSpanJsx, setPeriodHistoryEmpId, staff }} />}
 
             {waterMemoGroup && <WaterMemoModal ctx={{ org, BOC_LOGO_DATA_URI, amountToArabicWords, getWaterGroupSummary, setWaterMemoGroup, waterMemoGroup, waterMonth }} />}
+
+            {nominateModal && <NominateShiftModal ctx={{ nominateModal, setNominateModal, nominateBasket, setNominateBasket, staff: staffToday, nominationCycles, nominateEmployees, editNominationCycle }} />}
 
             {showSquadSchedule && <SquadScheduleModal ctx={{ org, BOC_LOGO_DATA_URI, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters }} />}
 

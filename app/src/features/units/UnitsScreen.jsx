@@ -83,7 +83,7 @@ const ShiftPills = ({ shifts }) => (<>
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org } = ctx;
+    const { printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle } = ctx;
     // الرموز المضافة من دليل الرموز (والرسمية المفعَّلة) خيارات في مجموعة «رموز أخرى»، تُحسب مرة واحدة لكل الموظفين
     const extraStatusOptions = Object.values(resolveCodeTable(timeFormCodeEdits).extraByMeaning).map(c => ({ value: c.meaning, label: '🔤 ' + c.meaning + ' (' + c.letter + ')', className: 'bg-white text-slate-700 font-bold' }));
     const statusGroups = [...DAILY_STATUS_GROUPS, ...(extraStatusOptions.length ? [{ label: 'رموز أخرى', options: extraStatusOptions }] : [])];
@@ -98,6 +98,30 @@ export const UnitsScreen = ({ ctx }) => {
         const updated = overtimeIds.includes(id) ? overtimeIds.filter(x => x !== id) : [...overtimeIds, id];
         setOvertimeIds(updated);
         safeStorage.setItem('overtimeSelectedIds', JSON.stringify(updated));
+    };
+    // ترشيح مسبق قائم قبل بدايته (من السجل المحفوظ في الموظف المشتق)
+    const pendingNomPoint = (s) => (s.workHistory || []).find(p => p.from && p.from > todayStr && p.workType === 'مناوب' && p.squad === '');
+    // زر الترشيح للصباحي: يبدّل وجوده في السلة؛ والمرشح شارة تلغي ترشيحه قبل البداية؛ المناوب لا زر له
+    const renderNominateControl = (s) => {
+        const np = pendingNomPoint(s);
+        if (np) {
+            return (
+                <button onClick={() => cancelNominationFor(s.id, np.from)} title="اضغط لإلغاء الترشيح"
+                    className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer">
+                    <span>🎯 مرشح من {np.from}</span>
+                </button>
+            );
+        }
+        if (s.workType === 'مناوب') return null;
+        const inBasket = nominateBasket.includes(s.id);
+        return (
+            <button onClick={() => setNominateBasket(inBasket ? nominateBasket.filter(x => x !== s.id) : [...nominateBasket, s.id])}
+                className={inBasket
+                    ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
+                    : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
+                <span>{inBasket ? '✓ في سلة الترشيح' : '🎯 ترشيح للمناوبة'}</span>
+            </button>
+        );
     };
     return (
         <div className="space-y-5 animate-fadeIn">
@@ -882,6 +906,33 @@ export const UnitsScreen = ({ ctx }) => {
                 </div>
             ) : (
                 <div className="space-y-4">
+            {/* ترشيح المناوبين: دورات قائمة وسلة الترشيح */}
+            {(nominationCycles.length > 0 || nominateBasket.length > 0) && (
+                <div className="space-y-2 no-print">
+                    {nominationCycles.map(c => (
+                        <div key={c.start + '|' + c.until} className="p-3 bg-amber-50 border-2 border-amber-400 rounded-xl text-xs font-black text-amber-900 flex flex-wrap items-center justify-between gap-2">
+                            <span>🎯 ترشيح المناوبين: {c.ids.length} مرشحاً للفترة من {c.start} إلى {c.until || '—'}</span>
+                            <span className="flex gap-2">
+                                <button onClick={() => setNominateModal({ mode: 'edit', start: c.start, until: c.until })}
+                                    className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">✏️ تعديل التاريخين</button>
+                                <button onClick={() => cancelNominationCycle(c.start, c.until)}
+                                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">🗑️ إلغاء الجميع</button>
+                            </span>
+                        </div>
+                    ))}
+                    {nominateBasket.length > 0 && (
+                        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs font-black text-amber-900 flex flex-wrap items-center justify-between gap-2">
+                            <span>🎯 سلة الترشيح: {nominateBasket.length} موظف جاهز للترشيح للمناوبة</span>
+                            <span className="flex gap-2">
+                                <button onClick={() => setNominateModal({ mode: 'new' })}
+                                    className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">متابعة الترشيح</button>
+                                <button onClick={() => setNominateBasket([])}
+                                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">تفريغ السلة</button>
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
             {overtimeIds.length > 0 && (
                 <div className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white p-4 rounded-xl shadow-lg mb-6 flex flex-wrap gap-4 items-center justify-between no-print animate-fadeIn">
                     <div className="flex items-center gap-3">
@@ -980,12 +1031,15 @@ export const UnitsScreen = ({ ctx }) => {
                                                         <td className="px-4 py-3 text-gray-700">{s.jobTitle}</td>
                                                         <td className="px-4 py-3 text-gray-700 font-bold">{s.unit || '—'}</td>
                                                         <td className="px-4 py-3 no-print">
+                                                            <div className="flex flex-col items-start gap-1">
                                                             <button onClick={() => toggleOvertime(s.id)}
                                                                 className={overtimeIds.includes(s.id)
                                                                     ? 'px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'
                                                                     : 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1 cursor-pointer'}>
                                                                 <span>{overtimeIds.includes(s.id) ? '✓ مشمول' : '➕ إضافة'}</span>
                                                             </button>
+                                                            {renderNominateControl(s)}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -1156,8 +1210,9 @@ export const UnitsScreen = ({ ctx }) => {
                                                         <td className="px-4 py-3 text-gray-700">{s.jobTitle}</td>
                                                         <td className="px-4 py-3 text-gray-400"></td>
                                                         <td className="px-4 py-3 no-print">
+                                                            <div className="flex flex-col items-start gap-1">
                                                             {overtimeIds.includes(s.id) ? (
-                                                                <button 
+                                                                <button
                                                                     onClick={() => {
                                                                         const updated = overtimeIds.filter(id => id !== s.id);
                                                                         setOvertimeIds(updated);
@@ -1179,6 +1234,8 @@ export const UnitsScreen = ({ ctx }) => {
                                                                     <span>➕ إضافة</span>
                                                                 </button>
                                                             )}
+                                                            {renderNominateControl(s)}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                     );
