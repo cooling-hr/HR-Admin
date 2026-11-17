@@ -4,7 +4,7 @@ import { CONTRACT_TITLES, isContractEmployee } from '../../domain/employees';
 // نافذة إضافة/تعديل بيانات الموظف. الحالة والمنطق في StaffSystem؛ هذا المكوّن يرسم فقط ويستلم ما يحتاجه
 // عبر ctx صريح. شرط الظهور يبقى عند موضع الاستدعاء.
 export const EditEmployeeModal = ({ ctx }) => {
-    const { buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, org, saveEmployeeEdit, showCamera, staff, startCamera, stopCamera, updateEditField, videoRef } = ctx;
+    const { buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, editWork, editWorkFrom, org, saveEmployeeEdit, setEditWorkFrom, showCamera, staff, startCamera, stopCamera, updateEditField, updateEditWork, videoRef } = ctx;
     return (
                 <div className="preview-overlay">
                     <div className="preview-container" style={{maxWidth: '800px'}}>
@@ -99,7 +99,7 @@ export const EditEmployeeModal = ({ ctx }) => {
 
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-2">طبيعة العمل</label>
-                                    <select value={editingEmployee.workType}
+                                    <select value={editWork.workType}
                                         onChange={(e) => updateEditField('workType', e.target.value)}
                                         className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none">
                                         <option value="صباحي">صباحي</option>
@@ -107,10 +107,10 @@ export const EditEmployeeModal = ({ ctx }) => {
                                     </select>
                                 </div>
 
-                                {editingEmployee.workType === 'مناوب' && (
+                                {editWork.workType === 'مناوب' && (
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-2">الوجبة (الجروب)</label>
-                                        <select value={editingEmployee.squad || ''}
+                                        <select value={editWork.squad}
                                             onChange={(e) => updateEditField('squad', e.target.value)}
                                             className="w-full px-3 py-2 border-2 rounded-lg border-orange-200 focus:border-orange-500 outline-none bg-orange-50/10">
                                             <option value="">-- اختر الوجبة --</option>
@@ -119,6 +119,48 @@ export const EditEmployeeModal = ({ ctx }) => {
                                             <option value="C">الوجبة C</option>
                                             <option value="D">الوجبة D</option>
                                         </select>
+                                    </div>
+                                )}
+
+                                {!editWork.isNew && editWork.workType === 'مناوب' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">نوع المناوبة</label>
+                                            <select value={editWork.shiftKind}
+                                                onChange={(e) => updateEditWork({ shiftKind: e.target.value || undefined })}
+                                                className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none">
+                                                <option value="">حسب الموقع</option>
+                                                <option value="24h">ثلاثية (24 ساعة)</option>
+                                                <option value="12h">ثنائية (12 ساعة)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">نهاية المناوبة (اختياري)</label>
+                                            <input id="edit-workUntil"
+                                                ref={el => { if (el) buildDatePicker('edit-workUntil'); }}
+                                                type="text"
+                                                value={editWork.until}
+                                                onChange={(e) => updateEditWork({ until: e.target.value })}
+                                                className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none" />
+                                        </div>
+                                    </>
+                                )}
+
+                                {!editWork.isNew && editWork.changed && (
+                                    <div className="md:col-span-2 bg-amber-50 border-2 border-orange-200 rounded-lg p-3">
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">اعتباراً من (يسري التغيير من هذا اليوم، وما قبله يبقى كما كان)</label>
+                                        <input id="edit-workFrom"
+                                            ref={el => { if (el) buildDatePicker('edit-workFrom'); }}
+                                            type="text"
+                                            value={editWorkFrom}
+                                            onChange={(e) => setEditWorkFrom(e.target.value)}
+                                            className="w-full px-3 py-2 border-2 rounded-lg focus:border-blue-500 outline-none bg-white" />
+                                    </div>
+                                )}
+
+                                {!editWork.isNew && editWork.history && (
+                                    <div className="md:col-span-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                                        <span className="font-bold">سجل طبيعة العمل: </span>{editWork.history}
                                     </div>
                                 )}
 

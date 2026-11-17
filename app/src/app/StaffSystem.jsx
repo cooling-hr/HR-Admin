@@ -5,7 +5,7 @@ import { getJobRank, sortByJobNumber, sortByJobNumberOnly, sortByJobTitleHierarc
 import { headquartersUnit, locationJustification, locationNames, unitNames } from '../domain/org';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
-import { employeeOn, isThreeShiftOn, nominate, cancelNomination, setWorkFrom, assignSquad, renewShift, returnToMorning, pendingNominations } from '../domain/workHistory';
+import { workOn, activeWorkPoint, describeWorkHistory, employeeOn, isThreeShiftOn, nominate,cancelNomination, setWorkFrom, assignSquad, renewShift, returnToMorning, pendingNominations } from '../domain/workHistory';
 import { shiftLeaveCarry, shiftLeaveCarryNote } from '../domain/shiftLeave';
 import { getSafetyStatus, isInSafetyRoster, safetyFilterGroup } from '../domain/safety';
 import { PERIOD_TYPES, OPEN_ENDED_PERIOD_TYPES, periodsOf, getActivePeriod, periodEndOf, periodsOverlap, periodIdentityOf, periodMergeKeyOf, samePeriodDates, samePeriodExtras, periodPhaseOf, quickPeriodEnd, isLongOrMaternityLeave, LONG_ABSENCE_TYPES } from '../domain/periods';
@@ -615,6 +615,9 @@ import { buildDatePicker } from '../ui/datePicker';
                 return unifiedResultsRaw.map(r => (r && r.id) ? byId.get(r.id) : r).filter(Boolean);
             }, [unifiedResultsRaw, staffToday]);
             const [editingEmployee, setEditingEmployee] = useState(null);
+            // «اعتباراً من» لتعديل نوع الدوام/الوجبة، وما عدّله المستخدم فيها (null = لم يعدّل)
+            const [editWorkFrom, setEditWorkFromState] = useState(() => localDateStr());
+            const [editWorkPatch, setEditWorkPatch] = useState(null);
             const [selectedEmployeeCard, setSelectedEmployeeCard] = useState(null);
             // صنف عزل طباعة البطاقة لا يبقى بعد إغلاقها: لو بقي (متصفح لم يُطلق afterprint)
             // لطبّق عزله على أي طباعة تالية — المصفوفة مثلاً — فأخرجها بيضاء.
@@ -3785,6 +3788,8 @@ import { buildDatePicker } from '../ui/datePicker';
                 // يُفتح السجل الخام لا المشتق، فلا تُكتب قيم «اليوم» في السجل عند الحفظ
                 const raw = staff.find(s => s.id === employee.id) || employee;
                 setEditingEmployee({...raw});
+                setEditWorkFromState(localDateStr());
+                setEditWorkPatch(null);
                 setShowEditModal(true);
             };
             
@@ -3855,7 +3860,24 @@ import { buildDatePicker } from '../ui/datePicker';
                     alert('⛔ عذراً، ليس لديك صلاحية إضافة أو تعديل بيانات الملاك العام والمنتسبين!\nتم منحك صلاحية العرض والاطلاع والطباعة فقط.');
                     return;
                 }
-                
+                // تعديل نوع الدوام/الوجبة «اعتباراً من»: تاريخ صالح، ونهاية صالحة وغير سابقة له، وبلا نقطتين بتاريخ واحد
+                if (editWorkPatch) {
+                    const okDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
+                    if (!okDate(editWorkFrom)) {
+                        alert('⛔ تاريخ «اعتباراً من» غير صالح. اكتبه بصيغة السنة-الشهر-اليوم.');
+                        return;
+                    }
+                    if (editWorkPatch.until && (!okDate(editWorkPatch.until) || editWorkPatch.until < editWorkFrom)) {
+                        alert('⛔ نهاية المناوبة غير صالحة أو سابقة لتاريخ «اعتباراً من».');
+                        return;
+                    }
+                }
+                const wfFroms = (editingEmployee.workHistory || []).map(p => p.from);
+                if (new Set(wfFroms).size !== wfFroms.length) {
+                    alert('⛔ في سجل طبيعة العمل نقطتان بتاريخ واحد. غيّر تاريخ «اعتباراً من».');
+                    return;
+                }
+
                 // التحقق من رقم النقال
                 if (editingEmployee.mobile && editingEmployee.mobile.length > 0) {
                     const mobilePattern = /^07[0-9]{9}$/;
@@ -3924,12 +3946,14 @@ import { buildDatePicker } from '../ui/datePicker';
                 });
                 setShowEditModal(false);
                 setEditingEmployee(null);
+                setEditWorkPatch(null);
                 stopCamera();
             };
-            
+
             const cancelEdit = () => {
                 setShowEditModal(false);
                 setEditingEmployee(null);
+                setEditWorkPatch(null);
                 stopCamera();
             };
 
@@ -3994,8 +4018,53 @@ import { buildDatePicker } from '../ui/datePicker';
                 setEditingEmployee({ ...editingEmployee, statusPeriods: next });
             };
 
+            // تطبيق تعديل الدوام على نسخة التحرير: نقطة بتاريخ from فوق السجل الخام، فلا يتغير ما قبلها
+            // (setWorkFrom لا يمس إلا نقطة from، ويحلّ محل نقطة بالتاريخ نفسه). الحقلان الخامان يطابقان حالة اليوم.
+            const applyEditWork = (base, from, patch) => {
+                let upd = setWorkFrom(base, from, patch);
+                upd = { ...upd, workHistory: upd.workHistory.map(p => {
+                    if (p.from !== from) return p;
+                    const q = { ...p };
+                    // الصباحي لا يحمل نوع مناوبة، و«حسب الموقع» يمسح النوع الصريح
+                    if (q.workType === 'صباحي' || ('shiftKind' in patch && !patch.shiftKind)) delete q.shiftKind;
+                    return q;
+                }) };
+                const t = workOn(upd, localDateStr());
+                setEditingEmployee(prev => ({ ...prev, workHistory: upd.workHistory, workType: t.workType, squad: t.squad }));
+            };
+            const isValidYmd = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '');
+            const updateEditWork = (change) => {
+                const base = staff.find(s => s.id === editingEmployee.id);
+                if (!base) { setEditingEmployee({ ...editingEmployee, ...change }); return; }
+                let patch = { ...(editWorkPatch || {}), ...change };
+                if (change.workType === 'صباحي') patch = { workType: 'صباحي', squad: '', until: '' };
+                else if (change.workType === 'مناوب' && !('squad' in patch)) patch.squad = '';
+                setEditWorkPatch(patch);
+                if (isValidYmd(editWorkFrom) && (!patch.until || isValidYmd(patch.until))) applyEditWork(base, editWorkFrom, patch);
+            };
+            const setEditWorkFrom = (date) => {
+                setEditWorkFromState(date);
+                const base = editingEmployee && staff.find(s => s.id === editingEmployee.id);
+                if (base && editWorkPatch && isValidYmd(date) && (!editWorkPatch.until || isValidYmd(editWorkPatch.until))) applyEditWork(base, date, editWorkPatch);
+            };
+            // ما تعرضه نافذة التعديل لنوع الدوام: حالته في تاريخ «اعتباراً من» لا الحقل الخام وحده
+            const editWork = (() => {
+                if (!editingEmployee) return null;
+                const isNew = !staff.some(s => s.id === editingEmployee.id);
+                if (isNew) return { isNew, workType: editingEmployee.workType, squad: editingEmployee.squad || '', shiftKind: '', until: '', changed: false, history: '' };
+                const d = isValidYmd(editWorkFrom) ? editWorkFrom : localDateStr();
+                const s = workOn(editingEmployee, d);
+                const pt = activeWorkPoint(editingEmployee, d);
+                return {
+                    isNew, workType: s.workType, squad: s.squad || '', shiftKind: s.shiftKind || '',
+                    until: editWorkPatch && 'until' in editWorkPatch ? (editWorkPatch.until || '') : ((pt && pt.until) || ''),
+                    changed: !!editWorkPatch, history: describeWorkHistory(editingEmployee),
+                };
+            })();
             const updateEditField = (field, value) => {
-                if (field === 'name' && value) {
+                if ((field === 'workType' || field === 'squad') && editWork && !editWork.isNew) {
+                    updateEditWork({ [field]: value });
+                } else if (field === 'name' && value) {
                     const guessedGender = guessGender(value);
                     setEditingEmployee({...editingEmployee, name: value, gender: guessedGender});
                 } else if (field === 'jobNumber') {
@@ -5318,7 +5387,7 @@ return (
 
             {showSquadSchedule && <SquadScheduleModal ctx={{ org, BOC_LOGO_DATA_URI, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters }} />}
 
-            {showEditModal && editingEmployee && <EditEmployeeModal ctx={{ org, buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, saveEmployeeEdit, showCamera, staff, startCamera, stopCamera, updateEditField, videoRef }} />}
+            {showEditModal && editingEmployee && <EditEmployeeModal ctx={{ org, buildDatePicker, canEdit, cancelEdit, capturePhoto, editingEmployee, editWork, editWorkFrom, setEditWorkFrom, updateEditWork, saveEmployeeEdit, showCamera, staff, startCamera, stopCamera, updateEditField, videoRef }} />}
                     
                     {showPrintForm && <NewEmployeeFormPrint ctx={{ org, setShowPrintForm }} />}
                     

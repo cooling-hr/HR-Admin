@@ -39,6 +39,27 @@ const activePointOn = (emp: Employee, date: string): WorkPoint | undefined => {
   return hit && !(hit.until && date > hit.until) ? hit : undefined;
 };
 
+// النقطة السارية في date للقراءة (نهايتها وغيرها) أو undefined
+export const activeWorkPoint = (emp: Employee, date: string): WorkPoint | undefined => activePointOn(emp, date);
+
+// وصف مختصر مقروء للسجل: «صباحي، مناوب (C، ثنائية) من … إلى …»؛ فارغ بلا سجل
+export const describeWorkHistory = (emp: Employee): string => {
+  const pts = emp.workHistory;
+  if (!pts || !pts.length) return '';
+  return sortPoints(pts).map(p => {
+    let t = p.workType;
+    if (p.workType === 'مناوب') {
+      const parts = [p.squad || 'الوجبة غير محددة'];
+      if (p.shiftKind === '24h') parts.push('ثلاثية');
+      else if (p.shiftKind === '12h') parts.push('ثنائية');
+      t += ' (' + parts.join('، ') + ')';
+    }
+    if (p.from) t += ' من ' + p.from;
+    if (p.until) t += ' إلى ' + p.until;
+    return t;
+  }).join('، ');
+};
+
 // حالة الموظف في تاريخ date: آخر نقطة from <= date، وتنتهي بـ until فيعود صباحياً
 export const workOn = (emp: Employee, date: string): WorkState => {
   const pts = emp.workHistory;
