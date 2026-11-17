@@ -947,14 +947,18 @@ export const UnitsScreen = ({ ctx }) => {
                         </div>
                     ))}
                     {nominateBasket.length > 0 && (
-                        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs font-black text-amber-900 flex flex-wrap items-center justify-between gap-2">
-                            <span>🎯 سلة الترشيح: {nominateBasket.length} موظف جاهز للترشيح للمناوبة</span>
-                            <span className="flex gap-2">
-                                <button onClick={() => setNominateModal({ mode: 'new' })}
-                                    className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">متابعة الترشيح</button>
-                                <button onClick={() => setNominateBasket([])}
-                                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">تفريغ السلة</button>
-                            </span>
+                        // شريط ثابت أسفل الشاشة: زر الترشيح في الصف يضيف إلى السلة فقط، واختيار المدة في نافذة هذا الشريط؛
+                        // وهو في أعلى الصفحة لا يراه من نزل في قائمة طويلة.
+                        <div className="fixed bottom-4 inset-x-3 z-40 flex justify-center pointer-events-none no-print">
+                            <div className="pointer-events-auto w-full max-w-xl p-3 bg-amber-50 border-2 border-amber-400 rounded-2xl shadow-2xl text-xs font-black text-amber-900 flex flex-wrap items-center justify-between gap-2">
+                                <span>🎯 سلة الترشيح: {nominateBasket.length} موظف — اختر مدة الترشيح من «متابعة»</span>
+                                <span className="flex gap-2">
+                                    <button onClick={() => setNominateModal({ mode: 'new' })}
+                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer">⏳ متابعة: اختيار المدة</button>
+                                    <button onClick={() => setNominateBasket([])}
+                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">تفريغ السلة</button>
+                                </span>
+                            </div>
                         </div>
                     )}
                 </div>
