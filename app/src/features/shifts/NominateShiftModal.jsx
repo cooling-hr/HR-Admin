@@ -39,7 +39,11 @@ export const NominateShiftModal = ({ ctx }) => {
     const save = () => {
         if (problem) return;
         let ok;
-        if (isEdit) ok = editNominationCycle(nominateModal.start, nominateModal.until, start, until);
+        if (isEdit) {
+            ok = editNominationCycle(nominateModal.start, nominateModal.until, start, until);
+            // فترة الترشيح المفتوحة على الدورة نفسها تتبع تاريخيها الجديدين، وإلا رُشِّح الباقون بالقديمين فانقسمت الدورة
+            if (ok && nominatePeriod && nominatePeriod.start === nominateModal.start && nominatePeriod.until === nominateModal.until) setNominatePeriod({ start, until });
+        }
         else if (isPeriod) {
             // اعتماد الفترة: بدء وضع الترشيح يكون بسلة فارغة، أما تغيير الفترة فيُبقي المختارين
             if (!nominatePeriod) setNominateBasket([]);
