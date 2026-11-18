@@ -143,7 +143,9 @@ export const PreviewModal = ({ ctx }) => {
                                                         className={isFirstInLocation && key === 'مبررات التشغيل' ? 'merged-cell justification-cell' : ''}>
                                                         {key === 'مبررات التشغيل' ? (
                                                             // قابل للتحرير كباقي الخلايا، ونص يلتف (حقل input بسطر واحد كان يقصّ المبرر الطويل)
-                                                            <div contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label="مبررات التشغيل"
+                                                            // فقرة واحدة كما كانت في input: Enter ممنوع، لأن textContent يُسقط فاصل السطر فتلتصق الكلمات
+                                                            <div contentEditable suppressContentEditableWarning role="textbox" aria-label="مبررات التشغيل"
+                                                                onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                                                                 onBlur={(e) => { const t = e.currentTarget.textContent || ''; if (t !== (value || '')) updateCell(idx, key, t); }}
                                                                 className="editable-cell">{value || ''}</div>
                                                         ) : key === 'ت' ? (
