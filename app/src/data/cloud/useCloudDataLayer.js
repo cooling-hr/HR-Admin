@@ -1226,6 +1226,10 @@ const pushRetryTimerRef = React.useRef(null);
 const pushRetryAttemptRef = React.useRef(0);
 // آخر نسخة من pushDataToCloud (إغلاق حديث) ليقرأها المؤقت الطويل بدل إغلاق قديم
 const pushDataToCloudRef = React.useRef(null);
+// الحزمة الصريحة للمحاولة الجارية، وآخر حزمة صريحة فشلت: إعادة المحاولة تبثّها هي لا حالة مُعاد بناؤها،
+// فلا تُعدّ «محفوظة» خطأً إن اختلفت الحالة عنها أو طابقت بصمتها آخر ما على الخادم
+const attemptBundleRef = React.useRef(null);
+const lastFailedBundleRef = React.useRef(null);
 // تأخيرات إعادة المحاولة بالملّي ثانية؛ بعد الثالثة يبقى التأخير 60 ثانية
 const PUSH_RETRY_DELAYS_MS = [10000, 30000, 60000];
 // أخطاء الخادم العابرة (تستحق إعادة المحاولة) مقابل الدائمة كرفض الصلاحيات
@@ -1233,6 +1237,7 @@ const isTransientStatus = (s) => s >= 500 || s === 408 || s === 429;
 // فشل الحفظ: يُبقي علامة «غير محفوظ»، ويعرض الخطأ، ويجدول إعادة المحاولة إن طُلب
 const failPush = (error, { retry = false, connected = false } = {}) => {
     unsavedPushRef.current = true;
+    lastFailedBundleRef.current = attemptBundleRef.current;
     setCloudSyncStatus(prev => ({ ...prev, connected, syncing: false, error }));
     if (pushRetryTimerRef.current) {
         clearTimeout(pushRetryTimerRef.current);
@@ -1243,13 +1248,16 @@ const failPush = (error, { retry = false, connected = false } = {}) => {
         pushRetryAttemptRef.current += 1;
         pushRetryTimerRef.current = setTimeout(() => {
             pushRetryTimerRef.current = null;
-            pushDataToCloudRef.current && pushDataToCloudRef.current(null, { auto: true });
+            // ختم جديد للمحاولة: الختم القديم في الحزمة الصريحة يُسقَط ليُعاد توليده
+            const failed = lastFailedBundleRef.current;
+            pushDataToCloudRef.current && pushDataToCloudRef.current(failed ? { ...failed, lastCloudUpdate: undefined } : null, { auto: true });
         }, delay);
     }
 };
 // نجح الحفظ (أو لا شيء يُحفظ): تُمسح العلامة والعدّاد والمؤقت
 const markPushSaved = () => {
     unsavedPushRef.current = false;
+    lastFailedBundleRef.current = null;
     pushRetryAttemptRef.current = 0;
     if (pushRetryTimerRef.current) {
         clearTimeout(pushRetryTimerRef.current);
@@ -1418,6 +1426,7 @@ const pushDataToCloud = async (bundle = null, opts = {}) => {
         pushRetryTimerRef.current = null;
     }
     isPushingRef.current = true;
+    attemptBundleRef.current = bundle;
     try {
         const nowIso = (bundle && bundle.lastCloudUpdate) ? bundle.lastCloudUpdate : new Date().toISOString();
         const dataPayload = { ...(bundle || (buildCloudBundleRef.current || buildCloudBundle)()), lastCloudUpdate: nowIso };
