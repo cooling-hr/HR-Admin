@@ -142,7 +142,10 @@ export const PreviewModal = ({ ctx }) => {
                                                         rowSpan={isFirstInLocation && key === 'مبررات التشغيل' ? row.locationSize : 1}
                                                         className={isFirstInLocation && key === 'مبررات التشغيل' ? 'merged-cell justification-cell' : ''}>
                                                         {key === 'مبررات التشغيل' ? (
-                                                            value || ''
+                                                            // قابل للتحرير كباقي الخلايا، ونص يلتف (حقل input بسطر واحد كان يقصّ المبرر الطويل)
+                                                            <div contentEditable suppressContentEditableWarning role="textbox" aria-multiline="true" aria-label="مبررات التشغيل"
+                                                                onBlur={(e) => { const t = e.currentTarget.textContent || ''; if (t !== (value || '')) updateCell(idx, key, t); }}
+                                                                className="editable-cell">{value || ''}</div>
                                                         ) : key === 'ت' ? (
                                                             <span className="font-bold text-gray-700">{value}</span>
                                                         ) : (
