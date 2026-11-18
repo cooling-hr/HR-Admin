@@ -5442,7 +5442,7 @@ return (
 
             {shiftAssignmentKey && <ShiftAssignmentModal ctx={{ shiftAssignmentKey, setShiftAssignmentKey, pendingNomCycles, applyShiftAssignments, org }} />}
 
-            {nominateModal && <NominateShiftModal ctx={{ nominateModal, setNominateModal, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, staff: staffToday, nominationCycles, nominateEmployees, editNominationCycle }} />}
+            {nominateModal && <NominateShiftModal ctx={{ nominateModal, setNominateModal, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, staff: staffToday, nominationCycles, nominateEmployees, editNominationCycle, org }} />}
             {shiftEndOpen && <ShiftEndModal ctx={{ staff: staffToday, todayStr, setCurrentShiftEnd, setShiftEndOpen }} />}
 
             {showSquadSchedule && <SquadScheduleModal ctx={{ org, BOC_LOGO_DATA_URI, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters }} />}

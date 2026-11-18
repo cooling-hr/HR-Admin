@@ -13,7 +13,7 @@ const untilAfterMonths = (start, months) => {
 // نافذة ترشيح المناوبين مسبقاً (جديد) أو تعديل تاريخي دورة مرشحة (edit). الحالة والمعالجة في StaffSystem؛
 // الحقول المحلية هنا مسودة النافذة فقط. شرط الظهور يبقى عند موضع الاستدعاء.
 export const NominateShiftModal = ({ ctx }) => {
-    const { nominateModal, setNominateModal, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, staff, nominationCycles, nominateEmployees, editNominationCycle } = ctx;
+    const { nominateModal, setNominateModal, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, staff, nominationCycles, nominateEmployees, editNominationCycle, org } = ctx;
     const isEdit = nominateModal.mode === 'edit';
     const isPeriod = nominateModal.mode === 'period';
     const isNew = !isEdit && !isPeriod;
@@ -67,7 +67,7 @@ export const NominateShiftModal = ({ ctx }) => {
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[130] flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
                 <div className="bg-gradient-to-r from-indigo-700 to-blue-800 p-4 text-white flex-shrink-0 flex items-center justify-between">
-                    <h3 className="text-base font-black flex items-center gap-2"><span>🎯</span><span>{isEdit ? 'تعديل تاريخي دورة الترشيح' : (isPeriod ? 'فترة ترشيح المناوبين' : 'ترشيح للمناوبة')}</span></h3>
+                    <h3 className="text-base font-black flex items-center gap-2"><span>🎯</span><span>{isEdit ? 'تعديل تاريخي دورة الترشيح' : (isPeriod ? `فترة ترشيح المناوبين ${org.terms.forThe} ${org.terms.whole}` : 'ترشيح للمناوبة')}</span></h3>
                     <button type="button" onClick={close} aria-label="إغلاق" title="إغلاق"
                         className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-bold transition cursor-pointer flex-shrink-0">✕</button>
                 </div>
@@ -76,6 +76,9 @@ export const NominateShiftModal = ({ ctx }) => {
                         <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-xs font-bold text-amber-900 leading-relaxed">
                             توجد دورة مرشحة مفتوحة ({open.start} ← {open.until || 'بلا نهاية'}): اقتُرح تاريخاها ليكون الجميع في دورة واحدة. يمكنك تغييرهما.
                         </div>
+                    )}
+                    {isPeriod && (
+                        <p className="text-xs font-bold text-slate-600 leading-relaxed">تُحدَّد الفترة مرة واحدة لكل وحدات {org.terms.the}، ثم تختار المرشحين من أي وحدة دون إعادة إدخالها.</p>
                     )}
                     {!isNew && <>
                     <div className="space-y-1">

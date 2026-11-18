@@ -201,6 +201,9 @@ export const UnitsScreen = ({ ctx }) => {
     };
     // مناوبون حاليون بلا تاريخ نهاية: يُوضع لهم تاريخ موحّد دفعة واحدة، ومن لم يُجدَّد له يعود صباحياً
     const openEndedShiftCount = staff.filter(s => hasOpenEndedShift(s, todayStr)).length;
+    // عدد المحفوظين في دورة فترة الترشيح المفتوحة: يطمئن المستخدم بعد كل حفظ أن الفترة باقية للوحدات الأخرى
+    const periodCycle = nominatePeriod ? nominationCycles.find(c => c.start === nominatePeriod.start && c.until === nominatePeriod.until) : null;
+    const periodSavedCount = periodCycle ? periodCycle.ids.length : 0;
     // معاينة كشف الساعات الإضافية الموحد (بند في قائمة «معاينة وطباعة الكشوف»)
     const openOvertimePreview = () => {
         const selectedEmployees = staff.filter(s => overtimeIds.includes(s.id));
@@ -1025,7 +1028,12 @@ export const UnitsScreen = ({ ctx }) => {
                     {nominationCycles.map(c => (
                         <div key={c.start + '|' + c.until} className="p-3 bg-amber-50 border-2 border-amber-400 rounded-xl text-xs font-black text-amber-900 flex flex-wrap items-center justify-between gap-2">
                             <span>🎯 ترشيح المناوبين: {c.ids.length} مرشحاً للفترة من {c.start} إلى {c.until || '—'}</span>
-                            <span className="flex gap-2">
+                            <span className="flex flex-wrap gap-2">
+                                {/* العودة إلى الترشيح بتاريخي الدورة نفسها بلا إدخالهما ثانية (دورة لم تبدأ بعد وذات نهاية) */}
+                                {!nominatePeriod && c.until && c.start >= todayStr && (
+                                    <button onClick={() => { setNominateBasket([]); setNominatePeriod({ start: c.start, until: c.until }); }}
+                                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition cursor-pointer">➕ ترشيح آخرين لهذه الفترة</button>
+                                )}
                                 <button onClick={() => setNominateModal({ mode: 'edit', start: c.start, until: c.until })}
                                     className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">✏️ تعديل التاريخين</button>
                                 <button onClick={() => cancelNominationCycle(c.start, c.until)}
@@ -1037,7 +1045,13 @@ export const UnitsScreen = ({ ctx }) => {
                         // شريط ثابت أسفل الشاشة طوال وضع الترشيح: الفترة معتمدة مسبقاً والصفوف تختار الأشخاص فقط
                         <div className="fixed bottom-4 inset-x-3 z-40 flex justify-center pointer-events-none no-print">
                             <div className="pointer-events-auto w-full max-w-xl p-3 bg-amber-50 border-2 border-amber-400 rounded-2xl shadow-2xl text-xs font-black text-amber-900 flex flex-wrap items-center justify-between gap-2">
-                                <span>🎯 ترشيح للفترة {nominatePeriod.start} ← {nominatePeriod.until}: {nominateBasket.length} مختار</span>
+                                <span className="flex flex-col gap-0.5">
+                                    <span>🎯 ترشيح {org.terms.the} {org.terms.whole} للفترة {nominatePeriod.start} ← {nominatePeriod.until}: {nominateBasket.length} مختار</span>
+                                    <span className="text-[11px] font-bold text-amber-800">تنقّل بين الوحدات واختر منها، ثم احفظ مرة واحدة أو بعد كل وحدة</span>
+                                    {periodSavedCount > 0 && (
+                                        <span className="text-[11px] font-bold text-emerald-700">✓ محفوظ في هذه الفترة: {periodSavedCount}{nominateBasket.length === 0 ? ' — الفترة باقية لبقية الوحدات' : ''}</span>
+                                    )}
+                                </span>
                                 <span className="flex gap-2">
                                     <button onClick={() => setNominateModal({ mode: 'new' })} disabled={nominateBasket.length === 0}
                                         className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">✓ مراجعة وحفظ</button>
@@ -1045,7 +1059,7 @@ export const UnitsScreen = ({ ctx }) => {
                                         if (nominateBasket.length > 0 && !confirm('إلغاء الترشيح؟ ستُمسح اختياراتك (' + nominateBasket.length + ') ولن يُحفظ شيء.')) return;
                                         setNominateBasket([]); setNominatePeriod(null);
                                     }}
-                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">{nominateBasket.length === 0 ? '✓ إنهاء الترشيح' : '✕ إلغاء الترشيح'}</button>
+                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">{nominateBasket.length === 0 ? 'خروج من وضع الترشيح' : '✕ إلغاء الترشيح'}</button>
                                 </span>
                             </div>
                         </div>
