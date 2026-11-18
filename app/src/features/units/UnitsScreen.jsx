@@ -956,7 +956,7 @@ export const UnitsScreen = ({ ctx }) => {
                     </div>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className={`space-y-4 ${nominatePeriod ? 'pb-24' : ''}`}>
             {/* ترشيح المناوبين: دورات قائمة وسلة الترشيح */}
             {(nominationCycles.length > 0 || nominatePeriod) && (
                 <div className="space-y-2 no-print">
