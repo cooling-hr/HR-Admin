@@ -174,6 +174,21 @@ export const UnitsScreen = ({ ctx }) => {
             </button>
         );
     };
+    // معاينة وطباعة كشف المرشحين للمناوبة بالأعمدة نفسها المستعملة في كشف الإضافي (من السلة أو من دورة محفوظة)
+    const openNomineesPreview = (ids, title) => {
+        const nominees = sortByJobTitleHierarchy(staff.filter(s => ids.includes(s.id)), 'كشف المرشحين');
+        setPreviewData(nominees.map((s, i) => ({
+            type: 'data',
+            'ت': i + 1,
+            'الرقم الوظيفي': s.jobNumber || '',
+            'الاسم': getThreeName(s.name),
+            'العنوان الوظيفي': s.jobTitle || '',
+            'الوحدة': s.unit || ''
+        })));
+        setVisiblePreviewColumns(['الرقم الوظيفي', 'الاسم', 'العنوان الوظيفي', 'الوحدة']);
+        setPreviewTitle(title);
+        setShowPreview(true);
+    };
     // مناوبون حاليون بلا تاريخ نهاية: يُوضع لهم تاريخ موحّد دفعة واحدة، ومن لم يُجدَّد له يعود صباحياً
     const openEndedShiftCount = staff.filter(s => hasOpenEndedShift(s, todayStr)).length;
     const setOpenEndedShiftEnd = () => {
@@ -984,6 +999,8 @@ export const UnitsScreen = ({ ctx }) => {
                             <span className="flex gap-2">
                                 <button onClick={() => setNominateModal({ mode: 'edit', start: c.start, until: c.until })}
                                     className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">✏️ تعديل التاريخين</button>
+                                <button onClick={() => openNomineesPreview(c.ids, `كشف المرشحين للمناوبة من ${c.start} إلى ${c.until || '—'} ل${org.section}`)}
+                                    className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">🖨️ طباعة المرشحين</button>
                                 <button onClick={() => cancelNominationCycle(c.start, c.until)}
                                     className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">🗑️ إلغاء الجميع</button>
                             </span>
@@ -1042,6 +1059,13 @@ export const UnitsScreen = ({ ctx }) => {
                         ) : (
                             <button onClick={() => setNominateModal({ mode: 'period' })}
                                 className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer shadow-sm">🎯 ترشيح المناوبين</button>
+                        )}
+                        {(nominatePeriod || nominateBasket.length > 0) && (
+                            <button onClick={() => openNomineesPreview(nominateBasket, `كشف المرشحين للمناوبة من ${nominatePeriod ? nominatePeriod.start : '—'} إلى ${nominatePeriod ? nominatePeriod.until : '—'} ل${org.section}`)}
+                                disabled={nominateBasket.length === 0}
+                                className="bg-white text-teal-700 hover:bg-teal-50 px-4 py-2 font-bold rounded-lg text-xs transition shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                👁️ معاينة وتصدير المرشحين
+                            </button>
                         )}
                         {overtimeIds.length > 0 && (<>
                         <button
