@@ -979,7 +979,10 @@ export const UnitsScreen = ({ ctx }) => {
                                 <span className="flex gap-2">
                                     <button onClick={() => setNominateModal({ mode: 'new' })} disabled={nominateBasket.length === 0}
                                         className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">✓ مراجعة وحفظ</button>
-                                    <button onClick={() => { setNominateBasket([]); setNominatePeriod(null); }}
+                                    <button onClick={() => {
+                                        if (nominateBasket.length > 0 && !confirm('إلغاء الترشيح؟ ستُمسح اختياراتك (' + nominateBasket.length + ') ولن يُحفظ شيء.')) return;
+                                        setNominateBasket([]); setNominatePeriod(null);
+                                    }}
                                         className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">✕ إلغاء الترشيح</button>
                                 </span>
                             </div>
