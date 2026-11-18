@@ -119,6 +119,9 @@ export const setShiftEnd = (emp: Employee, today: string, endDate: string): Empl
   const pts = sortPoints(baseHistory(emp)).map(p => ({ ...p }));
   const i = currentPointIndex(pts, today);
   pts[i].until = endDate;
+  // نقطة مناوبة لاحقة مفتوحة تبدأ قبل النهاية (كتغيير وجبة مجدول من «اعتباراً من») تُقطع بالنهاية نفسها،
+  // وإلا بقي صاحبها مناوباً بعد التاريخ. وما يبدأ بعد النهاية (تجديد) يُترك.
+  pts.forEach((p, j) => { if (j > i && p.workType === 'مناوب' && !p.until && p.from <= endDate) p.until = endDate; });
   return withHistory(emp, pts);
 };
 
