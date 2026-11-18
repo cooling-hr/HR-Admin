@@ -98,6 +98,30 @@ export const nominate = (emp: Employee, p: { start: string; until: string; shift
   }));
 };
 
+// النقطة السارية اليوم: آخر نقطة from <= today (دون النظر إلى until)
+const currentPointIndex = (pts: WorkPoint[], today: string): number => {
+  let idx = -1;
+  pts.forEach((p, i) => { if (p.from <= today) idx = i; });
+  return idx;
+};
+
+// مناوب اليوم ونقطته السارية بلا تاريخ نهاية (أُدخل قبل ميزة الترشيح)
+export const hasOpenEndedShift = (emp: Employee, today: string): boolean => {
+  if (workOn(emp, today).workType !== 'مناوب') return false;
+  const pts = sortPoints(baseHistory(emp));
+  const i = currentPointIndex(pts, today);
+  return i >= 0 && !pts[i].until;
+};
+
+// وضع تاريخ نهاية على نقطة المناوبة السارية المفتوحة وحدها؛ المرجع نفسه إن لم تكن مفتوحة
+export const setShiftEnd = (emp: Employee, today: string, endDate: string): Employee => {
+  if (!hasOpenEndedShift(emp, today)) return emp;
+  const pts = sortPoints(baseHistory(emp)).map(p => ({ ...p }));
+  const i = currentPointIndex(pts, today);
+  pts[i].until = endDate;
+  return withHistory(emp, pts);
+};
+
 // إلغاء ترشيح لم تُحدَّد وجبته: يحذف نقطة from===start وحدها إن كانت squad فارغة
 export const cancelNomination = (emp: Employee, start: string): Employee => {
   const pts = emp.workHistory;
