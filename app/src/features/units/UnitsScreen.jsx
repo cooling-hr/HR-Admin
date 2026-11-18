@@ -313,7 +313,7 @@ export const UnitsScreen = ({ ctx }) => {
                             </div>
                             
                             {/* مطابقة الوجبات: مطويّة افتراضياً في سطر واحد بالحبوب الثلاث، وزر التعديل يفتح الصفّين A–D */}
-                            <div className="md:col-span-12 bg-white border border-slate-150 p-4 rounded-xl shadow-sm space-y-3">
+                            <div className="md:col-span-12 bg-white border border-slate-200 p-4 rounded-xl shadow-sm space-y-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="text-xs font-black text-slate-800">⚙️ الوجبات العاملة لتاريخ الموقف:</span>
@@ -351,7 +351,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                     >
                                                         <span className="text-[11px] font-black">الوجبة {sq}</span>
                                                         {isCurrentActive ? (
-                                                            <span className="text-[9px] bg-purple-700/70 px-1 py-0.2 rounded mt-0.5 block font-bold">🕒 مستلمة (24س)</span>
+                                                            <span className="text-[9px] bg-purple-700/70 px-1 py-0 rounded mt-0.5 block font-bold">🕒 مستلمة (24س)</span>
                                                         ) : (
                                                             <span className="text-[9px] text-slate-400 mt-0.5 block">🏖️ استراحة</span>
                                                         )}
@@ -373,10 +373,10 @@ export const UnitsScreen = ({ ctx }) => {
 
                                                 if (isMorning) {
                                                     btnStyle = 'bg-amber-500 border-amber-500 text-white shadow-sm font-black';
-                                                    badge = <span className="text-[9px] bg-amber-600/70 px-1 py-0.2 rounded mt-0.5 block font-bold">☀️ صباحي (12س)</span>;
+                                                    badge = <span className="text-[9px] bg-amber-600/70 px-1 py-0 rounded mt-0.5 block font-bold">☀️ صباحي (12س)</span>;
                                                 } else if (isNight) {
                                                     btnStyle = 'bg-indigo-700 border-indigo-700 text-white shadow-sm font-black';
-                                                    badge = <span className="text-[9px] bg-indigo-800/70 px-1 py-0.2 rounded mt-0.5 block font-bold">🌙 مسائي (12س)</span>;
+                                                    badge = <span className="text-[9px] bg-indigo-800/70 px-1 py-0 rounded mt-0.5 block font-bold">🌙 مسائي (12س)</span>;
                                                 }
 
                                                 return (
@@ -1034,6 +1034,11 @@ export const UnitsScreen = ({ ctx }) => {
                                     <button onClick={() => { setNominateBasket([]); setNominatePeriod({ start: c.start, until: c.until }); }}
                                         className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition cursor-pointer">➕ ترشيح آخرين لهذه الفترة</button>
                                 )}
+                                {/* دورة لا يعرضها تنبيه «توزيع وقرارات» (أبعد من أسبوع): زر لفتح نافذة التوزيع مبكراً */}
+                                {!pendingNomCycles.some(p => p.start === c.start && p.until === c.until) && (
+                                    <button onClick={() => setShiftAssignmentKey(c.start + '|' + c.until)}
+                                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition cursor-pointer">🧩 توزيع الوجبات الآن</button>
+                                )}
                                 <button onClick={() => setNominateModal({ mode: 'edit', start: c.start, until: c.until })}
                                     className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">✏️ تعديل التاريخين</button>
                                 <button onClick={() => cancelNominationCycle(c.start, c.until)}
@@ -1355,7 +1360,7 @@ export const UnitsScreen = ({ ctx }) => {
                                                                     {s.name}
                                                                 </button>
                                                                 {missingFields.length > 0 && (
-                                                                    <span className="text-[10px] text-red-600 font-bold self-start bg-red-50 border border-red-100 px-1 py-0.2 rounded-md">
+                                                                    <span className="text-[10px] text-red-600 font-bold self-start bg-red-50 border border-red-100 px-1 py-0 rounded-md">
                                                                         ⚠️ نواقص: {missingFields.join('، ')}
                                                                     </span>
                                                                 )}

@@ -125,6 +125,8 @@ import { buildDatePicker } from '../ui/datePicker';
             }, [staff, todayStr]);
             // دورات الترشيح التي اقتربت أو بدأت ولم تُوزَّع وجباتها (من السجل الخام): تنبيه تبويب الوحدات
             const pendingNomCycles = useMemo(() => pendingNominations(staff, todayStr), [staff, todayStr]);
+            // كل الدورات المعلّقة مهما بعد بدؤها: لفتح نافذة التوزيع قبل تنبيه الأسبوع
+            const allNomCycles = useMemo(() => pendingNominations(staff, todayStr, 3650), [staff, todayStr]);
             const [shiftAssignmentKey, setShiftAssignmentKey] = useState(null);
             const [view, setView] = useState('dashboard');
 
@@ -5440,7 +5442,7 @@ return (
 
             {waterMemoGroup && <WaterMemoModal ctx={{ org, BOC_LOGO_DATA_URI, amountToArabicWords, getWaterGroupSummary, setWaterMemoGroup, waterMemoGroup, waterMonth }} />}
 
-            {shiftAssignmentKey && <ShiftAssignmentModal ctx={{ shiftAssignmentKey, setShiftAssignmentKey, pendingNomCycles, applyShiftAssignments, org }} />}
+            {shiftAssignmentKey && <ShiftAssignmentModal ctx={{ shiftAssignmentKey, setShiftAssignmentKey, pendingNomCycles: allNomCycles,applyShiftAssignments, org }} />}
 
             {nominateModal && <NominateShiftModal ctx={{ nominateModal, setNominateModal, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, staff: staffToday, nominationCycles, nominateEmployees, editNominationCycle, org }} />}
             {shiftEndOpen && <ShiftEndModal ctx={{ staff: staffToday, todayStr, setCurrentShiftEnd, setShiftEndOpen }} />}

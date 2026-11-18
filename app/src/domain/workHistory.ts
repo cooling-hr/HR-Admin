@@ -173,7 +173,7 @@ export const setWorkFrom = (
 export interface NominationCycle { start: string; until: string; nominees: Employee[]; outgoing: Employee[] }
 
 // الدورات المرشَّحة التي اقتربت (أو بدأت) ولم تُوزَّع وجباتها كلها، الأقدم أولاً
-export const pendingNominations = (staff: Employee[], today: string): NominationCycle[] => {
+export const pendingNominations = (staff: Employee[], today: string, alertDays: number = NOMINATION_ALERT_DAYS): NominationCycle[] => {
   const groups = new Map<string, NominationCycle>();
   for (const emp of staff) {
     for (const p of emp.workHistory || []) {
@@ -188,7 +188,7 @@ export const pendingNominations = (staff: Employee[], today: string): Nomination
       g.nominees.push(emp);
     }
   }
-  const limit = addDays(today, NOMINATION_ALERT_DAYS);
+  const limit = addDays(today, alertDays);
   const out: NominationCycle[] = [];
   for (const g of groups.values()) {
     if (g.start > limit) continue;
