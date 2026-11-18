@@ -1219,6 +1219,54 @@ const pendingPushRef = React.useRef(false);
 // أصلاً، فتُفقَد البيانات المحفوظة للتو صمتاً (وليس فقط UID المستخدم — أي حفظة بحزمة
 // صريحة تتزامن مع دفعة أخرى قيد التنفيذ).
 const pendingBundleRef = React.useRef(null);
+// يوجد تعديل محلي لم يصل السحابة بعد: يمنع الاستطلاع من تطبيق لقطة الخادم فوقه ومن إخفاء علامة الفشل
+const unsavedPushRef = React.useRef(false);
+// مؤقت إعادة المحاولة التلقائية بعد فشل الحفظ، وعدّاد المحاولات المتتالية
+const pushRetryTimerRef = React.useRef(null);
+const pushRetryAttemptRef = React.useRef(0);
+// آخر نسخة من pushDataToCloud (إغلاق حديث) ليقرأها المؤقت الطويل بدل إغلاق قديم
+const pushDataToCloudRef = React.useRef(null);
+// تأخيرات إعادة المحاولة بالملّي ثانية؛ بعد الثالثة يبقى التأخير 60 ثانية
+const PUSH_RETRY_DELAYS_MS = [10000, 30000, 60000];
+// أخطاء الخادم العابرة (تستحق إعادة المحاولة) مقابل الدائمة كرفض الصلاحيات
+const isTransientStatus = (s) => s >= 500 || s === 408 || s === 429;
+// فشل الحفظ: يُبقي علامة «غير محفوظ»، ويعرض الخطأ، ويجدول إعادة المحاولة إن طُلب
+const failPush = (error, { retry = false, connected = false } = {}) => {
+    unsavedPushRef.current = true;
+    setCloudSyncStatus(prev => ({ ...prev, connected, syncing: false, error }));
+    if (pushRetryTimerRef.current) {
+        clearTimeout(pushRetryTimerRef.current);
+        pushRetryTimerRef.current = null;
+    }
+    if (retry) {
+        const delay = PUSH_RETRY_DELAYS_MS[Math.min(pushRetryAttemptRef.current, PUSH_RETRY_DELAYS_MS.length - 1)];
+        pushRetryAttemptRef.current += 1;
+        pushRetryTimerRef.current = setTimeout(() => {
+            pushRetryTimerRef.current = null;
+            pushDataToCloudRef.current && pushDataToCloudRef.current(null, { auto: true });
+        }, delay);
+    }
+};
+// نجح الحفظ (أو لا شيء يُحفظ): تُمسح العلامة والعدّاد والمؤقت
+const markPushSaved = () => {
+    unsavedPushRef.current = false;
+    pushRetryAttemptRef.current = 0;
+    if (pushRetryTimerRef.current) {
+        clearTimeout(pushRetryTimerRef.current);
+        pushRetryTimerRef.current = null;
+    }
+};
+// تحذير المتصفح قبل إغلاق الصفحة أو إعادة تحميلها وفيها تعديل لم يُحفظ في السحابة
+React.useEffect(() => {
+    const onBeforeUnload = (e) => {
+        if (unsavedPushRef.current) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+}, []);
 // بصمة آخر حمولة نعلم أنها على الخادم — تمنع إعادة بثّ ما استقبلناه للتو
 const lastSyncedSignatureRef = React.useRef(null);
 const CLOUD_SIGNATURE_KEYS = ['staffData', 'systemUsersList', 'officialHolidaysList', 'hourlyLeaveRecords', 'hourlyLeaveTimings', 'timeFormCodeEdits', 'mealAuthorizations', 'overtimeHoursRecords', 'dailyStatusOverrides', 'shiftAnchorDate', 'threeShiftAnchorSquad', 'twoShiftAnchorSquad', 'overtimeSelectedIds', 'pendingDeletionRequest'];
@@ -1251,6 +1299,8 @@ const fetchCloudData = async () => {
         if (res.ok) {
             const cloudData = await res.json();
             if (cloudData && typeof cloudData === 'object') {
+                // لقطة الخادم الأحدث حُجبت لأن عندنا تعديلاً محلياً لم يُحفظ
+                let heldBack = false;
                 if (cloudData.lastCloudUpdate) {
                     const cloudTime = new Date(cloudData.lastCloudUpdate).getTime();
                     const localTime = lastCloudTimeRef.current ? new Date(lastCloudTimeRef.current).getTime() : 0;
@@ -1273,6 +1323,10 @@ const fetchCloudData = async () => {
                         // وتطبيقه يعيد كتابة كل الحالة فوق ما على الشاشة. الاستطلاع التالي يجد الختم متطابقاً
                         if (isPushingRef.current) {
                             // لا شيء يُطبَّق الآن
+                        } else if (unsavedPushRef.current) {
+                            // عندنا تعديل محلي لم يصل السحابة: تطبيق اللقطة الآن يمحوه صمتاً.
+                            // لا نطبّقها ولا نقدّم lastCloudTimeRef، ويُنبَّه المستخدم أدناه
+                            heldBack = true;
                         } else if (cloudData.staffData && Array.isArray(cloudData.staffData) && cloudData.staffData.length > 0) {
                             try {
                                 applyDataBundleToState(cloudData);
@@ -1283,7 +1337,12 @@ const fetchCloudData = async () => {
                         }
                     }
                 }
-                setCloudSyncStatus({ connected: true, syncing: false, lastSync: syncClockLabel(), error: null });
+                if (unsavedPushRef.current) {
+                    // تعديل غير محفوظ: لا نمسح علامة الفشل القائمة (ونضع تنبيه التعارض إن حُجبت لقطة)
+                    setCloudSyncStatus(prev => ({ ...prev, syncing: false, error: heldBack ? 'حفظ مستخدم آخر تعديلات بينما تعديلاتك على هذا الجهاز لم تُحفظ بعد. صدّر نسخة احتياطية (JSON) قبل إعادة تحميل الصفحة، فإعادة التحميل تُسقط ما لم يُحفظ.' : prev.error }));
+                } else {
+                    setCloudSyncStatus({ connected: true, syncing: false, lastSync: syncClockLabel(), error: null });
+                }
             }
         } else {
             setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false }));
@@ -1329,7 +1388,7 @@ const buildCloudBundleRef = React.useRef(null);
 React.useLayoutEffect(() => { buildCloudBundleRef.current = buildCloudBundle; });
 
 // بث التعديلات مباشرة إلى السحابة الحية لتنعكس لدى الجميع في نفس اللحظة
-const pushDataToCloud = async (bundle = null) => {
+const pushDataToCloud = async (bundle = null, opts = {}) => {
     // 1. حظر تام وقاطع لأي مزامنة سحابية إذا كان الملف يعمل كـ أوفلاين محلي (file://) أو تم إلغاء رابط السحابة
     if (window.location.protocol === 'file:' || !FIREBASE_DB_URL) {
         return;
@@ -1353,6 +1412,11 @@ const pushDataToCloud = async (bundle = null) => {
         pendingBundleRef.current = bundle;
         return;
     }
+    // دفعة جديدة تحلّ محل أي إعادة محاولة مجدولة
+    if (pushRetryTimerRef.current) {
+        clearTimeout(pushRetryTimerRef.current);
+        pushRetryTimerRef.current = null;
+    }
     isPushingRef.current = true;
     try {
         const nowIso = (bundle && bundle.lastCloudUpdate) ? bundle.lastCloudUpdate : new Date().toISOString();
@@ -1368,6 +1432,8 @@ const pushDataToCloud = async (bundle = null) => {
         // أرشيفية لكل جهاز متصل عن كل حفظة واحدة.
         const payloadSignature = cloudPayloadSignature(dataPayload);
         if (!bundle && payloadSignature !== null && payloadSignature === lastSyncedSignatureRef.current) {
+            // لا شيء غير محفوظ: الحمولة مطابقة لما على الخادم
+            markPushSaved();
             setCloudSyncStatus(prev => ({ ...prev, syncing: false }));
             return;
         }
@@ -1377,17 +1443,20 @@ const pushDataToCloud = async (bundle = null) => {
         try {
             const stampRes = await cloudFetch(FIREBASE_DB_URL.replace('.json', '/lastCloudUpdate.json') + '?t=' + Date.now());
             if (!stampRes.ok) {
-                setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: `تعذّر التحقق من حالة السحابة قبل الحفظ (رمز ${stampRes.status}). لم يصل آخر تعديل — أعد المحاولة.` });
+                const willRetry = isTransientStatus(stampRes.status);
+                failPush(`تعذّر التحقق من حالة السحابة قبل الحفظ (رمز ${stampRes.status}). ` + (willRetry ? 'تعديلك محفوظ على هذا الجهاز وسيُعاد الحفظ تلقائياً.' : 'تعديلك محفوظ على هذا الجهاز فقط.'), { retry: willRetry });
                 return;
             }
             const serverStamp = await stampRes.json();
             if (serverStamp && knownServerUpdateRef.current && serverStamp > knownServerUpdateRef.current) {
-                setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false, error: 'حفظ مستخدم آخر تعديلات بعد آخر تحديث لديك. أعد تحميل الصفحة قبل الحفظ.' }));
-                alert('⚠️ حفظ مستخدم آخر تعديلات بعد آخر تحديث وصل إلى جهازك.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
+                failPush('حفظ مستخدم آخر تعديلات بعد آخر تحديث لديك، وتعديلاتك على هذا الجهاز لم تُحفظ. صدّر نسخة احتياطية (JSON) من «النسخ الاحتياطي» قبل إعادة تحميل الصفحة، فإعادة التحميل تُسقط ما لم يُحفظ.', { retry: false, connected: true });
+                if (!opts.auto) {
+                    alert('⚠️ حفظ مستخدم آخر تعديلات بعد آخر تحديث وصل إلى جهازك.\n\nلو حفظت الآن ستمحو عمله.\n\nصدّر نسخة احتياطية (JSON) أولاً من «النسخ الاحتياطي»، ثم أعد تحميل الصفحة (Ctrl+F5) وأعد إدخال تعديلك.');
+                }
                 return;
             }
         } catch (e) {
-            setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الاتصال بالسحابة قبل الحفظ. لم يصل آخر تعديل — أعد المحاولة عند عودة الاتصال.' });
+            failPush('تعذّر الاتصال بالسحابة. تعديلك محفوظ على هذا الجهاز وسيُعاد الحفظ تلقائياً.', { retry: true });
             return;
         }
 
@@ -1418,7 +1487,7 @@ const pushDataToCloud = async (bundle = null) => {
                     : '[حارس الحفظ] لا إيتاغ من الخادم (المتصفح يحجبه أو الخادم لا يُرسله) — يُستأنف الفحص وحده بلا حماية ذرّية.');
             }
         } catch (e) {
-            setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الاتصال بالسحابة أثناء المطالبة بالحفظ. لم يصل آخر تعديل — أعد المحاولة عند عودة الاتصال.' });
+            failPush('تعذّر الاتصال بالسحابة. تعديلك محفوظ على هذا الجهاز وسيُعاد الحفظ تلقائياً.', { retry: true });
             return;
         }
 
@@ -1433,16 +1502,19 @@ const pushDataToCloud = async (bundle = null) => {
                     body: JSON.stringify(nowIso)
                 });
                 if (claimRes.status === 412) {
-                    setCloudSyncStatus(prev => ({ ...prev, connected: true, syncing: false, error: 'حفظ مستخدم آخر تعديلات في اللحظة نفسها. أعد تحميل الصفحة قبل الحفظ.' }));
-                    alert('⚠️ حفظ مستخدم آخر تعديلات في اللحظة نفسها بالضبط.\n\nلو حفظت الآن ستمحو عمله.\n\nأعد تحميل الصفحة (Ctrl+F5) ثم أعد إدخال تعديلك.');
+                    failPush('حفظ مستخدم آخر تعديلات في اللحظة نفسها، وتعديلاتك على هذا الجهاز لم تُحفظ. صدّر نسخة احتياطية (JSON) من «النسخ الاحتياطي» قبل إعادة تحميل الصفحة، فإعادة التحميل تُسقط ما لم يُحفظ.', { retry: false, connected: true });
+                    if (!opts.auto) {
+                        alert('⚠️ حفظ مستخدم آخر تعديلات في اللحظة نفسها بالضبط.\n\nلو حفظت الآن ستمحو عمله.\n\nصدّر نسخة احتياطية (JSON) أولاً من «النسخ الاحتياطي»، ثم أعد تحميل الصفحة (Ctrl+F5) وأعد إدخال تعديلك.');
+                    }
                     return;
                 }
                 if (!claimRes.ok) {
-                    setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: `تعذّرت المطالبة بختم السحابة (رمز ${claimRes.status}). لم يصل آخر تعديل — أعد المحاولة.` });
+                    const willRetry = isTransientStatus(claimRes.status);
+                    failPush(`تعذّرت المطالبة بختم السحابة (رمز ${claimRes.status}). ` + (willRetry ? 'تعديلك محفوظ على هذا الجهاز وسيُعاد الحفظ تلقائياً.' : 'تعديلك محفوظ على هذا الجهاز فقط.'), { retry: willRetry });
                     return;
                 }
             } catch (e) {
-                setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الاتصال بالسحابة أثناء المطالبة بالحفظ. لم يصل آخر تعديل — أعد المحاولة عند عودة الاتصال.' });
+                failPush('تعذّر الاتصال بالسحابة. تعديلك محفوظ على هذا الجهاز وسيُعاد الحفظ تلقائياً.', { retry: true });
                 return;
             }
         }
@@ -1459,6 +1531,7 @@ const pushDataToCloud = async (bundle = null) => {
             lastCloudTimeRef.current = nowIso;
             knownServerUpdateRef.current = nowIso;
             lastSyncedSignatureRef.current = payloadSignature;
+            markPushSaved();
             setCloudSyncStatus({ connected: true, syncing: false, lastSync: syncClockLabel(), error: null });
             logAuditEvent('save_system_bundle', currentUserName);
 
@@ -1500,11 +1573,12 @@ const pushDataToCloud = async (bundle = null) => {
             setShowLoginModal(true);
             alert('⛔ انتهت صلاحية جلستك ولم يصل آخر حفظ إلى السحابة.\n\nسجّل الدخول من جديد ثم أعد التعديل.');
         } else {
-            setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: `لم يصل آخر حفظ إلى السحابة (رمز ${res.status}). تعديلاتك محفوظة على هذا الجهاز فقط.` });
+            const willRetry = isTransientStatus(res.status);
+            failPush(`لم يصل آخر حفظ إلى السحابة (رمز ${res.status}). تعديلاتك محفوظة على هذا الجهاز ` + (willRetry ? 'وسيُعاد الحفظ تلقائياً.' : 'فقط.'), { retry: willRetry });
         }
     } catch (err) {
         console.warn("Could not push to Firebase Cloud:", err);
-        setCloudSyncStatus({ connected: false, syncing: false, lastSync: null, error: 'تعذّر الوصول إلى السحابة. تعديلاتك محفوظة على هذا الجهاز فقط وستُرفع عند عودة الاتصال.' });
+        failPush('تعذّر الوصول إلى السحابة. تعديلاتك محفوظة على هذا الجهاز وسيُعاد الحفظ تلقائياً.', { retry: true });
     } finally {
         isPushingRef.current = false;
         if (pendingPushRef.current) {
@@ -1515,6 +1589,9 @@ const pushDataToCloud = async (bundle = null) => {
         }
     }
 };
+
+// إغلاق حديث لـpushDataToCloud يقرأه مؤقت إعادة المحاولة (لا إغلاق قديم)
+React.useLayoutEffect(() => { pushDataToCloudRef.current = pushDataToCloud; });
 
 // جلب قائمة اللقطات والنسخ الاحتياطية السحابية والمحلية المتاحة (Time-Machine Snapshots Fetcher)
 const fetchAvailableSnapshots = async () => {
