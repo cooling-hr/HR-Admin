@@ -140,8 +140,10 @@ export const PreviewModal = ({ ctx }) => {
                                                 return (
                                                     <td key={i} 
                                                         rowSpan={isFirstInLocation && key === 'مبررات التشغيل' ? row.locationSize : 1}
-                                                        className={isFirstInLocation && key === 'مبررات التشغيل' ? 'merged-cell vertical-text' : ''}>
-                                                        {key === 'ت' ? (
+                                                        className={isFirstInLocation && key === 'مبررات التشغيل' ? 'merged-cell justification-cell' : ''}>
+                                                        {key === 'مبررات التشغيل' ? (
+                                                            value || ''
+                                                        ) : key === 'ت' ? (
                                                             <span className="font-bold text-gray-700">{value}</span>
                                                         ) : (
                                                             <input type="text" value={value || ''}
