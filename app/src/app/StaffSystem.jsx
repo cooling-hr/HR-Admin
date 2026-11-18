@@ -5442,7 +5442,7 @@ return (
 
             {waterMemoGroup && <WaterMemoModal ctx={{ org, BOC_LOGO_DATA_URI, amountToArabicWords, getWaterGroupSummary, setWaterMemoGroup, waterMemoGroup, waterMonth }} />}
 
-            {shiftAssignmentKey && <ShiftAssignmentModal ctx={{ shiftAssignmentKey, setShiftAssignmentKey, pendingNomCycles: allNomCycles,applyShiftAssignments, org }} />}
+            {shiftAssignmentKey && <ShiftAssignmentModal ctx={{ shiftAssignmentKey, setShiftAssignmentKey, pendingNomCycles: allNomCycles, applyShiftAssignments, org }} />}
 
             {nominateModal && <NominateShiftModal ctx={{ nominateModal, setNominateModal, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, staff: staffToday, nominationCycles, nominateEmployees, editNominationCycle, org }} />}
             {shiftEndOpen && <ShiftEndModal ctx={{ staff: staffToday, todayStr, setCurrentShiftEnd, setShiftEndOpen }} />}
