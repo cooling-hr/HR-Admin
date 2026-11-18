@@ -392,7 +392,7 @@ export const EditEmployeeModal = ({ ctx }) => {
                                                     <>
                                                         <img src={editingEmployee.photo} className="w-full h-full object-cover" alt="معاينة" />
                                                         <button onClick={() => updateEditField('photo', '')} 
-                                                            className="absolute inset-0 bg-red-600 bg-opacity-70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-bold text-sm">
+                                                            className="absolute inset-0 bg-red-600 bg-opacity-70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity font-bold text-sm">
                                                             🗑️ إزالة الصورة
                                                         </button>
                                                     </>
@@ -427,6 +427,7 @@ export const EditEmployeeModal = ({ ctx }) => {
                                                                     };
                                                                     reader.readAsDataURL(file);
                                                                 }
+                                                                e.target.value = ''; // ليعمل اختيار الصورة نفسها بعد إزالتها
                                                             }} />
                                                     </label>
                                                     <button onClick={startCamera}
@@ -436,7 +437,7 @@ export const EditEmployeeModal = ({ ctx }) => {
                                                 </div>
                                             ) : (
                                                 <div className="w-full bg-black rounded-lg p-2 flex flex-col items-center">
-                                                    <video ref={videoRef} className="w-48 h-48 object-cover rounded bg-slate-900 mb-2 border border-slate-700" playinline="true" muted></video>
+                                                    <video ref={videoRef} className="w-48 h-48 object-cover rounded bg-slate-900 mb-2 border border-slate-700" playsInline muted></video>
                                                     <div className="flex gap-2 w-full">
                                                         <button onClick={capturePhoto}
                                                             className="flex-1 py-1.5 px-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded text-xs transition">
@@ -462,20 +463,21 @@ export const EditEmployeeModal = ({ ctx }) => {
                                                 <input type="file" multiple accept="image/*,.pdf" className="hidden"
                                                     onChange={(e) => {
                                                         const files = Array.from(e.target.files);
-                                                        files.forEach(file => {
+                                                        // تُقرأ كل الملفات ثم يُحدَّث الحقل مرة واحدة: القراءة غير متزامنة، وكل ملف كان يقرأ
+                                                        // قائمة الوثائق القديمة فيمحو الأخير ما سبقه في الدفعة نفسها
+                                                        Promise.all(files.map(file => new Promise(resolve => {
                                                             const reader = new FileReader();
-                                                            reader.onload = (event) => {
-                                                                const base64Data = event.target.result;
-                                                                const newDoc = {
-                                                                    id: Date.now() + Math.random(),
-                                                                    name: file.name,
-                                                                    type: file.type,
-                                                                    data: base64Data
-                                                                };
-                                                                const docs = editingEmployee.documents || [];
-                                                                updateEditField('documents', [...docs, newDoc]);
-                                                            };
+                                                            reader.onload = (event) => resolve({
+                                                                id: Date.now() + Math.random(),
+                                                                name: file.name,
+                                                                type: file.type,
+                                                                data: event.target.result
+                                                            });
+                                                            reader.onerror = () => resolve(null);
                                                             reader.readAsDataURL(file);
+                                                        }))).then(newDocs => {
+                                                            const added = newDocs.filter(Boolean);
+                                                            if (added.length) updateEditField('documents', [...(editingEmployee.documents || []), ...added]);
                                                         });
                                                         e.target.value = ''; // تفريغ المدخل
                                                     }} />
