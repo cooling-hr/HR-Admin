@@ -4387,6 +4387,11 @@ import { buildDatePicker } from '../ui/datePicker';
                     alert('⛔ عذراً، ليس لديك صلاحية تعديل بيانات الملاك العام والمنتسبين!');
                     return false;
                 }
+                // setWorkFrom يُرجع كائناً جديداً دائماً، فلا يكشف فحص «لم يتغير» أدناه حفظاً بلا تغيير
+                if (newStart === oldStart && newUntil === oldUntil) {
+                    alert('⚠️ لم يتغير شيء.');
+                    return false;
+                }
                 const now = new Date().toISOString();
                 let moved = 0;
                 const updated = staff.map(s => {
@@ -5320,6 +5325,8 @@ import { buildDatePicker } from '../ui/datePicker';
             useEscapeClose(showPrintForm, () => setShowPrintForm(false));
             useEscapeClose(!!waterMemoGroup, () => setWaterMemoGroup(null));
             useEscapeClose(showSquadSchedule, () => setShowSquadSchedule(false));
+            useEscapeClose(!!shiftAssignmentKey, () => setShiftAssignmentKey(null));
+            useEscapeClose(!!nominateModal, () => setNominateModal(null));
 
 
 return (

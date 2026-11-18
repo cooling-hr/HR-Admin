@@ -92,7 +92,7 @@ export const ShiftAssignmentModal = ({ ctx }) => {
                         return (
                             <div key={unit || '—'} className="border border-slate-200 rounded-2xl p-3 space-y-3">
                                 <div className="text-sm font-black text-indigo-900">{unit || 'بلا وحدة'}</div>
-                                <div className="space-y-2">
+                                {noms.length > 0 && <div className="space-y-2">
                                     <p className="text-xs font-black text-slate-700">المرشحون ({noms.length}):</p>
                                     {noms.map(e => (
                                         <div key={e.id} className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2">
@@ -100,7 +100,7 @@ export const ShiftAssignmentModal = ({ ctx }) => {
                                             {squadSelect(squads[e.id] || '', (v) => setSquads({ ...squads, [e.id]: v }))}
                                         </div>
                                     ))}
-                                </div>
+                                </div>}
                                 {outs.length > 0 && (
                                     <div className="space-y-2">
                                         <p className="text-xs font-black text-slate-700">المناوبون الحاليون ({outs.length}):</p>
