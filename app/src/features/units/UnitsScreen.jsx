@@ -7,7 +7,7 @@ import { getMissingFields } from '../../domain/employees';
 import { isLongOrMaternityLeave } from '../../domain/periods';
 import { resolveCodeTable } from '../../domain/timeForm';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
-import { hasOpenEndedShift } from '../../domain/workHistory';
+import { hasOpenEndedShift, workOn } from '../../domain/workHistory';
 import { unitNames } from '../../domain/org';
 import { PendingNominationAlert } from '../shifts/ShiftAssignmentModal';
 
@@ -620,6 +620,8 @@ export const UnitsScreen = ({ ctx }) => {
                                                     const status = getEmployeeDailyStatus(emp, dailyReportDate);
                                                     const isOverride = dailyStatusOverrides[dailyReportDate] && dailyStatusOverrides[dailyReportDate][emp.id];
                                                     const missingFields = getMissingFields(emp);
+                                                    // طبيعة العمل بتاريخ الموقف لا بتاريخ اليوم (emp هنا من staffToday)
+                                                    const dayWork = workOn(emp, dailyReportDate).workType;
                                                     
                                                     let statusBadgeColor = 'bg-slate-100 text-slate-700 border-slate-200';
                                                     if (status === 'دوام صباحي') statusBadgeColor = 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100';
@@ -655,9 +657,9 @@ export const UnitsScreen = ({ ctx }) => {
                                                             </td>
                                                             <td className="px-4 py-3.5 text-center font-bold text-slate-600 w-1/4">
                                                                 <span className={`inline-block px-4 py-1.5 rounded-xl text-xs md:text-sm font-black ${
-                                                                    emp.workType === 'مناوب' ? 'bg-purple-50 text-purple-700 border border-purple-200 shadow-sm' : 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
+                                                                    dayWork === 'مناوب' ? 'bg-purple-50 text-purple-700 border border-purple-200 shadow-sm' : 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
                                                                 }`}>
-                                                                    {emp.workType}
+                                                                    {dayWork}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-3.5 text-center w-1/3">
