@@ -124,7 +124,8 @@ export const PreviewModal = ({ ctx }) => {
                                         </tr>
                                     );
                                 }
-                                const isFirstInLocation = row.isFirst && view === 'shift';
+                                // أول صف في مجموعة وحدة (قائمة المناوبين أو كشف المرشحين من الوحدات): خلية المبررات تُدمج على صفوفها
+                                const isFirstInLocation = row.isFirst && (view === 'shift' || row.locationSize > 0);
 
                                 return (
                                     <tr key={idx} className={needsPageBreak ? 'print-page-break' : ''}>

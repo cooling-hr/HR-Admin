@@ -8,7 +8,7 @@ import { isLongOrMaternityLeave } from '../../domain/periods';
 import { resolveCodeTable } from '../../domain/timeForm';
 import { sortByJobTitleHierarchy } from '../../domain/sorting';
 import { hasOpenEndedShift, workOn } from '../../domain/workHistory';
-import { unitNames } from '../../domain/org';
+import { unitJustification, unitNames } from '../../domain/org';
 import { PendingNominationAlert } from '../shifts/ShiftAssignmentModal';
 
 // خيارات قائمة الموقف اليومي مرتّبة بتكرارها كما ذكرها أسامة (2026-10-20). كل الحالات المؤرَّخة (الدورة
@@ -85,7 +85,7 @@ const ShiftPills = ({ shifts }) => (<>
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { setShiftEndOpen, pendingNomCycles, setShiftAssignmentKey, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle } = ctx;
+    const { setShiftEndOpen, pendingNomCycles, setShiftAssignmentKey, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle, groupShiftByUnit } = ctx;
     // الرموز المضافة من دليل الرموز (والرسمية المفعَّلة) خيارات في مجموعة «رموز أخرى»، تُحسب مرة واحدة لكل الموظفين
     const extraStatusOptions = Object.values(resolveCodeTable(timeFormCodeEdits).extraByMeaning).map(c => ({ value: c.meaning, label: '🔤 ' + c.meaning + ' (' + c.letter + ')', className: 'bg-white text-slate-700 font-bold' }));
     const statusGroups = [...DAILY_STATUS_GROUPS, ...(extraStatusOptions.length ? [{ label: 'رموز أخرى', options: extraStatusOptions }] : [])];
@@ -174,18 +174,28 @@ export const UnitsScreen = ({ ctx }) => {
             </button>
         );
     };
-    // معاينة وطباعة كشف المرشحين للمناوبة بالأعمدة نفسها المستعملة في كشف الإضافي (من السلة أو من دورة محفوظة)
+    // معاينة وطباعة كشف المرشحين للمناوبة (من السلة أو من دورة محفوظة): مجمَّعون حسب الوحدة كقائمة المناوبين،
+    // بفاصل لكل وحدة ومبررات تشغيلها في خلية مدموجة على صفوفها
     const openNomineesPreview = (ids, title) => {
-        const nominees = sortByJobTitleHierarchy(staff.filter(s => ids.includes(s.id)), 'كشف المرشحين');
-        setPreviewData(nominees.map((s, i) => ({
-            type: 'data',
-            'ت': i + 1,
-            'الرقم الوظيفي': s.jobNumber || '',
-            'الاسم': getThreeName(s.name),
-            'العنوان الوظيفي': s.jobTitle || '',
-            'الوحدة': s.unit || ''
-        })));
-        setVisiblePreviewColumns(['الرقم الوظيفي', 'الاسم', 'العنوان الوظيفي', 'الوحدة']);
+        const rows = [];
+        let counter = 1;
+        groupShiftByUnit(staff.filter(s => ids.includes(s.id))).forEach(([unit, group]) => {
+            rows.push({ type: 'separator', content: `━━━ ${unit} ━━━` });
+            group.forEach((s, idx) => rows.push({
+                type: 'data',
+                isFirst: idx === 0,
+                location: unit,
+                locationSize: group.length,
+                'ت': counter++,
+                'الرقم الوظيفي': s.jobNumber || '',
+                'الاسم': getThreeName(s.name),
+                'العنوان الوظيفي': s.jobTitle || '',
+                'الوحدة': s.unit || '',
+                'مبررات التشغيل': idx === 0 ? (unitJustification(org, unit) || '') : ''
+            }));
+        });
+        setPreviewData(rows);
+        setVisiblePreviewColumns(['الرقم الوظيفي', 'الاسم', 'العنوان الوظيفي', 'الوحدة', 'مبررات التشغيل']);
         setPreviewTitle(title);
         setShowPreview(true);
     };
