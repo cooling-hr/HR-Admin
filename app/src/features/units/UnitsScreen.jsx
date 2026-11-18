@@ -1021,7 +1021,7 @@ export const UnitsScreen = ({ ctx }) => {
                     </div>
                 </div>
             ) : (
-                <div className={`space-y-4 ${nominatePeriod ? 'pb-24' : ''}`}>
+                <div className={`space-y-4 ${nominatePeriod ? 'pb-40 sm:pb-32' : ''}`}>
             {/* ترشيح المناوبين: دورات قائمة وسلة الترشيح */}
             {(nominationCycles.length > 0 || nominatePeriod) && (
                 <div className="space-y-2 no-print">
@@ -1054,12 +1054,12 @@ export const UnitsScreen = ({ ctx }) => {
                                 </span>
                                 <span className="flex gap-2">
                                     <button onClick={() => setNominateModal({ mode: 'new' })} disabled={nominateBasket.length === 0}
-                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">✓ مراجعة وحفظ</button>
+                                        className="px-3 py-1.5 whitespace-nowrap bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-600">✓ مراجعة وحفظ</button>
                                     <button onClick={() => {
-                                        if (nominateBasket.length > 0 && !confirm('إلغاء الترشيح؟ ستُمسح اختياراتك (' + nominateBasket.length + ') ولن يُحفظ شيء.')) return;
+                                        if (nominateBasket.length > 0 && !confirm('إلغاء الترشيح؟ ستُمسح اختياراتك غير المحفوظة (' + nominateBasket.length + ')، وما حُفظ سابقاً يبقى.')) return;
                                         setNominateBasket([]); setNominatePeriod(null);
                                     }}
-                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">{nominateBasket.length === 0 ? 'خروج من وضع الترشيح' : '✕ إلغاء الترشيح'}</button>
+                                        className="px-2.5 py-1.5 whitespace-nowrap bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">{nominateBasket.length === 0 ? 'خروج من وضع الترشيح' : '✕ إلغاء الترشيح'}</button>
                                 </span>
                             </div>
                         </div>
