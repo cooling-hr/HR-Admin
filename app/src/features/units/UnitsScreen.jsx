@@ -85,7 +85,7 @@ const ShiftPills = ({ shifts }) => (<>
 // شاشة الوحدات بشاشاتها الفرعية الثلاث (الموقف اليومي، تقرير الفترة، الوحدات). الحالة والمنطق
 // كلها في StaffSystem؛ هذه الشاشة ترسم فقط وتستلم ما تحتاجه عبر ctx صريح.
 export const UnitsScreen = ({ ctx }) => {
-    const { setCurrentShiftEnd, pendingNomCycles, setShiftAssignmentKey, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle } = ctx;
+    const { setShiftEndOpen, pendingNomCycles, setShiftAssignmentKey, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, staff, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide, org, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle } = ctx;
     // الرموز المضافة من دليل الرموز (والرسمية المفعَّلة) خيارات في مجموعة «رموز أخرى»، تُحسب مرة واحدة لكل الموظفين
     const extraStatusOptions = Object.values(resolveCodeTable(timeFormCodeEdits).extraByMeaning).map(c => ({ value: c.meaning, label: '🔤 ' + c.meaning + ' (' + c.letter + ')', className: 'bg-white text-slate-700 font-bold' }));
     const statusGroups = [...DAILY_STATUS_GROUPS, ...(extraStatusOptions.length ? [{ label: 'رموز أخرى', options: extraStatusOptions }] : [])];
@@ -191,58 +191,13 @@ export const UnitsScreen = ({ ctx }) => {
     };
     // مناوبون حاليون بلا تاريخ نهاية: يُوضع لهم تاريخ موحّد دفعة واحدة، ومن لم يُجدَّد له يعود صباحياً
     const openEndedShiftCount = staff.filter(s => hasOpenEndedShift(s, todayStr)).length;
-    // نافذة منبثقة بمنتقي تاريخ (طلب أسامة 2026-11-18) بدل كتابة التاريخ نصاً: null مغلقة، وإلا التاريخ المختار ('' قبل الاختيار)
-    const [shiftEndPick, setShiftEndPick] = React.useState(null);
-    const shiftEndOpen = shiftEndPick !== null;
-    React.useEffect(() => {
-        if (!shiftEndOpen) return;
-        const onKey = (e) => { if (e.key === 'Escape') setShiftEndPick(null); };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, [shiftEndOpen]);
-    const confirmShiftEnd = () => {
-        if (!shiftEndPick) return;
-        const n = setCurrentShiftEnd(shiftEndPick);
-        if (!n) return;
-        setShiftEndPick(null);
-        alert('✅ وُضع تاريخ النهاية ' + shiftEndPick + ' على ' + n + ' مناوباً.');
-    };
     return (
         <div className="space-y-5 animate-fadeIn">
             <PendingNominationAlert ctx={{ pendingNomCycles, setShiftAssignmentKey }} />
             {openEndedShiftCount > 0 && (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-black text-amber-900 flex flex-wrap items-center gap-3 no-print">
                     <span>⏱️ {openEndedShiftCount} مناوباً حالياً بلا تاريخ نهاية لفترتهم — من لم يُجدَّد له يبقى مناوباً</span>
-                    <button onClick={() => setShiftEndPick('')} className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">📅 تحديد نهاية لهم</button>
-                </div>
-            )}
-            {shiftEndOpen && (
-                <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[130] flex items-center justify-center p-4 no-print">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden">
-                        <div className="bg-gradient-to-r from-indigo-700 to-blue-800 p-4 text-white flex items-center justify-between">
-                            <h3 className="text-base font-black flex items-center gap-2"><span>📅</span><span>نهاية مناوبة المناوبين الحاليين</span></h3>
-                            <button type="button" onClick={() => setShiftEndPick(null)} aria-label="إغلاق" title="إغلاق"
-                                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-bold transition cursor-pointer flex-shrink-0">✕</button>
-                        </div>
-                        <div className="p-5 space-y-4 text-right">
-                            <div className="space-y-1">
-                                <label className="block text-xs font-black text-slate-700">📅 آخر يوم لمناوبتهم الحالية:</label>
-                                <input type="date" value={shiftEndPick} min={todayStr} onChange={(e) => setShiftEndPick(e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono outline-none focus:border-indigo-600" />
-                            </div>
-                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 leading-relaxed">
-                                {shiftEndPick
-                                    ? <span>سيُوضع تاريخ النهاية <span className="font-mono text-indigo-800">{shiftEndPick}</span> على {openEndedShiftCount} مناوباً حالياً. من لا تُجدِّد له يعود صباحياً بعد هذا التاريخ تلقائياً، ومن تجدّد له يُرشَّح من اليوم التالي كالمعتاد.</span>
-                                    : <span>اختر التاريخ من التقويم (مثلاً آخر يوم في الفترة الحالية).</span>}
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                                <button type="button" onClick={() => setShiftEndPick(null)}
-                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">إلغاء</button>
-                                <button type="button" onClick={confirmShiftEnd} disabled={!shiftEndPick}
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">✓ تأكيد وحفظ</button>
-                            </div>
-                        </div>
-                    </div>
+                    <button onClick={() => setShiftEndOpen(true)} className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">📅 تحديد نهاية لهم</button>
                 </div>
             )}
             {/* شاشات القسم الثلاث انتقلت إلى الشريط الملتصق أعلى الصفحة، في صفّ تحت

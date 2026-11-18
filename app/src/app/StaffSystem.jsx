@@ -21,6 +21,7 @@ import { PageHeader } from '../ui/PageHeader';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { UnitsScreen } from '../features/units/UnitsScreen';
 import { NominateShiftModal } from '../features/shifts/NominateShiftModal';
+import { ShiftEndModal } from '../features/shifts/ShiftEndModal';
 import { ShiftAssignmentModal } from '../features/shifts/ShiftAssignmentModal';
 import { LoginModal } from '../features/auth/LoginModal';
 import { EditEmployeeModal } from '../features/employees/EditEmployeeModal';
@@ -476,6 +477,7 @@ import { buildDatePicker } from '../ui/datePicker';
             // ترشيح المناوبين: سلة المعرّفات ونافذة الترشيح/تعديل الدورة (null أو {mode:'new'|'edit', start, until})
             const [nominateBasket, setNominateBasket] = useState([]);
             const [nominateModal, setNominateModal] = useState(null);
+            const [shiftEndOpen, setShiftEndOpen] = useState(false);
             // فترة الترشيح المعتمدة {start, until}: وجودها = وضع الترشيح (تظهر أزرار الاختيار في الصفوف)
             const [nominatePeriod, setNominatePeriod] = useState(null);
             const [periodSearchQuery, setPeriodSearchQuery] = useState('');
@@ -5350,6 +5352,7 @@ import { buildDatePicker } from '../ui/datePicker';
             useEscapeClose(showSquadSchedule, () => setShowSquadSchedule(false));
             useEscapeClose(!!shiftAssignmentKey, () => setShiftAssignmentKey(null));
             useEscapeClose(!!nominateModal, () => setNominateModal(null));
+            useEscapeClose(shiftEndOpen, () => setShiftEndOpen(false));
 
 
 return (
@@ -5417,7 +5420,7 @@ return (
 ) : view === 'units' && unitsSubView === 'dutyMeals' ? (
                             <DutyMealsScreen ctx={{ pendingNomCycles, setShiftAssignmentKey, getEmployeeDailyStatus, getSquadsOnDuty, mealAuthorizations, org, setMealAuthorizations, staff: staffToday }} />
                         ) : view === 'units' ? (
-                            <UnitsScreen ctx={{ setCurrentShiftEnd, pendingNomCycles, setShiftAssignmentKey, staff: staffToday, org, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
+                            <UnitsScreen ctx={{ setShiftEndOpen, pendingNomCycles, setShiftAssignmentKey, staff: staffToday, org, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, setNominateModal, nominationCycles, cancelNominationFor, cancelNominationCycle, printTimeForm, exportTimeFormExcel, showShiftEditor, setShowShiftEditor, anchorDate, changeReportDateByDays, dailyReportDate, dailyStats, dailyUnitCounts, dailyStatusOverrides, dataEntryOperator, expandedEmpPeriod, exportDailyReportExcel, exportPeriodReportExcel, getEmployeeDailyStatus, getEmployeeDefaultNaturalStatus, lockedSections, officialHolidays, openEditModal, overtimeIds, overtimeListMonth, periodEndDate, periodReportData, periodReportRows, periodSearchQuery, periodView, setPeriodView, showTimeForm, timeFormData, timeFormKind, setTimeFormKind, selectTimeFormMonth, periodStartDate, periodUnitFilter, periodWorkTypeFilter, safeStorage, selectedDailyUnitTab, selectedUnit, setDailyReportDate, setDataEntryOperator, setEmployeeDailyStatusOverride, setExpandedEmpPeriod, setOvertimeIds, setOvertimeListMonth, setPendingShiftConfirm, setPeriodEndDate, setPeriodPreset, setPeriodSearchQuery, setPeriodStartDate, setPeriodUnitFilter, setPeriodWorkTypeFilter, setPreviewData, setPreviewTitle, setSelectedDailyUnitTab, setSelectedUnit, setShowHolidaysModal, setShowPreview, setShowSquadSchedule, setUnitBulkStatus, setUnitsSubView, setVisiblePreviewColumns, threeShiftAnchorSquad, twoShiftAnchorSquad, unitsSubView, timeFormCodeEdits, setShowCodesGuide }} />
                         ) : (
                             <StaffListScreen ctx={{ applySafetyDate, authorizeEmployeeDelete, buildDatePicker, bulkSafetyDate, canEdit, changeStatus, current, currentUserName, exportStandardExcel, getWaterGroupSummary, logAuditEvent, openEditModal, periodSpanJsx, preparePreview, resetWaterGroupDaysToAuto, safetyFilter, safetyGroupCounts, safetyUndo, search, selectedSafetyIds, setBulkSafetyDate, setPeriodHistoryEmpId, setSafetyFilter, setSafetyUndo, setSearch, setSelectedSafetyIds, setShowSizeDetails, setStaff, setWaterGroupDays, setWaterMemoGroup, setWaterMonth, showSizeDetails, staff: staffToday, staffRaw: staff, stats, tableWrapperRef, undoSafetyDate, updateTombstones, view, waterMonth }} />
                                                 )}
@@ -5454,6 +5457,7 @@ return (
             {shiftAssignmentKey && <ShiftAssignmentModal ctx={{ shiftAssignmentKey, setShiftAssignmentKey, pendingNomCycles, applyShiftAssignments, org }} />}
 
             {nominateModal && <NominateShiftModal ctx={{ nominateModal, setNominateModal, nominateBasket, setNominateBasket, nominatePeriod, setNominatePeriod, staff: staffToday, nominationCycles, nominateEmployees, editNominationCycle }} />}
+            {shiftEndOpen && <ShiftEndModal ctx={{ staff: staffToday, todayStr, setCurrentShiftEnd, setShiftEndOpen }} />}
 
             {showSquadSchedule && <SquadScheduleModal ctx={{ org, BOC_LOGO_DATA_URI, getSquadsOnDuty, periodEndDate, periodReportData, periodStartDate, setShowSquadSchedule, squadRosters }} />}
 
