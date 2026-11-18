@@ -1035,7 +1035,7 @@ export const UnitsScreen = ({ ctx }) => {
                                         if (nominateBasket.length > 0 && !confirm('إلغاء الترشيح؟ ستُمسح اختياراتك (' + nominateBasket.length + ') ولن يُحفظ شيء.')) return;
                                         setNominateBasket([]); setNominatePeriod(null);
                                     }}
-                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">✕ إلغاء الترشيح</button>
+                                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">{nominateBasket.length === 0 ? '✓ إنهاء الترشيح' : '✕ إلغاء الترشيح'}</button>
                                 </span>
                             </div>
                         </div>
@@ -1200,7 +1200,7 @@ export const UnitsScreen = ({ ctx }) => {
                                         <h3 className="text-xl font-bold mb-2">{unit.name}</h3>
                                         <div className="text-sm opacity-90">
                                             <div>نشط: {activeCount}</div>
-                                            <div className="mt-1">صباحي: {unitStaff.filter(s => s.workType === 'صباحي').length} • مناوب: {unitStaff.filter(s => s.workType === 'مناوب').length}</div>
+                                            <div className="mt-1">صباحي: {unitStaff.filter(s => s.workType === 'صباحي').length} • مناوب: {unitStaff.filter(s => s.workType === 'مناوب').length}{unitStaff.filter(s => pendingNomPoint(s)).length > 0 && ` • مرشحون: ${unitStaff.filter(s => pendingNomPoint(s)).length}`}</div>
                                             {unitStaff.filter(s => overtimeIds.includes(s.id)).length > 0 && (
                                                 <div className="mt-2 font-bold text-xs bg-white text-teal-800 rounded px-2.5 py-1 inline-block bg-opacity-95 shadow-sm">
                                                     🛒 مشمولو الإضافي: {unitStaff.filter(s => overtimeIds.includes(s.id)).length}

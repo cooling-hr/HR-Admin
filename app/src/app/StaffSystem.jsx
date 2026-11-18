@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';   // لـcreatePortal في بطاقة الموظف، لا للتركيب (التركيب في ملف المدخل)
 import { FIELD_NAMES_AR, mergeKeyOf, ownKey, ATTENDANCE_PARTS, isValidAttendanceValue, analyzeMergePeriods, analyzeMergeAttendance, analyzeMerge } from '../domain/merge';
 import { getJobRank, sortByJobNumber, sortByJobNumberOnly, sortByJobTitleHierarchy, ensureTopTwo, sortByUnit } from '../domain/sorting';
-import { headquartersUnit, locationJustification, locationNames, unitNames } from '../domain/org';
+import { headquartersUnit, unitJustification, unitNames } from '../domain/org';
 import { CONTRACT_TITLES, isContractEmployee, contractTypeOf, getMissingFields } from '../domain/employees';
 import { getWaterSeasonalRate, WATER_LEAVE_TALLY_TYPES, WATER_NEXT_MONTH_TYPES, previousMonthStr, isShiftOnDutyStatus } from '../domain/water';
 import { workOn, activeWorkPoint, describeWorkHistory, employeeOn, isThreeShiftOn, nominate,cancelNomination, setWorkFrom, assignSquad, renewShift, returnToMorning, pendingNominations, setShiftEnd } from '../domain/workHistory';
@@ -1215,8 +1215,8 @@ import { buildDatePicker } from '../ui/datePicker';
                 // القراءة من أول الشهر (قرار أسامة: الدخول من الشهر التالي)
                 const monthFirst = monthStr + '-01';
                 const inGroup = groupKey === 'triple'
-                    ? (s => { const e = employeeOn(s, monthFirst); return e.workType === 'مناوب' && e.location && isThreeShiftOn(s, monthFirst) && e.squad; })
-                    : (s => { const e = employeeOn(s, monthFirst); return e.workType === 'مناوب' && e.location && !isThreeShiftOn(s, monthFirst) && e.squad; });
+                    ? (s => { const e = employeeOn(s, monthFirst); return e.workType === 'مناوب' && isThreeShiftOn(s, monthFirst) && e.squad; })
+                    : (s => { const e = employeeOn(s, monthFirst); return e.workType === 'مناوب' && !isThreeShiftOn(s, monthFirst) && e.squad; });
                 const members = staff.filter(inGroup);
                 if (members.length === 0) return 0;
                 const counts = members.map(emp => {
@@ -1241,8 +1241,8 @@ import { buildDatePicker } from '../ui/datePicker';
                 const inGroup = groupKey === 'morning'
                     ? (s => employeeOn(s, monthFirst).workType === 'صباحي')
                     : groupKey === 'triple'
-                        ? (s => employeeOn(s, monthFirst).workType === 'مناوب' && s.location && isThreeShiftOn(s, monthFirst))
-                        : (s => employeeOn(s, monthFirst).workType === 'مناوب' && s.location && !isThreeShiftOn(s, monthFirst));
+                        ? (s => employeeOn(s, monthFirst).workType === 'مناوب' && isThreeShiftOn(s, monthFirst))
+                        : (s => employeeOn(s, monthFirst).workType === 'مناوب' && !isThreeShiftOn(s, monthFirst));
                 const headcount = staff.filter(s => inGroup(s) && (monthStr === waterMonth ? !excludedWaterIds.has(s.id) : !isExcludedFromWater(s, monthStr))).length;
                 const manualDays = waterAttendanceDays[monthStr] && waterAttendanceDays[monthStr][groupKey];
                 const isAuto = manualDays === undefined || manualDays === null;
@@ -3069,6 +3069,17 @@ import { buildDatePicker } from '../ui/datePicker';
                 return rows.slice().sort((a, b) => at(a) - at(b));
             }, [periodReportData]);
             
+            // تجميع المناوبين حسب الوحدة: shiftUnitOrder ثم بقية وحدات الجهة ثم أي وحدة أخرى، ومن بلا وحدة آخراً
+            const groupShiftByUnit = (list) => {
+                const known = [...org.shiftUnitOrder, ...unitNames(org).filter(u => !org.shiftUnitOrder.includes(u))];
+                const extra = [];
+                list.forEach(s => { if (s.unit && !known.includes(s.unit) && !extra.includes(s.unit)) extra.push(s.unit); });
+                const groups = [...known, ...extra].map(u => [u, sortByJobTitleHierarchy(list.filter(s => s.unit === u), u)]);
+                const none = list.filter(s => !s.unit);
+                if (none.length) groups.push(['بلا وحدة', sortByJobTitleHierarchy(none, '')]);
+                return groups.filter(g => g[1].length > 0);
+            };
+
             const current = useMemo(() => {
                 const data = search ? filtered : staffToday;
                 let result = [];
@@ -3076,17 +3087,7 @@ import { buildDatePicker } from '../ui/datePicker';
                 if (view === 'all') result = sortByUnit(data, unitNames(org)); // ترتيب حسب الوحدات
                 else if (view === 'morning') { result = data.filter(s => s.workType === 'صباحي' && !isContractEmployee(s)); result = sortByJobNumber(result); }
                 else if (view === 'shift') {
-                result = data.filter(s => s.workType === 'مناوب');
-                // ترتيب حسب الموقع
-                const locationOrder = org.shiftViewLocationOrder;
-                result.sort((a, b) => {
-                    const indexA = locationOrder.indexOf(a.location);
-                    const indexB = locationOrder.indexOf(b.location);
-                    if (indexA === -1 && indexB === -1) return 0;
-                    if (indexA === -1) return 1;
-                    if (indexB === -1) return -1;
-                    return indexA - indexB;
-                });
+                result = groupShiftByUnit(data.filter(s => s.workType === 'مناوب')).flatMap(g => g[1]);
             }
                 else if (view === 'contract') result = data.filter(s => isContractEmployee(s));
                 else if (view === 'safety') {
@@ -3104,20 +3105,10 @@ import { buildDatePicker } from '../ui/datePicker';
                     result = sortByJobNumber(result);
                 }
                 else if (view === 'maaShift') {
-                result = data.filter(s =>
+                result = groupShiftByUnit(data.filter(s =>
                     s.workType === 'مناوب' &&
                     !excludedWaterIds.has(s.id)
-                );
-                // نفس ترتيب المناوبين: حسب الموقع
-                const locationOrder = org.shiftViewLocationOrder;
-                result.sort((a, b) => {
-                    const indexA = locationOrder.indexOf(a.location);
-                    const indexB = locationOrder.indexOf(b.location);
-                    if (indexA === -1 && indexB === -1) return 0;
-                    if (indexA === -1) return 1;
-                    if (indexB === -1) return -1;
-                    return indexA - indexB;
-                });
+                )).flatMap(g => g[1]);
             }
                 else if (view === 'evaluation') {
                     // التقييم لحظة واحدة لا مدى شهري، فيُفحص تاريخ اليوم فقط
@@ -4691,24 +4682,20 @@ import { buildDatePicker } from '../ui/datePicker';
                     let counter = 1;
                     let rowIndex = 4;
                     
-                    locationNames(org).forEach(location => {
-                        const locationStaff = current.filter(s => s.location === location);
-                        if (locationStaff.length > 0) {
-                            // حساب نوع المناوبة
-                            const shiftType = location.includes('نهر بن عمر') ? 'ثلاثية' : 'ثنائية';
-                            
+                    groupShiftByUnit(current).forEach(([unit, locationStaff]) => {
                             displayData.push({ 
                                 type: 'separator', 
-                                content: `━━━ ${location} (${shiftType}) ━━━`,
+                                content: `━━━ ${unit} ━━━`,
                                 rowIndex: rowIndex++
                             });
                             
                             const startRow = rowIndex;
                             locationStaff.forEach((s, idx) => {
+                                const shiftType = isThreeShiftOn(s, localDateStr()) ? 'ثلاثية' : 'ثنائية';
                                 const rowData = {
                                     type: 'data',
                                     isFirst: idx === 0,
-                                    location: location,
+                                    location: unit,
                                     locationSize: locationStaff.length,
                                     startRow: startRow,
                                     endRow: startRow + locationStaff.length - 1,
@@ -4721,9 +4708,9 @@ import { buildDatePicker } from '../ui/datePicker';
                                 
                                 // إضافة الأعمدة حسب النوع
                                 if (view === 'shift') {
-                                    rowData['الموقع'] = s.location;
+                                    rowData['الوحدة'] = s.unit || '';
                                     rowData['نوع المناوبة'] = shiftType;
-                                    rowData['مبررات التشغيل'] = idx === 0 ? (locationJustification(org, location) || '') : '';
+                                    rowData['مبررات التشغيل'] = idx === 0 ? (unitJustification(org, unit) || '') : '';
                                 } else if (view === 'maaShift') {
                                     rowData['نوع المناوبة'] = shiftType;
                                     rowData['ملاحظات'] = '';
@@ -4731,7 +4718,6 @@ import { buildDatePicker } from '../ui/datePicker';
                                 
                                 displayData.push(rowData);
                             });
-                        }
                     });
                 } else if (view === 'maa') {
                     // current مُستبعد أصلاً بحسب isExcludedFromWater — لا حاجة لتكرار الاستبعاد هنا
@@ -5214,7 +5200,7 @@ import { buildDatePicker } from '../ui/datePicker';
                         const columns = Object.keys(dataRows[0]).filter(k => !['type', 'isFirst', 'location', 'locationSize', 'startRow', 'endRow', 'rowIndex'].includes(k));
                         
                         if (view === 'shift') {
-                            worksheet.columns = [{key: 'ت', width: 6}, {key: 'الاسم الكامل', width: 32}, {key: 'الرقم الوظيفي', width: 15}, {key: 'العنوان الوظيفي', width: 23}, {key: 'الموقع', width: 20}, {key: 'نوع المناوبة', width: 17}, {key: 'مبررات التشغيل', width: 14}];
+                            worksheet.columns = [{key: 'ت', width: 6}, {key: 'الاسم الكامل', width: 32}, {key: 'الرقم الوظيفي', width: 15}, {key: 'العنوان الوظيفي', width: 23}, {key: 'الوحدة', width: 20}, {key: 'نوع المناوبة', width: 17}, {key: 'مبررات التشغيل', width: 14}];
                         } else if (view === 'units') {
                             worksheet.columns = [{key: 'ت', width: 6}, {key: 'الاسم الكامل', width: 35}, {key: 'الرقم الوظيفي', width: 14}, {key: 'العنوان الوظيفي', width: 22}, {key: 'الموقع', width: 22}, {key: 'الحالة', width: 12}];
                         } else if (view === 'morning' || view === 'maaMorning' || view === 'maaShift' || view === 'evaluation') {

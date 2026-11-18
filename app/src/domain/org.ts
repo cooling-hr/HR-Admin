@@ -9,6 +9,7 @@ export interface OrgUnit {
   cardIcon: string;        // بطاقة الوحدة في شاشة الوحدات
   cardGradient: string;    // أصناف Tailwind كاملة
   isHeadquarters?: boolean; // مقر الجهة: يُطبَّق عليه ensureTopTwo
+  location?: string;       // اسم الموقع في org.locations الذي تتبعه الوحدة (مبررات التشغيل)
 }
 
 export interface OrgLocation {
@@ -38,7 +39,6 @@ export interface Org {
   locations: OrgLocation[];
   dutyMealSites: string[];
   shiftUnitOrder: string[];
-  shiftViewLocationOrder: string[];
 }
 
 export const unitNames = (org: Org): string[] => org.units.map(u => u.name);
@@ -49,3 +49,9 @@ export const locationNames = (org: Org): string[] => org.locations.map(l => l.na
 
 export const locationJustification = (org: Org, location: string): string | undefined =>
   org.locations.find(l => l.name === location)?.justification;
+
+// مبررات التشغيل لوحدة: مبرر الموقع الذي تتبعه الوحدة
+export const unitJustification = (org: Org, unitName: string): string | undefined => {
+  const loc = org.units.find(u => u.name === unitName)?.location;
+  return loc ? locationJustification(org, loc) : undefined;
+};

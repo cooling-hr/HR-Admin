@@ -4,6 +4,7 @@ import { localDateStr } from '../../core/dates';
 import { getMissingFields } from '../../domain/employees';
 import { STATUS_BUTTON_GROUPS, STATUS_BUTTON_VALUES, statusButtonLabelWithIcon, statusStyle, getActivePeriod, periodsOf } from '../../domain/periods';
 import { getSafetyStatus } from '../../domain/safety';
+import { isThreeShiftOn } from '../../domain/workHistory';
 import { Icon, SAFETY_BOOT_IMG, SAFETY_VEST_IMG } from '../../ui/Icon';
 import { PageHeader } from '../../ui/PageHeader';
 import { Segmented } from '../../ui/Segmented';
@@ -31,7 +32,7 @@ export const StaffListScreen = ({ ctx }) => {
                         (view === 'evaluation' && 'استبعاد الإجازات الطويلة طويلة وأمومة') ||
                         (view === 'morning' && 'الاسم الثلاثي فقط') ||
                         (view === 'contract' && `عقود 315: ${stats.contract315} · عقود المحافظة: ${stats.contractGov}${stats.contractUnclassified ? ` · غير مصنّف: ${stats.contractUnclassified}` : ''}`) ||
-                        (view === 'shift' && 'مرتب حسب المواقع') ||
+                        (view === 'shift' && 'مرتب حسب الوحدات') ||
                         undefined
                     }
                     meta={<span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--surface-muted)] text-[color:var(--ink-2)]">{current.length} موظف</span>}
@@ -643,7 +644,7 @@ export const StaffListScreen = ({ ctx }) => {
                                     </tr>
                                     {current.filter(s => s.workType === 'مناوب').map((s, idx) => {
                                         const globalIndex = current.indexOf(s);
-                                        const shiftType = s.location && s.location.includes('نهر بن عمر') ? 'ثلاثية' : 'ثنائية';
+                                        const shiftType = isThreeShiftOn(s, localDateStr()) ? 'ثلاثية' : 'ثنائية';
 
 
         return (
@@ -676,7 +677,7 @@ export const StaffListScreen = ({ ctx }) => {
                                 current.map((s, i) => {
                                 // حساب نوع المناوبة
                                 const shiftType = s.workType === 'مناوب' ? 
-                                    (s.location && s.location.includes('نهر بن عمر') ? 'ثلاثية' : 'ثنائية') 
+                                    (isThreeShiftOn(s, localDateStr()) ? 'ثلاثية' : 'ثنائية') 
                                     : '';
 
 

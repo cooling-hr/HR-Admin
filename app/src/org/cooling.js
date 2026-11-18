@@ -17,11 +17,11 @@ export const coolingOrg = {
     terms: { the: 'الشعبة', forThe: 'للشعبة', whole: 'كلها' },
     units: [
         { name: 'مقر الشعبة', shortName: 'مقر الشعبة', tabLabel: '📍 مقر الشعبة', cardIcon: '🏢', cardGradient: 'from-blue-500 to-blue-600', isHeadquarters: true },
-        { name: 'تبريد باب الزبير', shortName: 'باب الزبير', tabLabel: '❄️ باب الزبير', cardIcon: '❄️', cardGradient: 'from-indigo-500 to-indigo-600' },
+        { name: 'تبريد باب الزبير', shortName: 'باب الزبير', tabLabel: '❄️ باب الزبير', cardIcon: '❄️', cardGradient: 'from-indigo-500 to-indigo-600', location: 'باب الزبير' },
         { name: 'ورشة التبريد', shortName: 'ورشة التبريد', tabLabel: '🔧 ورشة التبريد', cardIcon: '🔧', cardGradient: 'from-purple-500 to-purple-600' },
-        { name: 'تبريد المكينة', shortName: 'المكينة', tabLabel: '🏭 تبريد المكينة', cardIcon: '⚙️', cardGradient: 'from-pink-500 to-pink-600' },
-        { name: 'تبريد نهر بن عمر', shortName: 'نهر بن عمر', tabLabel: '🌊 نهر بن عمر', cardIcon: '💧', cardGradient: 'from-cyan-500 to-cyan-600' },
-        { name: 'تبريد المركز الثقافي', shortName: 'المركز الثقافي', tabLabel: '🏛️ المركز الثقافي', cardIcon: '🎭', cardGradient: 'from-teal-500 to-teal-600' },
+        { name: 'تبريد المكينة', shortName: 'المكينة', tabLabel: '🏭 تبريد المكينة', cardIcon: '⚙️', cardGradient: 'from-pink-500 to-pink-600', location: 'المكينة' },
+        { name: 'تبريد نهر بن عمر', shortName: 'نهر بن عمر', tabLabel: '🌊 نهر بن عمر', cardIcon: '💧', cardGradient: 'from-cyan-500 to-cyan-600', location: 'نهر بن عمر' },
+        { name: 'تبريد المركز الثقافي', shortName: 'المركز الثقافي', tabLabel: '🏛️ المركز الثقافي', cardIcon: '🎭', cardGradient: 'from-teal-500 to-teal-600', location: 'المركز الثقافي النفطي' },
     ],
     locations: [
         { name: 'نهر بن عمر', justification: 'صيانة وتصليح وتنصيب اجهزة التبريد المنفصلة في قسم المختبرات والسيطرة النوعية ومحطة عزل نهر بن عمر واليمامة الرئيسية والحقلية' },
@@ -31,7 +31,4 @@ export const coolingOrg = {
     ],
     dutyMealSites: ['تبريد باب الزبير', 'تبريد المكينة', 'تبريد المركز الثقافي', 'تبريد نهر بن عمر'],
     shiftUnitOrder: ['تبريد نهر بن عمر', 'تبريد باب الزبير', 'تبريد المركز الثقافي', 'تبريد المكينة'],
-    // منقول حرفياً من ترتيب «المناوبون»: قيمه لا تطابق قيم location المحفوظة (نهر بن عمر...)،
-    // فالترتيب لا يعمل اليوم. أُبقي كما هو حتى يقرر أسامة (2026-11-03).
-    shiftViewLocationOrder: ['وحدة تبريد نهر بن عمر', 'وحدة تبريد باب الزبير', 'وحدة تبريد المركز الثقافي', 'وحدة تبريد المكينة', 'دار استراحة المشروع السكني'],
 };

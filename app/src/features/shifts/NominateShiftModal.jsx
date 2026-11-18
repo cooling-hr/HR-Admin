@@ -49,7 +49,7 @@ export const NominateShiftModal = ({ ctx }) => {
             const kindMap = {};
             nominees.forEach(s => { kindMap[s.id] = kindOf(s); });
             ok = nominateEmployees(nominees.map(s => s.id), { start, until, shiftKind: '12h', kinds: kindMap });
-            if (ok) { setNominateBasket([]); setNominatePeriod(null); }
+            if (ok) setNominateBasket([]); // الفترة تبقى لإكمال وحدات أخرى؛ ينهيها المستخدم من الشريط
         }
         if (ok) close();
     };
