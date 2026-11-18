@@ -191,6 +191,32 @@ export const UnitsScreen = ({ ctx }) => {
     };
     // مناوبون حاليون بلا تاريخ نهاية: يُوضع لهم تاريخ موحّد دفعة واحدة، ومن لم يُجدَّد له يعود صباحياً
     const openEndedShiftCount = staff.filter(s => hasOpenEndedShift(s, todayStr)).length;
+    // معاينة كشف الساعات الإضافية الموحد (بند في قائمة «معاينة وطباعة الكشوف»)
+    const openOvertimePreview = () => {
+        const selectedEmployees = staff.filter(s => overtimeIds.includes(s.id));
+        const sortedSelected = sortByJobTitleHierarchy(selectedEmployees, 'كشف الإضافي');
+        setPreviewData(sortedSelected.map((s, i) => ({
+            type: 'data',
+            'ت': i + 1,
+            'الرقم الوظيفي': s.jobNumber || '',
+            'الاسم': getThreeName(s.name),
+            'العنوان الوظيفي': s.jobTitle || ''
+        })));
+        setVisiblePreviewColumns(['الرقم الوظيفي', 'الاسم', 'العنوان الوظيفي']);
+        const [otY, otM] = (overtimeListMonth || '').split('-').map(Number);
+        const otMonth = otY && otM ? ` لشهر ${ARABIC_MONTH_NAMES[otM - 1]} ${otY}` : '';
+        setPreviewTitle(`كشف الساعات الإضافية${otMonth} ل${org.section}`);
+        setShowPreview(true);
+    };
+    // قائمة الزر الموحد: كشف الإضافي أو كشوف المرشحين (السلة الحالية والدورات المحفوظة)
+    const [printMenuOpen, setPrintMenuOpen] = React.useState(false);
+    const printOptionsCount = (overtimeIds.length > 0 ? 1 : 0) + (nominateBasket.length > 0 ? 1 : 0) + nominationCycles.length;
+    React.useEffect(() => {
+        if (!printMenuOpen) return;
+        const onKey = (e) => { if (e.key === 'Escape') setPrintMenuOpen(false); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [printMenuOpen]);
     return (
         <div className="space-y-5 animate-fadeIn">
             <PendingNominationAlert ctx={{ pendingNomCycles, setShiftAssignmentKey }} />
@@ -992,8 +1018,6 @@ export const UnitsScreen = ({ ctx }) => {
                             <span className="flex gap-2">
                                 <button onClick={() => setNominateModal({ mode: 'edit', start: c.start, until: c.until })}
                                     className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">✏️ تعديل التاريخين</button>
-                                <button onClick={() => openNomineesPreview(c.ids, `كشف المرشحين للمناوبة من ${c.start} إلى ${c.until || '—'} ل${org.section}`)}
-                                    className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold rounded-lg text-xs transition cursor-pointer">🖨️ طباعة المرشحين</button>
                                 <button onClick={() => cancelNominationCycle(c.start, c.until)}
                                     className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">🗑️ إلغاء الجميع</button>
                             </span>
@@ -1053,38 +1077,31 @@ export const UnitsScreen = ({ ctx }) => {
                             <button onClick={() => setNominateModal({ mode: 'period' })}
                                 className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-lg text-xs transition cursor-pointer shadow-sm">🎯 ترشيح المناوبين</button>
                         )}
-                        {(nominatePeriod || nominateBasket.length > 0) && (
-                            <button onClick={() => openNomineesPreview(nominateBasket, `كشف المرشحين للمناوبة من ${nominatePeriod ? nominatePeriod.start : '—'} إلى ${nominatePeriod ? nominatePeriod.until : '—'} ل${org.section}`)}
-                                disabled={nominateBasket.length === 0}
-                                className="bg-white text-teal-700 hover:bg-teal-50 px-4 py-2 font-bold rounded-lg text-xs transition shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                                👁️ معاينة وتصدير المرشحين
-                            </button>
+                        {printOptionsCount > 0 && (
+                            <div className="relative">
+                                <button onClick={() => setPrintMenuOpen(o => !o)} aria-haspopup="menu" aria-expanded={printMenuOpen}
+                                    className="bg-white text-teal-700 hover:bg-teal-50 px-4 py-2 font-bold rounded-lg text-xs transition shadow-sm cursor-pointer">
+                                    🖨️ معاينة وطباعة الكشوف
+                                </button>
+                                {printMenuOpen && (
+                                    <div role="menu" className="absolute top-full right-0 mt-1 z-50 min-w-[16rem] bg-white border border-slate-200 rounded-xl shadow-xl py-1 text-right">
+                                        {overtimeIds.length > 0 && (
+                                            <button role="menuitem" onClick={() => { setPrintMenuOpen(false); openOvertimePreview(); }}
+                                                className="w-full text-right px-3 py-2 text-xs font-bold text-slate-700 hover:bg-teal-50 transition cursor-pointer">⏱️ كشف العمل الإضافي ({overtimeIds.length})</button>
+                                        )}
+                                        {nominateBasket.length > 0 && (
+                                            <button role="menuitem" onClick={() => { setPrintMenuOpen(false); openNomineesPreview(nominateBasket, `كشف المرشحين للمناوبة من ${nominatePeriod ? nominatePeriod.start : '—'} إلى ${nominatePeriod ? nominatePeriod.until : '—'} ل${org.section}`); }}
+                                                className="w-full text-right px-3 py-2 text-xs font-bold text-slate-700 hover:bg-teal-50 transition cursor-pointer">🎯 المرشحون المختارون الآن ({nominateBasket.length})</button>
+                                        )}
+                                        {nominationCycles.map(c => (
+                                            <button key={c.start + '|' + c.until} role="menuitem" onClick={() => { setPrintMenuOpen(false); openNomineesPreview(c.ids, `كشف المرشحين للمناوبة من ${c.start} إلى ${c.until || '—'} ل${org.section}`); }}
+                                                className="w-full text-right px-3 py-2 text-xs font-bold text-slate-700 hover:bg-teal-50 transition cursor-pointer">🎯 مرشحو الفترة {c.start} ← {c.until || '—'} ({c.ids.length})</button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         )}
                         {overtimeIds.length > 0 && (<>
-                        <button
-                            onClick={() => {
-                                const selectedEmployees = staff.filter(s => overtimeIds.includes(s.id));
-                                const sortedSelected = sortByJobTitleHierarchy(selectedEmployees, 'كشف الإضافي');
-                                
-                                const exportData = sortedSelected.map((s, i) => ({
-            type: 'data',
-            'ت': i + 1,
-            'الرقم الوظيفي': s.jobNumber || '',
-            'الاسم': getThreeName(s.name),
-            'العنوان الوظيفي': s.jobTitle || ''
-        }));
-        
-        setPreviewData(exportData);
-        setVisiblePreviewColumns(['الرقم الوظيفي', 'الاسم', 'العنوان الوظيفي']);
-                                const [otY, otM] = (overtimeListMonth || '').split('-').map(Number);
-                                const otMonth = otY && otM ? ` لشهر ${ARABIC_MONTH_NAMES[otM - 1]} ${otY}` : '';
-                                setPreviewTitle(`كشف الساعات الإضافية${otMonth} ل${org.section}`);
-                                setShowPreview(true);
-                            }}
-                            className="bg-white text-teal-700 hover:bg-teal-50 px-4 py-2 font-bold rounded-lg text-xs transition shadow-sm cursor-pointer"
-                        >
-                            👁️ معاينة وتصدير الكشف الموحد
-                        </button>
                         <button 
                             onClick={() => {
                                 if (confirm('❓ هل أنت متأكد من إفراغ سلة العمل الإضافي وتصفير القائمة بالكامل؟')) {
